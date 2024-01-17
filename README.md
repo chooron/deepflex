@@ -1,2 +1,2 @@
-# deepflex
+# DeepFlex.jl
 julia implement of superflexpy
