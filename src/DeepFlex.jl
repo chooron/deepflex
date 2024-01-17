@@ -17,6 +17,7 @@ abstract type DiscElement <: StateParameterizedElement end
 
 # Abstract Unit Type
 abstract type Component end
+abstract type Unit end
 
 # Abstract Flux Type
 abstract type Flux end

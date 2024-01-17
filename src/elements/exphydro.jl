@@ -51,7 +51,7 @@ function SnowReservoir(; id::String, parameters::Dict{String,Union{float,Vector{
     SnowReservoir(id, get(parameters, "Tmax", 1.0), get(parameters, "Df", 1.0), get(init_states, "Snow", 0.0), solver)
 end
 
-function get_du(ele::SnowReservoir, S::float, input::Dict{String,Number})
+function get_du(ele::SnowReservoir, S::Number, input::Dict{String,Number})
     return [Snow - melt(S, get(input, "Temp", 0.0), Tmax=ele.Tmax, Df=ele.Df)]
 end
 
@@ -71,7 +71,7 @@ end
 
     # states
     init_states::float
-    states::Vector{float}
+    states::Vector{float} = nothing
 
     # solver
     solver::Any
@@ -96,3 +96,44 @@ function get_du(ele::SnowReservoir, Rain, Melt, T, Lday)
     du = flux_rain + flux_melt - flux_et - flux_qb - flux_qs
     return [du]
 end
+
+@with_kw mutable struct ExpHydro <: Unit
+    id::String
+
+    # attribute
+    topology::AbstractGraph
+
+    # inner variables
+    fluxes::Dict{String,Vector{float}} = nothing
+
+end
+
+using Graphs
+using MetaGraphsNext
+
+function ExpHydro(id, parameters, init_states)
+    topology = MetaGraph(
+        DiGraph();
+        label_type=Symbol,
+        vertex_data_type=Element,
+        edge_data_type=Nothing,
+        graph_data="ExpHydro Topology",
+    )
+    topology[:ir] = InterceptionFilter(id="ir", parameters=parameters)
+    topology[:sr] = SnowReservoir(id="sr", parameters=parameters, init_states=init_states, solver=nothing)
+    topology[:wr] = SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states, solver=nothing)
+
+    topology[:ir, :sr] = nothing
+    topology[:sr, :wr] = nothing
+    ExpHydro(id, topology)
+end
+
+function get_output(unit::ExpHydro, input::Dict{String,Vector{Number}})
+    # initialize unit fluxes
+    if isnothing(unit.fluxes)
+        unit.fluxes = input
+    end
+    # todo 遍历有向图
+    # merge!(unit.fluxes, fluxes)
+end
+
