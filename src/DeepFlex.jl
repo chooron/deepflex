@@ -25,16 +25,20 @@ abstract type StateParameterizedElement <: BaseElement end
 abstract type ODEsElement <: StateParameterizedElement end
 abstract type DiscElement <: StateParameterizedElement end
 
-## Abstract Unit Type
+## Abstract Component Types
 abstract type Component end
 abstract type Unit end
+# abstract type Node end
+abstract type Network end
 
 export ODEsElement
 
-# Element Methods
+# framework Methods
 include("framework/element.jl")
-# Implements Element
-include("elements/exphydro.jl")
+include("framework/Unit.jl")
+include("framework/Node.jl")
+# Implements Models
+include("models/exphydro.jl")
 # Implement Flux
 include("fluxes/snowfall.jl")
 include("fluxes/rainfall.jl")

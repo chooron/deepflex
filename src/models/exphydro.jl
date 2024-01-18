@@ -12,7 +12,7 @@ function InterceptionFilter(; id::String, parameters::Dict{Symbol,T}) where {T<:
     InterceptionFilter{T}(id=id, Tmin=get(parameters, :Tmin, 0.0))
 end
 
-function get_output(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solve::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
+function get_fluxes(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solve::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
     flux_snow = snowfall.(input[:Prcp], input[:Temp], ele.Tmin)
     flux_rain = rainfall.(input[:Prcp], input[:Temp], ele.Tmin)
     return Dict(:Snow => flux_snow, :Rain => flux_rain)
@@ -47,11 +47,11 @@ function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Di
         init_states=[get(init_states, :SnowWater, 0.0)], solver=solver)
 end
 
-function get_du(ele::SnowReservoir{T}, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
+function get_du(ele::SnowReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
     return get(input, :Snow, 0.0) .- melt.(S, input[:Temp], ele.Tmax, ele.Df)
 end
 
-function get_fluxes(ele::SnowReservoir{T}, S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+function get_fluxes(ele::SnowReservoir{T}; S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
     return Dict(:Melt => melt.(S[1, :], input[:Temp], ele.Tmax, ele.Df))
 end
 
@@ -88,7 +88,7 @@ function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_state
         init_states=[get(init_states, :SoilWater, 10.0)], solver=solver)
 end
 
-function get_du(ele::SoilWaterReservoir{T}, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
+function get_du(ele::SoilWaterReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
     flux_rain = input[:Rain]
     flux_melt = input[:Melt]
 
@@ -101,7 +101,7 @@ function get_du(ele::SoilWaterReservoir{T}, S::Vector{T}, input::Dict{Symbol,T})
     return du
 end
 
-function get_fluxes(ele::SoilWaterReservoir{T}, S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+function get_fluxes(ele::SoilWaterReservoir{T}; S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
     soilwater = S[1, :]
     flux_pet = pet.(input[:Temp], input[:Lday])
     flux_et = evap.(soilwater, flux_pet, ele.Smax)
@@ -119,7 +119,7 @@ end
     output_names::Vector{Symbol} = [:Q]
 end
 
-function get_output(ele::FluxAggregator; input::Dict{Symbol,Vector{T}}) where {T<:Number}
+function get_fluxes(ele::FluxAggregator; input::Dict{Symbol,Vector{T}}) where {T<:Number}
     flux_q = input[:Qb] + input[:Qs]
     return Dict(:Q => flux_q)
 end
@@ -151,16 +151,4 @@ function ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Sy
     set_props!(topology, 4, Dict(:ele => FluxAggregator(id="fa")))
 
     ExpHydro{T}(id=id, topology=topology)
-end
-
-function get_output(unit::ExpHydro, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-    # initialize unit fluxes
-    unit.fluxes = input
-    # traversal of the directed graph
-    for idx in topological_sort(unit.topology)
-        tmp_ele = get_prop(unit.topology, idx, :ele)
-        tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
-        merge!(unit.fluxes, tmp_fluxes)
-    end
-    return unit.fluxes
 end
