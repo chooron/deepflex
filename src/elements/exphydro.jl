@@ -13,8 +13,8 @@ function InterceptionFilter(; id::String, parameters::Dict{Symbol,T}) where {T<:
 end
 
 function get_output(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solve::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
-    flux_snow = snowfall(input[:Prcp], input[:Temp], ele.Tmin)
-    flux_rain = rainfall(input[:Prcp], input[:Temp], ele.Tmin)
+    flux_snow = snowfall.(input[:Prcp], input[:Temp], ele.Tmin)
+    flux_rain = rainfall.(input[:Prcp], input[:Temp], ele.Tmin)
     return Dict(:Snow => flux_snow, :Rain => flux_rain)
 end
 
@@ -41,15 +41,18 @@ end
 end
 
 function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
-    SnowReservoir{T}(id=id, Tmax=get(parameters, :Tmax, 1.0), Df=get(parameters, :Df, 1.0), init_states=[get(init_states, :SnowWater, 0.0)], solver=solver)
+    SnowReservoir{T}(id=id,
+        Tmax=get(parameters, :Tmax, 1.0),
+        Df=get(parameters, :Df, 1.0),
+        init_states=[get(init_states, :SnowWater, 0.0)], solver=solver)
 end
 
-function get_du(ele::SnowReservoir, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
-    return get(input, :Snow, 0.0) .- melt(S, get(input, :Temp, 0.0), ele.Tmax, ele.Df)
+function get_du(ele::SnowReservoir{T}, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
+    return get(input, :Snow, 0.0) .- melt.(S, input[:Temp], ele.Tmax, ele.Df)
 end
 
-function get_fluxes(ele::SnowReservoir, S::Vector{Number}, input::Dict{Symbol,Vector{Number}})
-    return Dict(:Melt => melt(S, get(input, :Temp, 0.0), ele.Tmax, ele.Df))
+function get_fluxes(ele::SnowReservoir{T}, S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+    return Dict(:Melt => melt.(S[1, :], input[:Temp], ele.Tmax, ele.Df))
 end
 
 
@@ -57,7 +60,6 @@ end
     id::String
 
     # parameters
-    Tmin::T
     Smax::T
     Qmax::T
     f::T
@@ -74,37 +76,38 @@ end
     num_downstream::Int = 1
     state_names::Vector{Symbol} = [:SoilWater]
     input_names::Vector{Symbol} = [:Rain, :Melt, :Temp, :Lday]
-    output_names::Vector{Symbol} = [:ET, :Qb, :Qs]
+    output_names::Vector{Symbol} = [:Pet, :Et, :Qb, :Qs]
 
 end
 
 function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
-    println([get(init_states, :SoilWater, 10.0)])
     SoilWaterReservoir{T}(id=id,
-        Tmin=get(parameters, :Tmin, 1.0), Smax=get(parameters, :Smax, 1.0),
-        Qmax=get(parameters, :Qmax, 0.0), f=get(parameters, :f, 0.0),
+        Smax=get(parameters, :Smax, 1.0),
+        Qmax=get(parameters, :Qmax, 0.0),
+        f=get(parameters, :f, 0.0),
         init_states=[get(init_states, :SoilWater, 10.0)], solver=solver)
 end
 
-function get_du(ele::SoilWaterReservoir, S::Vector{T}, input::Dict{:Symbol,T}) where {T<:Number}
+function get_du(ele::SoilWaterReservoir{T}, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
     flux_rain = input[:Rain]
     flux_melt = input[:Melt]
 
-    pet = pet(input[:Temp], input[:Lday])
-    flux_et = evap(S, pet, ele.Tmax)
-    flux_qb = baseflow(S, ele.Smax, ele.Qmax, ele.f)
-    flux_qs = surfaceflow(S, ele.Smax)
+    flux_pet = pet.(input[:Temp], input[:Lday])
+    flux_et = evap.(S, flux_pet, ele.Smax)
+    flux_qb = baseflow.(S, ele.Smax, ele.Qmax, ele.f)
+    flux_qs = surfaceflow.(S, ele.Smax)
 
-    du = @.flux_rain + flux_melt - flux_et - flux_qb - flux_qs
+    du = @.(flux_rain + flux_melt - flux_et - flux_qb - flux_qs)
     return du
 end
 
-function get_fluxes(ele::SoilWaterReservoir, S::Vector{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-    pet = pet(input[:Temp], input[:Lday])
-    flux_et = evap(S, pet, ele.Tmax)
-    flux_qb = baseflow(S, ele.Smax, ele.Qmax, ele.f)
-    flux_qs = surfaceflow(S, ele.Smax)
-    return Dict(:ET => flux_et, :Qb => flux_qb, :Qs => flux_qs)
+function get_fluxes(ele::SoilWaterReservoir{T}, S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+    soilwater = S[1, :]
+    flux_pet = pet.(input[:Temp], input[:Lday])
+    flux_et = evap.(soilwater, flux_pet, ele.Smax)
+    flux_qb = baseflow.(soilwater, ele.Smax, ele.Qmax, ele.f)
+    flux_qs = surfaceflow.(soilwater, ele.Smax)
+    return Dict(:Pet => flux_pet, :Et => flux_et, :Qb => flux_qb, :Qs => flux_qs)
 end
 
 @with_kw_noshow struct FluxAggregator <: BaseElement
@@ -116,7 +119,7 @@ end
     output_names::Vector{Symbol} = [:Q]
 end
 
-function get_output(ele::FluxAggregator, input::Dict{Symbol,Vector{Number}})
+function get_output(ele::FluxAggregator; input::Dict{Symbol,Vector{T}}) where {T<:Number}
     flux_q = input[:Qb] + input[:Qs]
     return Dict(:Q => flux_q)
 end

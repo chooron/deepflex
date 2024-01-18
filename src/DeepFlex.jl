@@ -41,5 +41,8 @@ include("fluxes/rainfall.jl")
 include("fluxes/pet.jl")
 include("fluxes/evap.jl")
 include("fluxes/melt.jl")
+include("fluxes/surfaceflow.jl")
+include("fluxes/baseflow.jl")
+# utils
 include("utils/smooth_func.jl")
 end

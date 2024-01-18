@@ -75,7 +75,7 @@ function get_states(ele::Union{StateElement,StateParameterizedElement}; names::V
 end
 
 
-function solve_prob(ele::ODEsElement, input::Dict{Symbol,Vector{T}})::Matrix{T} where {T<:Number}
+function solve_prob(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Matrix{T} where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
     tspan = (xs[1], xs[end])
@@ -103,7 +103,7 @@ end
 
 
 function get_output(ele::ODEsElement; input::Dict{Symbol,Vector{T}}, solved::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
-    S = solve_prob(ele, input)
+    S::Matrix{T} = solve_prob(ele, input=input)
     fluxes = get_fluxes(ele, S, input)
     return fluxes
 end
