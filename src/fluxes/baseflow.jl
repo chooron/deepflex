@@ -1,3 +1,3 @@
 function baseflow(S, Smax, Qmax, f)
-    (step_fct(S) * step_fct(S - Smax) * Qmax + step_fct(S) * step_fct(Smax - S) * Qmax * exp(-f * (Smax - S)))
+    @.(step_func(S) * step_func(S - Smax) * Qmax + step_func(S) * step_func(Smax - S) * Qmax * exp(-f * (Smax - S)))
 end

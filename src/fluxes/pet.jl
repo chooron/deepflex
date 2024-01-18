@@ -1,3 +1,3 @@
-function pet(T,Lday)
-    29.8 * Lday * 0.611 * n_exp((17.3 * T) / (T + 237.3)) / (T + 273.2)
+function pet(Temp::Vector{T}, Lday::Vector) where {T<:Number}
+    @. 29.8 * Lday * 0.611 * exp((17.3 * Temp) / (Temp + 237.3)) / (Temp + 273.2)
 end

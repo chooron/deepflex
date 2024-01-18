@@ -1,40 +1,33 @@
-include("../fluxes/snowfall.jl")
-include("../fluxes/rainfall.jl")
-include("../fluxes/pet.jl")
-include("../fluxes/evap.jl")
-include("../fluxes/melt.jl")
-
-
-@with_kw_noshow struct InterceptionFilter <: ParameterizedElement
+@with_kw_noshow struct InterceptionFilter{T<:Number} <: ParameterizedElement
     id::String
-    Tmin::Union{float,Vector{float}}
+    Tmin::T
 
     num_upstream::Int = 1
     num_downstream::Int = 1
-    input_names::Vector{String} = ["P", "T", "Lday"]
-    output_names::Vector{String} = ["Snow", "Rain"]
+    input_names::Vector{Symbol} = [:Prcp, :Temp]
+    output_names::Vector{Symbol} = [:Snow, :Rain]
 end
 
-function InterceptionFilter(; id::String, parameters::Dict{String,Union{float,Vector{float}}})
-    InterceptionFilter(id, get(parameters, "Tmin", 0.0))
+function InterceptionFilter(; id::String, parameters::Dict{Symbol,T}) where {T<:Number}
+    InterceptionFilter{T}(id=id, Tmin=get(parameters, :Tmin, 0.0))
 end
 
-function get_output(ele::InterceptionFilter; input::Dict{String,Vector{Number}}, solve::Bool=true)::Dict{String,Vector{Number}}
-    flux_snow = snowfall(P=input["P"], T=input["T"], Tmin=ele.Tmin)
-    flux_rain = rainfall(P=input["P"], T=input["T"], Tmin=ele.Tmin)
-    return [flux_snow, flux_rain]
+function get_output(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solve::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
+    flux_snow = snowfall(input[:Prcp], input[:Temp], ele.Tmin)
+    flux_rain = rainfall(input[:Prcp], input[:Temp], ele.Tmin)
+    return Dict(:Snow => flux_snow, :Rain => flux_rain)
 end
 
-@with_kw_noshow mutable struct SnowReservoir <: ODEsElement
+@with_kw_noshow mutable struct SnowReservoir{T<:Number} <: ODEsElement
     id::String
 
     # parameters
-    Tmax::float
-    Df::float
+    Tmax::T
+    Df::T
 
     # states
-    init_states::float
-    states::Vector{float}
+    init_states::Vector{T}
+    states::Vector{T} = []
 
     # solver
     solver::Any
@@ -42,36 +35,36 @@ end
     # attribute
     num_upstream::Int = 1
     num_downstream::Int = 1
-    state_names::Vector{String} = ["SnowWater"]
-    input_names::Vector{String} = ["Snow", "Temp"]
-    output_names::Vector{String} = ["Melt"]
+    state_names::Vector{Symbol} = [:SnowWater]
+    input_names::Vector{Symbol} = [:Snow, :Temp]
+    output_names::Vector{Symbol} = [:Melt]
 end
 
-function SnowReservoir(; id::String, parameters::Dict{String,Union{float,Vector{float}}}, init_states::Dict{String,float}, solver::Any)
-    SnowReservoir(id, get(parameters, "Tmax", 1.0), get(parameters, "Df", 1.0), get(init_states, "Snow", 0.0), solver)
+function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
+    SnowReservoir{T}(id=id, Tmax=get(parameters, :Tmax, 1.0), Df=get(parameters, :Df, 1.0), init_states=[get(init_states, :SnowWater, 0.0)], solver=solver)
 end
 
-function get_du(ele::SnowReservoir, S::Number, input::Dict{String,Number})
-    return [Snow - melt(S, get(input, "Temp", 0.0), Tmax=ele.Tmax, Df=ele.Df)]
+function get_du(ele::SnowReservoir, S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
+    return get(input, :Snow, 0.0) .- melt(S, get(input, :Temp, 0.0), ele.Tmax, ele.Df)
 end
 
-function get_fluxes(ele::SnowReservoir, S::Vector{Number}, input::Dict{String,Vector{Number}})
-    return Dict("Melt" => melt(S, get(input, "Temp", 0.0), Tmax=ele.Tmax, Df=ele.Df))
+function get_fluxes(ele::SnowReservoir, S::Vector{Number}, input::Dict{Symbol,Vector{Number}})
+    return Dict(:Melt => melt(S, get(input, :Temp, 0.0), ele.Tmax, ele.Df))
 end
 
 
-@with_kw_noshow mutable struct SoilWaterReservoir <: ODEsElement
+@with_kw_noshow mutable struct SoilWaterReservoir{T<:Number} <: ODEsElement
     id::String
 
     # parameters
-    Tmin::float
-    Smax::float
-    Qmax::float
-    f::float
+    Tmin::T
+    Smax::T
+    Qmax::T
+    f::T
 
     # states
-    init_states::float
-    states::Vector{float} = nothing
+    init_states::Vector{T}
+    states::Vector{T} = []
 
     # solver
     solver::Any
@@ -79,61 +72,92 @@ end
     # attribute
     num_upstream::Int = 1
     num_downstream::Int = 1
-    state_names::Vector{String} = ["SoilWater"]
-    input_names::Vector{String} = ["Rain", "Melt", "Temp", "Lday"]
-    output_names::Vector{String} = ["Melt"]
+    state_names::Vector{Symbol} = [:SoilWater]
+    input_names::Vector{Symbol} = [:Rain, :Melt, :Temp, :Lday]
+    output_names::Vector{Symbol} = [:ET, :Qb, :Qs]
 
 end
 
-function get_du(ele::SnowReservoir, Rain, Melt, T, Lday)
-    flux_rain = Rain
-    flux_melt = Melt
-    pet = pet(T, Lday)
+function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
+    println([get(init_states, :SoilWater, 10.0)])
+    SoilWaterReservoir{T}(id=id,
+        Tmin=get(parameters, :Tmin, 1.0), Smax=get(parameters, :Smax, 1.0),
+        Qmax=get(parameters, :Qmax, 0.0), f=get(parameters, :f, 0.0),
+        init_states=[get(init_states, :SoilWater, 10.0)], solver=solver)
+end
+
+function get_du(ele::SoilWaterReservoir, S::Vector{T}, input::Dict{:Symbol,T}) where {T<:Number}
+    flux_rain = input[:Rain]
+    flux_melt = input[:Melt]
+
+    pet = pet(input[:Temp], input[:Lday])
     flux_et = evap(S, pet, ele.Tmax)
     flux_qb = baseflow(S, ele.Smax, ele.Qmax, ele.f)
     flux_qs = surfaceflow(S, ele.Smax)
 
-    du = flux_rain + flux_melt - flux_et - flux_qb - flux_qs
-    return [du]
+    du = @.flux_rain + flux_melt - flux_et - flux_qb - flux_qs
+    return du
 end
 
-@with_kw mutable struct ExpHydro <: Unit
+function get_fluxes(ele::SoilWaterReservoir, S::Vector{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+    pet = pet(input[:Temp], input[:Lday])
+    flux_et = evap(S, pet, ele.Tmax)
+    flux_qb = baseflow(S, ele.Smax, ele.Qmax, ele.f)
+    flux_qs = surfaceflow(S, ele.Smax)
+    return Dict(:ET => flux_et, :Qb => flux_qb, :Qs => flux_qs)
+end
+
+@with_kw_noshow struct FluxAggregator <: BaseElement
     id::String
 
-    # attribute
+    num_upstream::Int = 1
+    num_downstream::Int = 1
+    input_names::Vector{Symbol} = [:Qb, :Qs]
+    output_names::Vector{Symbol} = [:Q]
+end
+
+function get_output(ele::FluxAggregator, input::Dict{Symbol,Vector{Number}})
+    flux_q = input[:Qb] + input[:Qs]
+    return Dict(:Q => flux_q)
+end
+
+@with_kw mutable struct ExpHydro{T} <: Unit where {T<:Number}
+    id::String
+
+    # model structure
     topology::AbstractGraph
 
     # inner variables
-    fluxes::Dict{String,Vector{float}} = nothing
+    fluxes::Dict{Symbol,Vector{T}} = Dict()
 
+    # attribute
+    input_names::Vector{Symbol} = [:Prcp, :Temp, :Lday]
 end
 
-using Graphs
-using MetaGraphsNext
+function ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
 
-function ExpHydro(id, parameters, init_states)
-    topology = MetaGraph(
-        DiGraph();
-        label_type=Symbol,
-        vertex_data_type=Element,
-        edge_data_type=Nothing,
-        graph_data="ExpHydro Topology",
-    )
-    topology[:ir] = InterceptionFilter(id="ir", parameters=parameters)
-    topology[:sr] = SnowReservoir(id="sr", parameters=parameters, init_states=init_states, solver=nothing)
-    topology[:wr] = SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states, solver=nothing)
+    dag = SimpleDiGraph(4)
+    add_edge!(dag, 1, 2)
+    add_edge!(dag, 2, 3)
+    add_edge!(dag, 3, 4)
 
-    topology[:ir, :sr] = nothing
-    topology[:sr, :wr] = nothing
-    ExpHydro(id, topology)
+    topology = MetaDiGraph(dag)
+    set_props!(topology, 1, Dict(:ele => InterceptionFilter(id="ir", parameters=parameters)))
+    set_props!(topology, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, init_states=init_states, solver=nothing)))
+    set_props!(topology, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states, solver=nothing)))
+    set_props!(topology, 4, Dict(:ele => FluxAggregator(id="fa")))
+
+    ExpHydro{T}(id=id, topology=topology)
 end
 
-function get_output(unit::ExpHydro, input::Dict{String,Vector{Number}})
+function get_output(unit::ExpHydro, input::Dict{Symbol,Vector{T}}) where {T<:Number}
     # initialize unit fluxes
-    if isnothing(unit.fluxes)
-        unit.fluxes = input
+    unit.fluxes = input
+    # traversal of the directed graph
+    for idx in topological_sort(unit.topology)
+        tmp_ele = get_prop(unit.topology, idx, :ele)
+        tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
+        merge!(unit.fluxes, tmp_fluxes)
     end
-    # todo 遍历有向图
-    # merge!(unit.fluxes, fluxes)
+    return unit.fluxes
 end
-

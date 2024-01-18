@@ -1,3 +1,3 @@
-function melt(S, T; Tmax, Df)
-    step_fct(T - Tmax) * step_fct(S) * minimum(S, Df * (T - Tmax))
+function melt(S, Temp, Tmax, Df)
+    @. step_func(Temp - Tmax) * step_func(S) * min(S, Df * (Temp - Tmax))
 end

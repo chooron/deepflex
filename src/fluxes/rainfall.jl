@@ -1,3 +1,3 @@
-function rainfall(; P::Vector{float}, T::Vector{float}, Tmin::Vector{float})
-    step_fct(T - Tmin) * P
+function rainfall(Prcp::Vector{T}, Temp::Vector{T}, Tmin::T) where{T<:Number}
+    @.step_func(Temp - Tmin) * Prcp
 end

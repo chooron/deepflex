@@ -1,13 +1,23 @@
 module DeepFlex
-# External packages
-using CSV
+## External packages
+# common packages
 using Parameters
-using DifferentialEquations
 using TOML
 
+# graph compute
+using Graphs
+using MetaGraphs
 
+# data interpolataion
+using Interpolations
+
+# solve ODEProblem
+using DifferentialEquations
+
+## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
-# Abstract Element Types
+
+## Abstract Element Types
 abstract type BaseElement end
 abstract type ParameterizedElement <: BaseElement end
 abstract type StateElement <: BaseElement end
@@ -15,22 +25,21 @@ abstract type StateParameterizedElement <: BaseElement end
 abstract type ODEsElement <: StateParameterizedElement end
 abstract type DiscElement <: StateParameterizedElement end
 
-# Abstract Unit Type
+## Abstract Unit Type
 abstract type Component end
 abstract type Unit end
 
-# Abstract Flux Type
-abstract type Flux end
-
+export ODEsElement
 
 # Element Methods
 include("framework/element.jl")
-
-
 # Implements Element
 include("elements/exphydro.jl")
-
 # Implement Flux
 include("fluxes/snowfall.jl")
-
+include("fluxes/rainfall.jl")
+include("fluxes/pet.jl")
+include("fluxes/evap.jl")
+include("fluxes/melt.jl")
+include("utils/smooth_func.jl")
 end
