@@ -81,6 +81,7 @@ function get_output(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Dict{Symbo
 end
 
 @kwdef mutable struct LuxElement <: StateParameterizedElement
+    model
     
 
 end
