@@ -25,6 +25,28 @@ function get_output(ele::E; input::Dict{Symbol,Vector{T}})::Dict{Symbol,Vector{T
     return fluxes
 end
 
+function get_output(ele::LagElement; input::Dict{Symbol,Vector{T}})::Dict{Symbol,Vector{T}} where {T<:Number}
+    weight = build_weight(ele)
+    states = solve_lag(weight, ele.lag_state, input)
+    # Get the new lag value to restart
+    final_states = states[end, :, :]
+    final_states[:, 1:end-1] = final_states[:, 2:end]
+    final_states[:, end] = 0
+    [states[:, i, 0] for i in 1:1:length(input[first(keys(input))])]
+end
+
+function solve_lag(weight::Vector{T}, lag_state::Vector{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
+    max_length = max([len(w) for w in weight])
+
+    # output = np.zeros((len(input[0]), len(weight), max_length))  # num_ts, num_fluxes, len_lag
+
+    # for flux_num, (w, ls, i) in enumerate(zip(weight, lag_state, input)):
+    #     for ts in range(len(input[0])):
+    #         updated_state = ls + i[ts] * w
+    #         output[ts, flux_num, :len(w)] = updated_state[:]
+    #         ls = np.append(updated_state[1:], 0)
+end
+
 function solve_prob(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Matrix{T} where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
@@ -56,4 +78,9 @@ function get_output(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Dict{Symbo
     S::Matrix{T} = solve_prob(ele, input=input)
     fluxes = get_fluxes(ele, S=S, input=input)
     return fluxes
+end
+
+@kwdef mutable struct LuxElement <: StateParameterizedElement
+    
+
 end

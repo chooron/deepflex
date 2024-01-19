@@ -1,4 +1,4 @@
-@with_kw_noshow struct InterceptionFilter{T<:Number} <: ParameterizedElement
+@kwdef struct InterceptionFilter{T<:Number} <: ParameterizedElement
     id::String
     Tmin::T
 
@@ -18,7 +18,7 @@ function get_fluxes(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solv
     return Dict(:Snow => flux_snow, :Rain => flux_rain)
 end
 
-@with_kw_noshow mutable struct SnowReservoir{T<:Number} <: ODEsElement
+@kwdef mutable struct SnowReservoir{T<:Number} <: ODEsElement
     id::String
 
     # parameters
@@ -56,7 +56,7 @@ function get_fluxes(ele::SnowReservoir{T}; S::Matrix{T}, input::Dict{Symbol,Vect
 end
 
 
-@with_kw_noshow mutable struct SoilWaterReservoir{T<:Number} <: ODEsElement
+@kwdef mutable struct SoilWaterReservoir{T<:Number} <: ODEsElement
     id::String
 
     # parameters
@@ -110,7 +110,7 @@ function get_fluxes(ele::SoilWaterReservoir{T}; S::Matrix{T}, input::Dict{Symbol
     return Dict(:Pet => flux_pet, :Et => flux_et, :Qb => flux_qb, :Qs => flux_qs)
 end
 
-@with_kw_noshow struct FluxAggregator <: BaseElement
+@kwdef struct FluxAggregator <: BaseElement
     id::String
 
     num_upstream::Int = 1
@@ -124,11 +124,11 @@ function get_fluxes(ele::FluxAggregator; input::Dict{Symbol,Vector{T}}) where {T
     return Dict(:Q => flux_q)
 end
 
-@with_kw mutable struct ExpHydro{T} <: Unit where {T<:Number}
+@kwdef mutable struct ExpHydro{T} <: Unit where {T<:Number}
     id::String
 
     # model structure
-    topology::AbstractGraph
+    stucture::AbstractGraph
 
     # inner variables
     fluxes::Dict{Symbol,Vector{T}} = Dict()

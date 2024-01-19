@@ -1,7 +1,6 @@
 module DeepFlex
 ## External packages
 # common packages
-using Parameters
 using TOML
 
 # graph compute
@@ -22,14 +21,13 @@ abstract type BaseElement end
 abstract type ParameterizedElement <: BaseElement end
 abstract type StateElement <: BaseElement end
 abstract type StateParameterizedElement <: BaseElement end
+abstract type LagElement <: StateParameterizedElement end
 abstract type ODEsElement <: StateParameterizedElement end
 abstract type DiscElement <: StateParameterizedElement end
+# abstract type LuxElement <: StateParameterizedElement end
 
 ## Abstract Component Types
 abstract type Component end
-abstract type Unit end
-# abstract type Node end
-abstract type Network end
 
 export ODEsElement
 
@@ -37,6 +35,7 @@ export ODEsElement
 include("framework/element.jl")
 include("framework/Unit.jl")
 include("framework/Node.jl")
+include("framework/Network.jl")
 # Implements Models
 include("models/exphydro.jl")
 # Implement Flux
@@ -49,4 +48,6 @@ include("fluxes/surfaceflow.jl")
 include("fluxes/baseflow.jl")
 # utils
 include("utils/smooth_func.jl")
+include("utils/copy.jl")
+include("utils/graph_utils.jl")
 end
