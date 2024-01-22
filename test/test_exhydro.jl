@@ -11,8 +11,8 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 
 parameters = Dict(:f => f, :Smax => Smax, :Qmax => Qmax, :Df => Df, :Tmax => Tmax, :Tmin => Tmin)
 init_states = Dict(:SnowWater => 0.0, :SoilWater => 1303.004248)
-ir = DeepFlex.InterceptionFilter(id="ir", parameters=parameters)
 model = DeepFlex.ExpHydro(id="exp-hydro", parameters=parameters, init_states=init_states)
+
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -34,3 +34,4 @@ ax = Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 x = range(1, 1000, length=1000)
 lines!(ax, x, flow_vec, color=:red)
 lines!(ax, x, result[:Q], color=:blue)
+fig

@@ -1,14 +1,16 @@
-mutable struct Node{U<:Unit,T<:Number} <: Component
+mutable struct Node{U,T} <: Component where {U<:Unit,T<:Number}
     id::String
     units::Dict{Symbol,U}
     weights::Dict{Symbol,T}
     area::T
-    routing_func::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}}
+    # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}}
     target_names::Vector{Symbol}
 end
 
-function Node(; id::String, units::Dict{Symbol,U}, weights::Dict{Symbol,T}, area::T, target_names::Vector{Symbol}) where {U<:Unit,T<:Number}
-    Node{U,T}(id, units, weights, area, target_names)
+function Node(; id::String, units::Dict{Symbol,U}, weights::Dict{Symbol,T}, area::T,
+    # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}},
+    target_names::Vector{Symbol}) where {U<:Unit,T<:Number}
+    Node{U,T}(id, units, weights, area,  target_names)
 end
 
 function get_output(node::Node, input::Dict{Symbol,Vector{T}}) where {T<:Number}

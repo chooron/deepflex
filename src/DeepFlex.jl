@@ -13,6 +13,10 @@ using Interpolations
 # solve ODEProblem
 using DifferentialEquations
 
+# parameters Optimizationusing 
+using Optimization
+using OptimizationBBO
+
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
@@ -28,14 +32,19 @@ abstract type DiscElement <: StateParameterizedElement end
 
 ## Abstract Component Types
 abstract type Component end
+abstract type Unit <: Component end
 
 export ODEsElement
 
+
 # framework Methods
+include("framework/paraminfo.jl")
 include("framework/element.jl")
-include("framework/Unit.jl")
-include("framework/Node.jl")
-include("framework/Network.jl")
+include("framework/unit.jl")
+include("framework/node.jl")
+include("framework/network.jl")
+# Optimization
+include("framework/optimize.jl")
 # Implements Models
 include("models/exphydro.jl")
 # Implement Flux

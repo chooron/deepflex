@@ -12,6 +12,18 @@ function get_parameters(ele::Union{ParameterizedElement,StateParameterizedElemen
     end
 end
 
+function set_parameters!(ele::Union{ParameterizedElement,StateParameterizedElement}; paraminfos::Vector{ParamInfo})
+    if isnothing(ele.parameters) & replace_all
+        # 当没有初始化参数时
+        ele.parameters = Dict(p.name => p.value for p in paraminfos if p in ele.param_names)
+    else
+        # 当有初始化参数时
+        for p in paraminfos
+            ele.parameters[p.name] = p.value
+        end
+    end
+end
+
 function get_states(ele::Union{StateElement,StateParameterizedElement}; names::Vector{Symbol}=nothing)::Dict{Symbol,Vector{<:Number}}
     if isnothing(names)
         return ele.states
@@ -82,6 +94,6 @@ end
 
 @kwdef mutable struct LuxElement <: StateParameterizedElement
     model
-    
+
 
 end

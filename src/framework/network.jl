@@ -1,9 +1,9 @@
-mutable struct Network{N<:Node,T<:Number} <: Component
+mutable struct Network{T<:Number} <: Component
     id::String
     topology::AbstractGraph
 end
 
-function Network(; id::String, nodes::Dict{Symbol,N}, topology::AbstractGraph)
+function Network(; id::String, nodes::Dict{Symbol,Node}, topology::AbstractGraph)
     topology = MetaDiGraph(topology)
     for (name, node) in nodes
         set_props!(topology, name, Dict(:node => node))
