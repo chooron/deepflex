@@ -1,29 +1,20 @@
-struct Optimize
-    optmzr
-
-end
-
-function mse(predict, target)
-    sum(abs(target .- predict)) / length(target)
-end
-
 function hyper_params_optimize(
     component::C,
-    paraminfos::Vector{ParamInfo},
+    paraminfos::Vector{ParamInfo{T}},
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}},
-    weight::Dict{Symbol,T}=Dict(),
-    errfunc::Dict{Symbol,T}=Dict()
+    weight::Dict{Symbol,T}=Dict{Symbol,T}(),
+    errfunc::Dict{Symbol,T}=Dict{Symbol,T}()
 ) where {C<:Component,T<:Number}
     """
     针对模型超参数进行优化
     """
     # 设置默认weight和errfunc
     if length(weight) == 0
-        weight = Dict(1.0 for k in keys(target))
+        weight = Dict(k => 1.0 for k in keys(output))
     end
-    if length(weight) == 0
-        errfunc = Dict(mse for k in keys(target))
+    if length(errfunc) == 0
+        errfunc = Dict(k => rmse for k in keys(output))
     end
 
     # 内部构造一个function
@@ -34,14 +25,24 @@ function hyper_params_optimize(
         predict = get_output(component, input=input)
         criteria = 0.0
         for (k, v) in output
-            criteria += err_func[k](v, predict[k]) * weight[k]
+            criteria += errfunc[k](v, predict[k]) * weight[k]
         end
         return criteria
     end
-    optf = Optimization.OptimizationFunction(objective, Optimization.AutoZygote())
-    optprob = Optimization.OptimizationProblem(optf, p_init)
-    sol = Optimization.solve(optprob, optmzr, callback=callback, maxiters=max_N_iter)
-    refine_paraminfos!(paraminfos, sol.u)
+
+    callback = function (p, l)
+        println("rmse: " * string(l))
+        return false
+    end
+
+    x0 = [p.default for p in paraminfos]
+    lb = [p.lb for p in paraminfos]
+    ub = [p.ub for p in paraminfos]
+    optf = Optimization.OptimizationFunction(objective)
+    optprob = Optimization.OptimizationProblem(optf, x0, (), lb=lb, ub=ub)
+    sol = Optimization.solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback=callback, maxiters=100)
+    println(sol.u)
+    update_paraminfos!(paraminfos, sol.u)
     return paraminfos
 end
 

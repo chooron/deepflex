@@ -12,14 +12,10 @@ function get_parameters(ele::Union{ParameterizedElement,StateParameterizedElemen
     end
 end
 
-function set_parameters!(ele::Union{ParameterizedElement,StateParameterizedElement}; paraminfos::Vector{ParamInfo})
-    if isnothing(ele.parameters) & replace_all
-        # 当没有初始化参数时
-        ele.parameters = Dict(p.name => p.value for p in paraminfos if p in ele.param_names)
-    else
-        # 当有初始化参数时
-        for p in paraminfos
-            ele.parameters[p.name] = p.value
+function set_parameters!(ele::Union{ParameterizedElement,StateParameterizedElement}; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
+    for p in paraminfos
+        if p.name in ele.param_names
+            setfield!(ele, p.name, p.value)
         end
     end
 end
@@ -29,6 +25,14 @@ function get_states(ele::Union{StateElement,StateParameterizedElement}; names::V
         return ele.states
     else
         return Dict(name => ele.states[name] for name in names)
+    end
+end
+
+function set_states!(ele::Union{StateElement,StateParameterizedElement}; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
+    for p in paraminfos
+        if p.name in ele.state_names
+            setfield!(ele, p.name, p.value)
+        end
     end
 end
 
@@ -79,7 +83,7 @@ function solve_prob(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Matrix{T} 
         # return dt
         get_du(ele, S=u, input=tmp_input)
     end
-    prob = ODEProblem(func, ele.init_states, tspan)
+    prob = ODEProblem(func, [getproperty(ele, sn) for sn in ele.state_names], tspan)
     sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, saveat=dt)
     solved_u = sol.u
     return hcat(solved_u...)
@@ -93,7 +97,16 @@ function get_output(ele::ODEsElement; input::Dict{Symbol,Vector{T}})::Dict{Symbo
 end
 
 @kwdef mutable struct LuxElement <: StateParameterizedElement
+    # 模型参数
     model
+    parameters
+    states
+end
 
+function LuxElement(model, device)
+    ps, st = Lux.setup(rng, model) .|> device
+    LuxElement(model=model, parameters=ps, states=st)
+end
 
+function get_output(ele::LuxElement; input::Dict{Symbol,Vector{T}})
 end

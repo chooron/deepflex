@@ -1,4 +1,4 @@
-@kwdef struct InterceptionFilter{T<:Number} <: ParameterizedElement
+@kwdef mutable struct InterceptionFilter{T<:Number} <: ParameterizedElement
     id::String
     Tmin::T
 
@@ -27,8 +27,8 @@ end
     Df::T
 
     # states
-    init_states::Vector{T}
-    states::Vector{T} = []
+    SnowWater::T
+    states::Dict{Symbol,Vector{T}} =Dict{Symbol,Vector{T}}()
 
     # solver
     solver::Any
@@ -36,17 +36,18 @@ end
     # attribute
     num_upstream::Int = 1
     num_downstream::Int = 1
-    param_names::Vector{Symbol} = [:Tmax,:Df]
+    param_names::Vector{Symbol} = [:Tmax, :Df]
     state_names::Vector{Symbol} = [:SnowWater]
     input_names::Vector{Symbol} = [:Snow, :Temp]
     output_names::Vector{Symbol} = [:Melt]
 end
 
-function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
+function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}, solver::Any) where {T<:Number}
     SnowReservoir{T}(id=id,
         Tmax=get(parameters, :Tmax, 1.0),
         Df=get(parameters, :Df, 1.0),
-        init_states=[get(init_states, :SnowWater, 0.0)], solver=solver)
+        SnowWater=get(initstates, :SnowWater, 0.0),
+        solver=solver)
 end
 
 function get_du(ele::SnowReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
@@ -67,8 +68,8 @@ end
     f::T
 
     # states
-    init_states::Vector{T}
-    states::Vector{T} = []
+    SoilWater::T
+    states::Dict{Symbol,Vector{T}} =Dict{Symbol,Vector{T}}()
 
     # solver
     solver::Any
@@ -76,19 +77,20 @@ end
     # attribute
     num_upstream::Int = 1
     num_downstream::Int = 1
-    param_names::Vector{Symbol} = [:Smax,:Qmax,:f]
+    param_names::Vector{Symbol} = [:Smax, :Qmax, :f]
     state_names::Vector{Symbol} = [:SoilWater]
     input_names::Vector{Symbol} = [:Rain, :Melt, :Temp, :Lday]
     output_names::Vector{Symbol} = [:Pet, :Et, :Qb, :Qs]
 
 end
 
-function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
+function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}, solver::Any) where {T<:Number}
     SoilWaterReservoir{T}(id=id,
         Smax=get(parameters, :Smax, 1.0),
         Qmax=get(parameters, :Qmax, 0.0),
         f=get(parameters, :f, 0.0),
-        init_states=[get(init_states, :SoilWater, 10.0)], solver=solver)
+        SoilWater=get(initstates, :SoilWater, 10.0),
+        solver=solver)
 end
 
 function get_du(ele::SoilWaterReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
@@ -131,46 +133,29 @@ end
     id::String
 
     # model structure
-    stucture::AbstractGraph
+    structure::AbstractGraph
 
     # inner variables
     fluxes::Dict{Symbol,Vector{T}} = Dict()
 
     # attribute
-    param_names::Vector{Symbol} = [:Tmin,:Tmax,:Df,:Smax,:Qmax,:f]
+    param_names::Vector{Symbol} = [:Tmin, :Tmax, :Df, :Smax, :Qmax, :f]
     input_names::Vector{Symbol} = [:Prcp, :Temp, :Lday]
     output_names::Vector{Symbol} = [:Q]
 end
 
-function ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
+function ExpHydro(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}) where {T<:Number}
 
     dag = SimpleDiGraph(4)
     add_edge!(dag, 1, 2)
     add_edge!(dag, 2, 3)
     add_edge!(dag, 3, 4)
 
-    stucture = MetaDiGraph(dag)
-    set_props!(stucture, 1, Dict(:ele => InterceptionFilter(id="ir", parameters=parameters)))
-    set_props!(stucture, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, init_states=init_states, solver=nothing)))
-    set_props!(stucture, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states, solver=nothing)))
-    set_props!(stucture, 4, Dict(:ele => FluxAggregator(id="fa")))
+    structure = MetaDiGraph(dag)
+    set_props!(structure, 1, Dict(:ele => InterceptionFilter(id="ir", parameters=parameters)))
+    set_props!(structure, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, initstates=initstates, solver=nothing)))
+    set_props!(structure, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, initstates=initstates, solver=nothing)))
+    set_props!(structure, 4, Dict(:ele => FluxAggregator(id="fa")))
 
-    ExpHydro{T}(id=id, stucture=stucture)
-end
-
-function ExpHydro(; id::String, paraminfos::Vector{ParamInfo})
-    parameters = Dict(p.name => p.value for p in paraminfos)
-    paramtype = typeof(parameters[first(keys(parameters))])
-    dag = SimpleDiGraph(4)
-    add_edge!(dag, 1, 2)
-    add_edge!(dag, 2, 3)
-    add_edge!(dag, 3, 4)
-
-    stucture = MetaDiGraph(dag)
-    set_props!(stucture, 1, Dict(:ele => InterceptionFilter(id="ir", parameters=parameters)))
-    set_props!(stucture, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, init_states=parameters, solver=nothing)))
-    set_props!(stucture, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, init_states=parameters, solver=nothing)))
-    set_props!(stucture, 4, Dict(:ele => FluxAggregator(id="fa")))
-
-    ExpHydro{paramtype}(id=id, stucture=stucture)
+    ExpHydro{T}(id=id, structure=structure)
 end

@@ -12,8 +12,8 @@ function ParamInfo(name::Symbol, default::T; lb::T=nothing, ub::T=nothing) where
     ParamInfo{T}(name, default, lb, ub, default)
 end
 
-function update_paraminfos!(paraminfos::Vector{ParamInfo}, paramvalues::Vector)
-    for (idx, value) in paramvalues
+function update_paraminfos!(paraminfos::Vector{ParamInfo{T}}, paramvalues::Vector{T}) where {T<:Number}
+    for (idx, value) in enumerate(paramvalues)
         paraminfos[idx].value = value
     end
 end

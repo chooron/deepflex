@@ -2,6 +2,7 @@ module DeepFlex
 ## External packages
 # common packages
 using TOML
+using Statistics
 
 # graph compute
 using Graphs
@@ -57,6 +58,7 @@ include("fluxes/surfaceflow.jl")
 include("fluxes/baseflow.jl")
 # utils
 include("utils/smooth_func.jl")
+include("utils/loss_func.jl")
 include("utils/copy.jl")
 include("utils/graph_utils.jl")
 end
