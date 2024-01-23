@@ -3,6 +3,7 @@ module DeepFlex
 # common packages
 using TOML
 using Statistics
+using Random
 
 # graph compute
 using Graphs
@@ -17,6 +18,10 @@ using DifferentialEquations
 # parameters Optimizationusing 
 using Optimization
 using OptimizationBBO
+
+# deep learning
+using ComponentArrays, Lux, DiffEqFlux, OrdinaryDiffEq, Optimization, OptimizationOptimJL,
+    OptimizationOptimisers, Random, Plots
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])

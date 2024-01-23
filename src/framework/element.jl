@@ -101,12 +101,27 @@ end
     model
     parameters
     states
+    device::AbstractLuxDevice
 end
 
-function LuxElement(model, device)
+function LuxElement(model, device=cpu_device())
     ps, st = Lux.setup(rng, model) .|> device
-    LuxElement(model=model, parameters=ps, states=st)
+    LuxElement(model=model, parameters=ps, states=st, device=device)
+end
+
+function LinearNNElement(in_dim::Int, out_dim::Int, hidd_size::Int, device)
+    model = Chain(Dense(in_dim, hidd_size, tanh), Dense(hidd_size, out_dim))
+    LuxElement(model, device)
+end
+
+function update_lux_element!(ele::LuxElement, tstate)
+    ele.model = tstate.model
+    ele.parameters = tstate.parameters
+    ele.states = tstate.states
 end
 
 function get_output(ele::LuxElement; input::Dict{Symbol,Vector{T}})
+    x = hcat(values(input)...) .|> ele.device
+    y_pred = cpu_device()(Lux.apply(ele.model, x, ele.parameters, ele.states)[1])
+    return y_pred
 end
