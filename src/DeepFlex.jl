@@ -13,15 +13,22 @@ using MetaGraphs
 using Interpolations
 
 # solve ODEProblem
-using DifferentialEquations
-
-# parameters Optimizationusing 
-using Optimization
-using OptimizationBBO
+using OrdinaryDiffEq
+using DiffEqFlux
 
 # deep learning
-using ComponentArrays, Lux, DiffEqFlux, OrdinaryDiffEq, Optimization, OptimizationOptimJL,
-    OptimizationOptimisers, Random, Plots
+using Lux
+using LuxCUDA
+using Zygote
+
+# parameters Optimization
+using Optimization
+using OptimizationBBO
+using Optimisers
+
+
+# , DiffEqFlux, OrdinaryDiffEq, Optimization, OptimizationOptimJL,
+#     OptimizationOptimisers, Random, Plots
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])

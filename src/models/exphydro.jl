@@ -42,11 +42,11 @@ end
     output_names::Vector{Symbol} = [:Melt]
 end
 
-function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}, solver::Any) where {T<:Number}
+function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
     SnowReservoir{T}(id=id,
         Tmax=get(parameters, :Tmax, 1.0),
         Df=get(parameters, :Df, 1.0),
-        SnowWater=get(initstates, :SnowWater, 0.0),
+        SnowWater=get(init_states, :SnowWater, 0.0),
         solver=solver)
 end
 
@@ -84,12 +84,12 @@ end
 
 end
 
-function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}, solver::Any) where {T<:Number}
+function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}, solver::Any) where {T<:Number}
     SoilWaterReservoir{T}(id=id,
         Smax=get(parameters, :Smax, 1.0),
         Qmax=get(parameters, :Qmax, 0.0),
         f=get(parameters, :f, 0.0),
-        SoilWater=get(initstates, :SoilWater, 10.0),
+        SoilWater=get(init_states, :SoilWater, 10.0),
         solver=solver)
 end
 
@@ -144,7 +144,7 @@ end
     output_names::Vector{Symbol} = [:Q]
 end
 
-function ExpHydro(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Symbol,T}) where {T<:Number}
+function ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
 
     dag = SimpleDiGraph(4)
     add_edge!(dag, 1, 2)
@@ -153,8 +153,8 @@ function ExpHydro(; id::String, parameters::Dict{Symbol,T}, initstates::Dict{Sym
 
     structure = MetaDiGraph(dag)
     set_props!(structure, 1, Dict(:ele => InterceptionFilter(id="ir", parameters=parameters)))
-    set_props!(structure, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, initstates=initstates, solver=nothing)))
-    set_props!(structure, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, initstates=initstates, solver=nothing)))
+    set_props!(structure, 2, Dict(:ele => SnowReservoir(id="sr", parameters=parameters, init_states=init_states, solver=nothing)))
+    set_props!(structure, 3, Dict(:ele => SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states, solver=nothing)))
     set_props!(structure, 4, Dict(:ele => FluxAggregator(id="fa")))
 
     ExpHydro{T}(id=id, structure=structure)

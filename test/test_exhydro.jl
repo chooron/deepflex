@@ -13,7 +13,6 @@ parameters = Dict(:f => f, :Smax => Smax, :Qmax => Qmax, :Df => Df, :Tmax => Tma
 init_states = Dict(:SnowWater => 0.0, :SoilWater => 1303.004248)
 model = DeepFlex.ExpHydro(id="exp-hydro", parameters=parameters, init_states=init_states)
 
-
 # load data
 file_path = "data/camels/01013500.csv"
 

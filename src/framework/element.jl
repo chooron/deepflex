@@ -101,17 +101,19 @@ end
     model
     parameters
     states
-    device::AbstractLuxDevice
+    device
 end
 
-function LuxElement(model, device=cpu_device())
+function LuxElement(model; device=cpu_device(), seed=42)
+    rng = MersenneTwister()
+    Random.seed!(rng, seed)
     ps, st = Lux.setup(rng, model) .|> device
     LuxElement(model=model, parameters=ps, states=st, device=device)
 end
 
-function LinearNNElement(in_dim::Int, out_dim::Int, hidd_size::Int, device)
+function LinearNNElement(in_dim::Int, out_dim::Int, hidd_size::Int, device=cpu_device(), seed=42)
     model = Chain(Dense(in_dim, hidd_size, tanh), Dense(hidd_size, out_dim))
-    LuxElement(model, device)
+    return LuxElement(model, device=device, seed=seed)
 end
 
 function update_lux_element!(ele::LuxElement, tstate)
@@ -120,8 +122,8 @@ function update_lux_element!(ele::LuxElement, tstate)
     ele.states = tstate.states
 end
 
-function get_output(ele::LuxElement; input::Dict{Symbol,Vector{T}})
-    x = hcat(values(input)...) .|> ele.device
-    y_pred = cpu_device()(Lux.apply(ele.model, x, ele.parameters, ele.states)[1])
+function get_output(ele::LuxElement; input::Dict{Symbol,Vector{T}}) where {T<:Number}
+    x = hcat(values(input)...)'
+    y_pred = cpu_device()(Lux.apply(ele.model, ele.device(x), ele.parameters, ele.states)[1])
     return y_pred
 end

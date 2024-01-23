@@ -49,6 +49,7 @@ function hybrid_params_optimize()
     """
     混合参数(包括模型超参数和模型内部权重)优化
     """
+
 end
 
 function nn_params_optimize!(
@@ -56,12 +57,12 @@ function nn_params_optimize!(
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}},
     epochs::Int=100,
-    opt=Adam(0.01f0))
+    opt=Adam(0.01f0)) where {T<:Number}
     """
     基于Lux实现深度学习模型内部参数优化(pretrain)
     """
-    x = hcat(values(input)...) .|> ele.device
-    y = hcat(values(output)...) .|> ele.device
+    x = hcat(values(input)...)'
+    y = hcat(values(output)...)
 
     # define loss function
     function loss_function(model, ps, st, data)
@@ -73,9 +74,10 @@ function nn_params_optimize!(
     # define random seed
     rng = MersenneTwister()
     Random.seed!(rng, 12345)
-    tstate = Lux.Training.TrainState(rng, model, opt)
+    tstate = Lux.Training.TrainState(rng, ele.model, opt)
     vjp = Lux.Training.AutoZygote()
     # model training
+    (x, y) = (x, y) .|> ele.device
     for epoch in 1:epochs
         grads, loss, stats, tstate = Lux.Training.compute_gradients(vjp,
             loss_function, (x, y), tstate)
@@ -89,7 +91,7 @@ end
 function node_params_optimize(
     ele::LuxElement;
     input::Dict{Symbol,Vector{T}},
-    output::Dict{Symbol,Vector{T}})
+    output::Dict{Symbol,Vector{T}}) where {T<:Number}
     """
     基于NeuralODE技术实现深度学习模型内部参数优化(pretrain)
     """
@@ -101,6 +103,6 @@ function node_params_optimize(
         return mse(pred, y), pred
     end
     opt_func = OptimizationFunction(loss_function, Optimization.AutoZygote())
-    opt_prob = OptimizationProblem(opt_func, ps)
+    opt_prob = OptimizationProblem(opt_func, ele.parameters)
     res = Optimization.solve(opt_prob, opt, zip(x_train, y_train); callback)
 end
