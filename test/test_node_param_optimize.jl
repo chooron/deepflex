@@ -29,17 +29,20 @@ nn_layer = Lux.Chain(
     Lux.Dense(20, 20, relu),
     Lux.Dense(20, 10, relu)
 )
-node_layer = NeuralODE(nn_layer, (0.0f0, 1.0f0), Tsit5();
+node_layer = NeuralODE(nn_layer,
+    (0.0f0, 1.0f0),
+    Tsit5();
     save_everystep=false,
+    saveat=
     reltol=1e-3, abstol=1e-3,
     save_start=false)
 output_layer = Lux.Dense(10, 1)
 
 
 model_no_ode = Lux.Chain(; input_layer, nn_layer, output_layer)
-ele = DeepFlex.LuxElement(model_no_ode, device=dev_gpu)
+# ele = DeepFlex.LuxElement(model_no_ode, device=dev_gpu)
 
-res = DeepFlex.node_params_optimize(ele, input=inputs, output=output)
-# output = DeepFlex.get_output(ele, input=inputs)
+# res = DeepFlex.node_params_optimize(ele, input=inputs, output=output)
+# # output = DeepFlex.get_output(ele, input=inputs)
 
 

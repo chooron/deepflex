@@ -4,6 +4,7 @@ module DeepFlex
 using TOML
 using Statistics
 using Random
+using ComponentArrays
 
 # graph compute
 using Graphs

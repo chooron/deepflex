@@ -95,14 +95,14 @@ function node_params_optimize(
     """
     基于NeuralODE技术实现深度学习模型内部参数优化(pretrain)
     """
-    x = hcat(values(input)...) .|> ele.device
-    y = hcat(values(output)...) .|> ele.device
+    x = ele.device(hcat(values(input)...)')
+    y = ele.device(hcat(values(output)...))
 
-    function loss_function(ps, _, x, y)
+    function loss_function(ps, x, y)
         pred, st_ = ele.model(x, ps, ele.states)
         return mse(pred, y), pred
     end
-    opt_func = OptimizationFunction(loss_function, Optimization.AutoZygote())
+    opt_func = OptimizationFunction((ps, _, x, y) -> loss_function(ps, x, y), Optimization.AutoZygote())
     opt_prob = OptimizationProblem(opt_func, ele.parameters)
     res = Optimization.solve(opt_prob, opt, zip(x_train, y_train); callback)
 end

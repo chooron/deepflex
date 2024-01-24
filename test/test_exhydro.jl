@@ -2,6 +2,7 @@
 using CSV
 using DataFrames
 using CairoMakie
+using ComponentArrays
 
 # test exphydro model
 include("../src/DeepFlex.jl")
@@ -23,14 +24,15 @@ prcp_vec = df[1:1000, "prcp(mm/day)"]
 temp_vec = df[1:1000, "tmean(C)"]
 flow_vec = df[1:1000, "flow(mm)"]
 
-inputs = Dict(:Prcp => prcp_vec, :Lday => lday_vec, :Temp => temp_vec)
-result = DeepFlex.get_output(model, input=inputs)
-result_df = DataFrame(result)
+inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec)
+result = DeepFlex.get_output(model, input=inputs, step=false)
 
-# plot result
-fig = Figure(size=(400, 300))
-ax = Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-x = range(1, 1000, length=1000)
-lines!(ax, x, flow_vec, color=:red)
-lines!(ax, x, result[:Q], color=:blue)
-fig
+# result_df = DataFrame(result)
+
+# # plot result
+# fig = Figure(size=(400, 300))
+# ax = Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+# x = range(1, 1000, length=1000)
+# lines!(ax, x, flow_vec, color=:red)
+# lines!(ax, x, result[:Q], color=:blue)
+# fig

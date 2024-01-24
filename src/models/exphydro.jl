@@ -13,10 +13,11 @@ function InterceptionFilter(; id::String, parameters::Dict{Symbol,T}) where {T<:
     InterceptionFilter{T}(id=id, Tmin=get(parameters, :Tmin, 0.0))
 end
 
-function get_fluxes(ele::InterceptionFilter; input::Dict{Symbol,Vector{T}}, solve::Bool=true)::Dict{Symbol,Vector{T}} where {T<:Number}
+
+function get_fluxes(ele::InterceptionFilter; input::ComponentVector{T}) where {T<:Number}
     flux_snow = snowfall.(input[:Prcp], input[:Temp], ele.Tmin)
     flux_rain = rainfall.(input[:Prcp], input[:Temp], ele.Tmin)
-    return Dict(:Snow => flux_snow, :Rain => flux_rain)
+    return ComponentVector(Snow=flux_snow, Rain=flux_rain)
 end
 
 @kwdef mutable struct SnowReservoir{T<:Number} <: ODEsElement
@@ -28,7 +29,7 @@ end
 
     # states
     SnowWater::T
-    states::Dict{Symbol,Vector{T}} =Dict{Symbol,Vector{T}}()
+    states::Dict{Symbol,Vector{T}} = Dict{Symbol,Vector{T}}()
 
     # solver
     solver::Any
@@ -50,12 +51,13 @@ function SnowReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Di
         solver=solver)
 end
 
-function get_du(ele::SnowReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
-    return get(input, :Snow, 0.0) .- melt.(S, input[:Temp], ele.Tmax, ele.Df)
+function get_du(ele::SnowReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
+    return ComponentVector(SnowWater=input[:Snow] .- melt.(S[:SnowWater], input[:Temp], ele.Tmax, ele.Df))
 end
 
-function get_fluxes(ele::SnowReservoir{T}; S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-    return Dict(:Melt => melt.(S[1, :], input[:Temp], ele.Tmax, ele.Df))
+
+function get_fluxes(ele::SnowReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
+    return ComponentVector(Melt=melt.(S[:SnowWater], input[:Temp], ele.Tmax, ele.Df))
 end
 
 
@@ -69,7 +71,7 @@ end
 
     # states
     SoilWater::T
-    states::Dict{Symbol,Vector{T}} =Dict{Symbol,Vector{T}}()
+    states::Dict{Symbol,Vector{T}} = Dict{Symbol,Vector{T}}()
 
     # solver
     solver::Any
@@ -93,26 +95,23 @@ function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_state
         solver=solver)
 end
 
-function get_du(ele::SoilWaterReservoir{T}; S::Vector{T}, input::Dict{Symbol,T}) where {T<:Number}
-    flux_rain = input[:Rain]
-    flux_melt = input[:Melt]
-
-    flux_pet = pet.(input[:Temp], input[:Lday])
-    flux_et = evap.(S, flux_pet, ele.Smax)
-    flux_qb = baseflow.(S, ele.Smax, ele.Qmax, ele.f)
-    flux_qs = surfaceflow.(S, ele.Smax)
-
-    du = @.(flux_rain + flux_melt - flux_et - flux_qb - flux_qs)
-    return du
-end
-
-function get_fluxes(ele::SoilWaterReservoir{T}; S::Matrix{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-    soilwater = S[1, :]
+function get_du(ele::SoilWaterReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
+    soilwater = S[:SoilWater]
     flux_pet = pet.(input[:Temp], input[:Lday])
     flux_et = evap.(soilwater, flux_pet, ele.Smax)
     flux_qb = baseflow.(soilwater, ele.Smax, ele.Qmax, ele.f)
     flux_qs = surfaceflow.(soilwater, ele.Smax)
-    return Dict(:Pet => flux_pet, :Et => flux_et, :Qb => flux_qb, :Qs => flux_qs)
+    du = @.(input[:Rain] + input[:Melt] - flux_et - flux_qb - flux_qs)
+    return ComponentVector(SoilWater=du)
+end
+
+function get_fluxes(ele::SoilWaterReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
+    soilwater = S[:SoilWater]
+    flux_pet = pet.(input[:Temp], input[:Lday])
+    flux_et = evap.(soilwater, flux_pet, ele.Smax)
+    flux_qb = baseflow.(soilwater, ele.Smax, ele.Qmax, ele.f)
+    flux_qs = surfaceflow.(soilwater, ele.Smax)
+    return ComponentVector(Pet=flux_pet, Et=flux_et, Qb=flux_qb, Qs=flux_qs)
 end
 
 @kwdef struct FluxAggregator <: BaseElement
@@ -124,9 +123,9 @@ end
     output_names::Vector{Symbol} = [:Q]
 end
 
-function get_fluxes(ele::FluxAggregator; input::Dict{Symbol,Vector{T}}) where {T<:Number}
+function get_fluxes(ele::FluxAggregator; input::ComponentVector{T}) where {T<:Number}
     flux_q = input[:Qb] + input[:Qs]
-    return Dict(:Q => flux_q)
+    return ComponentVector(Q=flux_q)
 end
 
 @kwdef mutable struct ExpHydro{T} <: Unit where {T<:Number}
@@ -136,7 +135,7 @@ end
     structure::AbstractGraph
 
     # inner variables
-    fluxes::Dict{Symbol,Vector{T}} = Dict()
+    fluxes::ComponentVector=ComponentVector()
 
     # attribute
     param_names::Vector{Symbol} = [:Tmin, :Tmax, :Df, :Smax, :Qmax, :f]
