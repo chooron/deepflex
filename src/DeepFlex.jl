@@ -60,7 +60,7 @@ include("framework/network.jl")
 # Optimization
 include("framework/optimize.jl")
 # Implements Models
-include("models/exphydro.jl")
+include("elements/exphydro.jl")
 # Implement Flux
 include("fluxes/snowfall.jl")
 include("fluxes/rainfall.jl")

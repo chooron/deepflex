@@ -1,11 +1,26 @@
-using ComponentArrays
+using ModelingToolkit
 
-# 假设有一个 ComponentVector 的结果
-re = ComponentVector(
-    SnowWater=0.0, SoilWater=1303.004248)
-result = [re, re, re]
-# 将相同名称的组件拼接成一个 Vector
-merged_vector = hcat(result...)
+@variables t
+D = Differential(t)
 
-# 打印结果
-println(merged_vector)
+@mtkmodel FOL begin
+    @parameters begin
+        τ # parameters
+    end
+    @variables begin
+        x(t) # dependent variables
+    end
+    @equations begin
+        D(x) ~ (1 - x) / τ
+    end
+end
+
+using DifferentialEquations: solve
+@mtkbuild fol = FOL()
+prob = ODEProblem(fol, [fol.x => 0.0], (0.0, 10.0), [fol.τ => 3.0])
+sol = solve(prob)
+
+using Plots
+plot(sol)
+
+FOL.structure[:parameters]
