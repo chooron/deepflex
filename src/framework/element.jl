@@ -77,14 +77,13 @@ function solve_prob(ele::ODEsElement; input::ComponentVector{T}) where {T<:Numbe
     tspan = (xs[1], xs[end])
 
     # fit interpolation functions
-    itp = Dict(k=>linear_interpolation(xs, input[k]) for k in keys(input))
+    itp = Dict(k => linear_interpolation(xs, input[k]) for k in keys(input))
 
     function ode_func!(du, u, p, t)
         # interpolate value by fitted functions
         tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
-        # return dt
-        tmp_du = get_du(ele, S=u, input=tmp_input)
-        du = ComponentVector(du; tmp_du...)
+        # return du
+        du = ComponentVector(du; Dict(ele.output_name=>sum(ele.multiplier .* tmp_input)))
     end
     s_init = get_init_states(ele)
     prob = ODEProblem(ode_func!, s_init, tspan)

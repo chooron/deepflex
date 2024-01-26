@@ -1,26 +1,22 @@
 using ModelingToolkit
-
-@variables t
-D = Differential(t)
+using DifferentialEquations
 
 @mtkmodel FOL begin
     @parameters begin
-        τ # parameters
+        Tmax
+        Df
+    end
+    begin
+        diff = Differential(t) 
     end
     @variables begin
-        x(t) # dependent variables
+        t
+        SnowWater(t)
+        Snow(t)
+        Temp(t)
     end
     @equations begin
-        D(x) ~ (1 - x) / τ
+        Melt ~ melt(SnowWater, Temp, Tmax, Df)
+        diff(SnowWater) ~ SnowWater - Melt
     end
 end
-
-using DifferentialEquations: solve
-@mtkbuild fol = FOL()
-prob = ODEProblem(fol, [fol.x => 0.0], (0.0, 10.0), [fol.τ => 3.0])
-sol = solve(prob)
-
-using Plots
-plot(sol)
-
-FOL.structure[:parameters]
