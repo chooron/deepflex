@@ -16,3 +16,12 @@ Implement for [Improving hydrologic models for predictions and process understan
     input_names::Vector{Symbol} = [:Prcp, :Temp, :Lday, :SnowWater, :SoilWater]
     output_names::Vector{Symbol} = [:Q]
 end
+
+function M50(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
+    elements = [
+        SnowReservoir(id="sr", parameters=parameters, init_states=init_states),
+        SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states)
+    ]
+    ExpHydro{T}(id=id, elements=elements)
+end
+

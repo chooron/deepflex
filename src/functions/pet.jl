@@ -1,17 +1,16 @@
-@kwdef struct Pet{T<:Number} <: ParameterizedElement
-    id::String
+@kwdef struct Pet{T<:Number} <: AbstractFunc
     input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Pet]
+    output_name::Symbol = :Pet
     parameters::Dict{Symbol,T}
 end
 
-function Pet(; id::String, input_names::Vector{Symbol}, parameters::Dict{Symbol,T}) where {T<:Number}
+function Pet(input_names::Vector{Symbol}; parameters::Dict{Symbol,T}) where {T<:Number}
     Pet{T}(id=id, input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Pet; input::ComponentVector{T}) where {T<:Number}
     args = [input[input_nm] for input_nm in ele.input_names]
-    pet.(args...; ele.parameters...)
+    ComponentVector(; Dict(ele.output_name => pet.(args...; ele.parameters...))...)
 end
 
 

@@ -10,6 +10,7 @@
 #     # attribute
 #     input_names::Vector{Symbol} = []
 # end
+
 function build_unit(; unit::Unit, paraminfos::Vector{ParamInfo})
     parameters = Dict(p.name => p.value for p in paraminfos)
 end
@@ -84,7 +85,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
                 # 判断是否为ODEsElement
                 if isa(tmp_ele, ODEsElement)
                     # 求解du并更新du
-                    tmp_du = get_du(tmp_ele, S=u, input=tmp_input)
+                    tmp_du = get_du(tmp_ele, state=u, input=tmp_input)
                     du = ComponentVector(du; tmp_du...)
                     # 计算出各个flux，更新至tmp_input中
                     tmp_fluxes = get_fluxes(tmp_ele, S=u, input=tmp_input)

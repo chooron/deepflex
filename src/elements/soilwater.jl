@@ -1,41 +1,30 @@
-
-@kwdef mutable struct SoilWaterReservoir{T<:Number} <: ODEsElement
-    id::String
-
-    # flux element
-    flux_eles::Vector{ParameterizedElement}()
-
-    # states
-    SoilWater::T
-    states::Dict{Symbol,Vector{T}} = Dict{Symbol,Vector{T}}()
-
-    # attribute
-    input_names::Vector{Symbol} = [:Rain, :Melt, :Temp, :Lday]
-    output_names::Vector{Symbol} = [:Pet, :Evap, :Qb, :Qs]
-    state_names::Vector{Symbol} = [:SoilWater]
-end
-
-function SoilWaterReservoir(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
-    flux_eles = [
-        Pet(input_names=[:Temp, :Lday], parameters=Dict()),
-        Evap(input_names=[:SoilWater, :Pet], parameters=Dict(:Smax => parameters[:Smax])),
-        Baseflow(input_names=[:SoilWater], parameters=Dict(:Smax => parameters[:Smax], :Qmax => parameters[:Qmax], :f => parameters[:f])),
-        Surfaceflow(input_names=[:SoilWater], parameters=Dict(:Smax => parameters[:Smax]))
+"""
+SoilWaterReservoir in Exp-Hydro
+"""
+function SoilWaterReservoir_ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::ComponentVector{T}) where {T<:Number}
+    funcs = [
+        Rainfall([:Prcp, :Temp], parameters=Dict(:Tmin => parameters[:Tmin])),
+        Pet([:Temp, :Lday], parameters=Dict()),
+        Evap([:SoilWater, :Pet], parameters=Dict(:Smax => parameters[:Smax])),
+        Baseflow([:SoilWater], parameters=Dict(:Smax => parameters[:Smax], :Qmax => parameters[:Qmax], :f => parameters[:f])),
+        Surfaceflow([:SoilWater], parameters=Dict(:Smax => parameters[:Smax])),
+        Flow([:Baseflow, :Surfaceflow], parameters=Dict())
     ]
-    SoilWaterReservoir{T}(id=id, SoilWater=init_states[:SoilWater]; flux_eles...)
+    multiplier = Dict(:SoilWater => ComponentVector{T}(Rain=1.0, Melt=1.0, Evap=-1.0, Qb=-1.0, Qs=-1.0))
+    ODEElement{T}(
+        id=id,
+        init_states=init_states,
+        funcs=funcs,
+        multiplier=multiplier
+    )
 end
 
-function get_du(ele::SoilWaterReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
-    fluxes = get_fluxes(ele, S=S, input=input)
-    du = @.(fluxes[:Rain] + fluxes[:Melt] - fluxes[:Evap] - fluxes[:Qb] - fluxes[:Qs])
-    return ComponentVector(SoilWater=du)
-end
-
-function get_fluxes(ele::SoilWaterReservoir{T}; S::ComponentVector{T}, input::ComponentVector{T}) where {T<:Number}
-    temp_fluxes = ComponentVector(input; S...)
-    for flux_ele in ele.flux_eles
-        temp_flux = get_output(flux_ele, input)
-        temp_fluxes = ComponentVector(temp_fluxes; temp_flux...)
-    end
-    return temp_fluxes
+"""
+SoilWaterReservoir in M50
+"""
+function SoilWaterReservoir_M50(; id::String, parameters::Dict{Symbol,T}, init_states::ComponentVector{T})
+    funcs = [
+        Rainfall([:Prcp, :Temp], parameters=Dict(:Tmin => parameters[:Tmin])),
+        LinearNN([:SnowWater, :SoilWater, :Temp], [:Evap], hidd_size=32, hidd_layer=1),
+    ]
 end

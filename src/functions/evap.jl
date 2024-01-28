@@ -1,16 +1,16 @@
-@kwdef struct Evap{T<:Number} <: ParameterizedElement
+@kwdef struct Evap{T<:Number} <: AbstractFunc
     input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Evap]
+    output_name::Symbol = :Evap
     parameters::Dict{Symbol,T}
 end
 
-function Evap(; input_names::Vector{Symbol}, parameters::Dict{Symbol,T}) where {T<:Number}
+function Evap(input_names::Vector{Symbol}; parameters::Dict{Symbol,T}) where {T<:Number}
     Evap{T}(id=id, input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Evap; input::ComponentVector{T}) where {T<:Number}
     args = [input[input_nm] for input_nm in ele.input_names]
-    evap.(args...; ele.parameters...)
+    ComponentVector(; Dict(ele.output_name => evap.(args...; ele.parameters...))...)
 end
 
 function evap(SoilWater::T, Pet::T; Smax::T) where {T<:Number}

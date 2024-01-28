@@ -34,22 +34,18 @@ using Optimisers
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
-## Abstract Element Types
-abstract type BaseElement end
-abstract type ParameterizedElement <: BaseElement end
-abstract type StateElement <: BaseElement end
-abstract type StateParameterizedElement <: BaseElement end
-abstract type LagElement <: StateParameterizedElement end
-abstract type ODEsElement <: StateParameterizedElement end
-abstract type DiscElement <: StateParameterizedElement end
-# abstract type LuxElement <: StateParameterizedElement end
 
 ## Abstract Component Types
 abstract type Component end
-abstract type Unit <: Component end
-
-export ODEsElement
-
+abstract type AbstractUnit <: Component end
+abstract type AbstractElement <: Component end
+abstract type AbstractFunc <: Component end
+abstract type AbstractNetwork <: Component end
+## Abstract Element Types
+# abstract type LagElement <: AbstractElement end
+# abstract type ODEElement <: AbstractElement end
+# abstract type DiscElement <: AbstractElement end
+# abstract type LuxElement <: StateParameterizedElement end
 
 # framework Methods
 include("framework/paraminfo.jl")
@@ -60,15 +56,15 @@ include("framework/network.jl")
 # Optimization
 include("framework/optimize.jl")
 # Implements Models
-include("elements/exphydro.jl")
+include("implements/ExpHydro.jl")
 # Implement Flux
-include("fluxes/snowfall.jl")
-include("fluxes/rainfall.jl")
-include("fluxes/pet.jl")
-include("fluxes/evap.jl")
-include("fluxes/melt.jl")
-include("fluxes/surfaceflow.jl")
-include("fluxes/baseflow.jl")
+include("functions/snowfall.jl")
+include("functions/rainfall.jl")
+include("functions/pet.jl")
+include("functions/evap.jl")
+include("functions/melt.jl")
+include("functions/surfaceflow.jl")
+include("functions/baseflow.jl")
 # utils
 include("utils/smooth_func.jl")
 include("utils/loss_func.jl")
