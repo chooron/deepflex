@@ -1,54 +1,49 @@
 # Element Methods
-mutable struct ODEElement{T<:Number} <: AbstractElement
+mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
     id::String
 
     # parameters
-    parameters::Dict{Symbol,T}
-    param_names::Vector{Symbol}
+    parameters::ComponentVector{T}
+    param_names::Set{Symbol}
 
     # states
     states::ComponentVector{T}
     init_states::ComponentVector{T}
-    state_names::Vector{Symbol}
-    multiplier::Dict{Symbol,ComponentVector{T}}
+    state_names::Set{Symbol}
 
     # functions
     funcs::Vector{AbstractFunc}
 
     # attribute
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
+    input_names::Set{Symbol}
+    output_names::Set{Symbol}
 end
 
 function ODEElement(
     ; id::String,
-    parameters::Dict{Symbol,T},
+    parameters::ComponentVector{T},
     init_states::ComponentVector{T},
-    funcs::Vector{AbstractFunc},
-    multiplier::Dict{Symbol,ComponentVector{T}}
-)
-    param_names = collect(keys(parameters))
-    states = ComponentVector{T}(; Dict(k => [init_states[k]] for k in keys(init_states)))
-    state_names = collect(keys(init_states))
+    funcs::Vector{AbstractFunc}
+) where {T<:Number}
+    param_names = Set(keys(parameters))
 
-    input_names = Vector{Symbol}()
-    output_names = Vector{Symbol}()
+    states = ComponentVector{T}(; Dict(k => [init_states[k]] for k in keys(init_states))...)
+    state_names = Set(keys(init_states))
+
+    input_names = Set{Symbol}()
+    output_names = Set{Symbol}()
     for func in funcs
-        for nm in func.input_names
-            if !(nm in input_names)
-                push!(input_names, func.input_names)
-            end
-        end
-        push!(output_names, func.output_name)
+        union!(input_names, func.input_names)
+        union!(output_names, func.output_names)
     end
-    ODEElement(
+
+    ODEElement{T}(
         id,
         parameters,
         param_names,
         states,
         init_states,
         state_names,
-        multiplier,
         funcs,
         input_names,
         output_names
@@ -84,7 +79,7 @@ function get_states(ele::AbstractElement; names::Vector{Symbol}=nothing)::Dict{S
     end
 end
 
-function set_states!(ele::Element; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
+function set_states!(ele::AbstractElement; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
     for p in paraminfos
         if p.name in ele.state_names
             setfield!(ele, p.name, p.value)
@@ -115,6 +110,7 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
         # return du
         du = ComponentVector(du; tmp_du...)
     end
+
     s_init = get_init_states(ele)
     prob = ODEProblem(ode_func!, s_init, tspan)
     sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, saveat=dt)
@@ -124,7 +120,7 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
     return solved_u
 end
 
-function get_fluxes(ele::ODEElement; state::ComponentVector{T}, input::ComponentVector{T})
+function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = ComponentVector(input; state...)
     for func in ele.funcs
         temp_flux = get_output(func; input=fluxes)
@@ -133,16 +129,17 @@ function get_fluxes(ele::ODEElement; state::ComponentVector{T}, input::Component
     return fluxes
 end
 
-function get_du(ele::ODEElement; state::ComponentVector{T}, input::ComponentVector{T})
+function get_du(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = get_fluxes(ele, state=state, input=input)
-    du = ComponentVector(; Dict(k => [fluxes[pk] .* ele.weights[pk] for pk in keys(weight)] for (sk, weight) in ele.state_weights)...)
+    # todo 这个地方还有问题
+    du = ComponentVector(; Dict(k => sum(func.weights[k] * fluxes[k] for func in ele.funcs) for k in keys(state))...)
     return du
 end
 
-function get_output(ele::Element; input::ComponentVector{T}) where {T<:Number}
+function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     state = solve_prob(ele, input=input)
     fluxes = get_fluxes(ele, state=state, input=input)
-    return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names))
+    return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
 end
 
 # function get_output(ele::LagElement; input::Dict{Symbol,Vector{T}}) where {T<:Number}

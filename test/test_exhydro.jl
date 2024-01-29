@@ -10,8 +10,8 @@ include("../src/DeepFlex.jl")
 # build model
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
-parameters = Dict(:f => f, :Smax => Smax, :Qmax => Qmax, :Df => Df, :Tmax => Tmax, :Tmin => Tmin)
-init_states = Dict(:SnowWater => 0.0, :SoilWater => 1303.004248)
+parameters = ComponentVector(; Dict(:f => f, :Smax => Smax, :Qmax => Qmax, :Df => Df, :Tmax => Tmax, :Tmin => Tmin)...)
+init_states = ComponentVector(; Dict(:SnowWater => 0.0, :SoilWater => 1303.004248)...)
 model = DeepFlex.ExpHydro(id="exp-hydro", parameters=parameters, init_states=init_states)
 
 # load data

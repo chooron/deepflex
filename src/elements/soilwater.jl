@@ -1,28 +1,27 @@
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SoilWaterReservoir_ExpHydro(; id::String, parameters::Dict{Symbol,T}, init_states::ComponentVector{T}) where {T<:Number}
+function SoilWaterReservoir_ExpHydro(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
-        Rainfall([:Prcp, :Temp], parameters=Dict(:Tmin => parameters[:Tmin])),
-        Pet([:Temp, :Lday], parameters=Dict()),
-        Evap([:SoilWater, :Pet], parameters=Dict(:Smax => parameters[:Smax])),
-        Baseflow([:SoilWater], parameters=Dict(:Smax => parameters[:Smax], :Qmax => parameters[:Qmax], :f => parameters[:f])),
-        Surfaceflow([:SoilWater], parameters=Dict(:Smax => parameters[:Smax])),
-        Flow([:Baseflow, :Surfaceflow], parameters=Dict())
+        Rainfall([:Prcp, :Temp], parameters=parameters[[:Tmin]], weights=ComponentVector(Rainfall=1.0)),
+        Pet([:Temp, :Lday], parameters=ComponentVector{T}(), weights=ComponentVector(Pet=0.0)),
+        Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]], weights=ComponentVector(Evap=-1.0)),
+        Baseflow([:SoilWater], parameters=parameters[[:Smax, :Qmax, :f]], weights=ComponentVector(Baseflow=-1.0)),
+        Surfaceflow([:SoilWater], parameters=parameters[[:Smax]], weights=ComponentVector(Surfaceflow=-1.0)),
+        Flow([:Baseflow, :Surfaceflow], parameters=ComponentVector{T}(), weights=ComponentVector(Flow=0.0))
     ]
-    multiplier = Dict(:SoilWater => ComponentVector{T}(Rain=1.0, Melt=1.0, Evap=-1.0, Qb=-1.0, Qs=-1.0))
-    ODEElement{T}(
+    ODEElement(
         id=id,
+        parameters=parameters,
         init_states=init_states,
-        funcs=funcs,
-        multiplier=multiplier
+        funcs=funcs
     )
 end
 
 """
 SoilWaterReservoir in M50
 """
-function SoilWaterReservoir_M50(; id::String, parameters::Dict{Symbol,T}, init_states::ComponentVector{T})
+function SoilWaterReservoir_M50(; id::String, parameters::Dict{Symbol,T}, init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
         Rainfall([:Prcp, :Temp], parameters=Dict(:Tmin => parameters[:Tmin])),
         LinearNN([:SnowWater, :SoilWater, :Temp], [:Evap], hidd_size=32, hidd_layer=1),

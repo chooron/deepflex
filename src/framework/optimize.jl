@@ -53,7 +53,7 @@ function hybrid_params_optimize()
 end
 
 function nn_params_optimize!(
-    ele::LuxElement;
+    nn::LuxNN;
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}},
     epochs::Int=100,
@@ -74,35 +74,35 @@ function nn_params_optimize!(
     # define random seed
     rng = MersenneTwister()
     Random.seed!(rng, 12345)
-    tstate = Lux.Training.TrainState(rng, ele.model, opt)
+    tstate = Lux.Training.TrainState(rng, nn.model, opt)
     vjp = Lux.Training.AutoZygote()
     # model training
-    (x, y) = (x, y) .|> ele.device
+    (x, y) = (x, y) .|> nn.device
     for epoch in 1:epochs
         grads, loss, stats, tstate = Lux.Training.compute_gradients(vjp,
             loss_function, (x, y), tstate)
         println("Epoch: $(epoch) || Loss: $(loss)")
         tstate = Lux.Training.apply_gradients(tstate, grads)
     end
-    update_lux_element!(ele, tstate)
+    update_lux_element!(nn, tstate)
 end
 
 
 function node_params_optimize(
-    ele::LuxElement;
+    nn::LuxNN;
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}}) where {T<:Number}
     """
     基于NeuralODE技术实现深度学习模型内部参数优化(pretrain)
     """
-    x = ele.device(hcat(values(input)...)')
-    y = ele.device(hcat(values(output)...))
+    x = nn.device(hcat(values(input)...)')
+    y = nn.device(hcat(values(output)...))
 
     function loss_function(ps, x, y)
-        pred, st_ = ele.model(x, ps, ele.states)
+        pred, st_ = nn.model(x, ps, nn.states)
         return mse(pred, y), pred
     end
     opt_func = OptimizationFunction((ps, _, x, y) -> loss_function(ps, x, y), Optimization.AutoZygote())
-    opt_prob = OptimizationProblem(opt_func, ele.parameters)
+    opt_prob = OptimizationProblem(opt_func, nn.parameters)
     res = Optimization.solve(opt_prob, opt, zip(x_train, y_train); callback)
 end

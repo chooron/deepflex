@@ -53,10 +53,9 @@ include("framework/element.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
 include("framework/network.jl")
-# Optimization
-include("framework/optimize.jl")
-# Implements Models
-include("implements/ExpHydro.jl")
+# Implement Element
+include("elements/snowwater.jl")
+include("elements/soilWater.jl")
 # Implement Flux
 include("functions/snowfall.jl")
 include("functions/rainfall.jl")
@@ -65,9 +64,14 @@ include("functions/evap.jl")
 include("functions/melt.jl")
 include("functions/surfaceflow.jl")
 include("functions/baseflow.jl")
+include("functions/flow.jl")
+include("functions/nn.jl")
+# Implements Models
+include("implements/ExpHydro.jl")
 # utils
 include("utils/smooth_func.jl")
 include("utils/loss_func.jl")
-include("utils/copy.jl")
 include("utils/graph_utils.jl")
+# Optimization
+include("framework/optimize.jl")
 end
