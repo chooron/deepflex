@@ -12,7 +12,7 @@
     output_names::Set{Symbol}
 
     # inner variables
-    fluxes::ComponentVector{T} = ComponentVector()
+    fluxes::ComponentVector = ComponentVector()
 end
 
 function build_unit(; id::String, elements::Vector{E}) where {E<:AbstractElement}
@@ -37,7 +37,7 @@ function update_fluxes!(unit::AbstractUnit; fluxes::ComponentVector)
     unit.fluxes = ComponentVector(unit.fluxes; fluxes...)
 end
 
-function get_fluxes(unit::AbstractUnit; flux_names::Vector{Symbol})
+function get_fluxes(unit::AbstractUnit; flux_names::Set{Symbol})
     output = Dict{Symbol,Vector}()
     for flux_nm in flux_names
         output[flux_nm] = unit.fluxes[flux_nm]
@@ -52,7 +52,6 @@ function get_init_states(sort_eles::Vector{E}) where {E<:AbstractElement}
             u_init = ComponentVector(u_init; tmp_ele.init_states...)
         end
     end
-    println(u_init)
     return u_init
 end
 
@@ -124,7 +123,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
         unit.fluxes = input
         # 带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
-            if isa(tmp_ele, ODEsElement)
+            if isa(tmp_ele, ODEElement)
                 tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
             else
                 tmp_fluxes = get_fluxes(tmp_ele, input=unit.fluxes)

@@ -1,6 +1,6 @@
 @kwdef struct Baseflow{T<:Number} <: AbstractFunc
     input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Qb]
+    output_names::Vector{Symbol} = [:Baseflow]
     parameters::ComponentVector{T}
     weights::ComponentVector{T}
 end

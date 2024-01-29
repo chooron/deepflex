@@ -15,5 +15,6 @@ function get_output(ele::Melt; input::ComponentVector{T}) where {T<:Number}
 end
 
 function melt(SnowWater::T, Temp::T; Tmax::T, Df::T) where {T<:Number}
+    println(step_func(Temp - Tmax) * step_func(SnowWater) * min(SnowWater, Df * (Temp - Tmax)))
     step_func(Temp - Tmax) * step_func(SnowWater) * min(SnowWater, Df * (Temp - Tmax))
 end

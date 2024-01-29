@@ -32,6 +32,7 @@ function ODEElement(
 
     input_names = Set{Symbol}()
     output_names = Set{Symbol}()
+
     for func in funcs
         union!(input_names, func.input_names)
         union!(output_names, func.output_names)
@@ -87,14 +88,6 @@ function set_states!(ele::AbstractElement; paraminfos::Vector{ParamInfo{T}}) whe
     end
 end
 
-function get_init_states(ele::ODEElement)
-    u_init_dict = Dict{Symbol,Number}()
-    for sn in ele.state_names
-        u_init_dict[sn] = getproperty(ele, sn)
-    end
-    return ComponentVector(u_init_dict)
-end
-
 function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
@@ -111,8 +104,7 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
         du = ComponentVector(du; tmp_du...)
     end
 
-    s_init = get_init_states(ele)
-    prob = ODEProblem(ode_func!, s_init, tspan)
+    prob = ODEProblem(ode_func!, ele.init_states, tspan)
     sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, saveat=dt)
     solved_u = sol.u
     solved_u_matrix = hcat(solved_u...)
@@ -131,8 +123,7 @@ end
 
 function get_du(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = get_fluxes(ele, state=state, input=input)
-    # todo 这个地方还有问题
-    du = ComponentVector(; Dict(k => sum(func.weights[k] * fluxes[k] for func in ele.funcs) for k in keys(state))...)
+    du = ComponentVector(; Dict(k => sum(vcat([func.weights[k] * fluxes[func.output_names] for func in ele.funcs]...)) for k in ele.state_names)...)
     return du
 end
 
