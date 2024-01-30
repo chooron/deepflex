@@ -65,6 +65,7 @@ include("functions/melt.jl")
 include("functions/surfaceflow.jl")
 include("functions/baseflow.jl")
 include("functions/flow.jl")
+include("functions/transparent.jl")
 include("functions/nn.jl")
 # Implements Models
 include("implements/ExpHydro.jl")

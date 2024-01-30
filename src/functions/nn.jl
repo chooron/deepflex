@@ -4,19 +4,21 @@ mutable struct LuxNN{T<:Number} <: AbstractFunc
     model::Any
     parameters::Any
     states::Any
+    weights::ComponentVector{T}
 end
 
 function LuxNN(
     input_names::Vector{Symbol},
     output_names::Vector{Symbol};
     model,
+    weights::ComponentVector{T},
     device=cpu_device(),
     seed=42
 )
     rng = MersenneTwister()
     Random.seed!(rng, seed)
     ps, st = Lux.setup(rng, model) .|> device
-    LuxNN(input_names, output_names, model, ps, st)
+    LuxNN(input_names, output_names, model, ps, st, weights)
 end
 
 

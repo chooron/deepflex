@@ -7,7 +7,7 @@ mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
     param_names::Set{Symbol}
 
     # states
-    states::ComponentVector{T}
+    states::ComponentVector
     init_states::ComponentVector{T}
     state_names::Set{Symbol}
 
@@ -101,14 +101,16 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
         tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
         tmp_du = get_du(ele, state=u, input=tmp_input)
         # return du
-        du = ComponentVector(du; tmp_du...)
+        for k in keys(ele.init_states)
+            du[k] = tmp_du[k]
+        end
     end
-
     prob = ODEProblem(ode_func!, ele.init_states, tspan)
     sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, saveat=dt)
     solved_u = sol.u
     solved_u_matrix = hcat(solved_u...)
     solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
+    ele.states = solved_u
     return solved_u
 end
 
@@ -123,7 +125,15 @@ end
 
 function get_du(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = get_fluxes(ele, state=state, input=input)
-    du = ComponentVector(; Dict(k => sum(vcat([func.weights[k] * fluxes[func.output_names] for func in ele.funcs]...)) for k in ele.state_names)...)
+    du_dict = Dict{Symbol,T}()
+    for k in ele.state_names
+        tmp_value = 0.0
+        for func in ele.funcs
+            tmp_value += func.weights[k] * fluxes[first(func.output_names)]
+        end
+        du_dict[k] = tmp_value
+    end
+    du = ComponentVector(; du_dict...)
     return du
 end
 

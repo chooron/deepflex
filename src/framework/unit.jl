@@ -99,7 +99,9 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
                 if isa(tmp_ele, ODEElement)
                     # 求解du并更新du
                     tmp_du = get_du(tmp_ele, state=u, input=tmp_input)
-                    du = ComponentVector(du; tmp_du...)
+                    for k in tmp_ele.state_names
+                        du[k] = tmp_du[k]
+                    end
                     # 计算出各个flux，更新至tmp_input中
                     tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
                 else
@@ -120,6 +122,9 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
         solved_u = sol.u
         solved_u_matrix = hcat(solved_u...)
         solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
+        for ele in unit.elements
+            ele.states = solved_u[collect(ele.state_names)]
+        end
         unit.fluxes = input
         # 带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
