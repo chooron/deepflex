@@ -45,5 +45,7 @@ end
 function get_output(ele::LuxNN; input::ComponentVector{T}) where {T<:Number}
     x = hcat([input[k] for k in keys(ele.input_names)]...)'
     y_pred = cpu_device()(Lux.apply(ele.model, ele.device(x), ele.parameters, ele.states)[1])
-    return dropdims(y_pred, dims=1)
+    y_pred = dropdims(y_pred, dims=1)
+    output = ComponentVector(; Dict(k => y_pred[i] for (i, k) in enumerate(ele.output_names))...)
+    return output
 end
