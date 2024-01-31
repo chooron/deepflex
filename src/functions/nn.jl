@@ -11,7 +11,7 @@ function LuxNN(
     input_names::Vector{Symbol},
     output_names::Vector{Symbol};
     model,
-    weights::ComponentVector{T},
+    weights::ComponentVector,
     device=cpu_device(),
     seed=42
 )
@@ -27,6 +27,7 @@ function LinearNN(
     output_names::Vector{Symbol};
     hidd_size::Int=32,
     hidd_layer::Int=1,
+    weights::ComponentVector,
     device=cpu_device(),
     seed=42
 )
@@ -34,7 +35,7 @@ function LinearNN(
     output_layer = Dense(hidd_size, length(output_names))
     hidd_layer = [Dense(hidd_size, hidd_size) for _ in 1:hidd_layer]
     model = Chain(input_layer, hidd_layer..., output_layer)
-    LuxNN(input_names, output_names, model=model, device=device, seed=seed)
+    LuxNN(input_names, output_names, weights=weights, model=model, device=device, seed=seed)
 end
 
 function update_lux_element!(ele::LuxNN, tstate)

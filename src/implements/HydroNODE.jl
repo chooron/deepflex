@@ -19,9 +19,9 @@ end
 
 function M50(; id::String, parameters::Dict{Symbol,T}, init_states::Dict{Symbol,T}) where {T<:Number}
     elements = [
-        SnowReservoir(id="sr", parameters=parameters, init_states=init_states),
-        SoilWaterReservoir(id="wr", parameters=parameters, init_states=init_states)
-        SoilWaterReservoir_M50()
+        SnowWater_ExpHydro_ODE(id="sr", parameters=parameters, init_states=init_states),
+        SoilWater_M50_ODE(id="wr", parameters=parameters, init_states=init_states)
+        SoilWater_M50()
     ]
     ExpHydro{T}(id=id, elements=elements)
 end
