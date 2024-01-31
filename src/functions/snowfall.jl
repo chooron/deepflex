@@ -2,11 +2,10 @@
     input_names::Vector{Symbol}
     output_names::Vector{Symbol} = [:Snowfall]
     parameters::ComponentVector{T}
-    weights::ComponentVector{T}
 end
 
-function Snowfall(input_names::Vector{Symbol}; parameters::ComponentVector{T}, weights::ComponentVector{T}) where {T<:Number}
-    Snowfall{T}(input_names=input_names, parameters=parameters,weights=weights)
+function Snowfall(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    Snowfall{T}(input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Snowfall; input::ComponentVector{T}) where {T<:Number}

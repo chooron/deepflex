@@ -13,6 +13,7 @@ mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
 
     # functions
     funcs::Vector{AbstractFunc}
+    get_du::Function
 
     # attribute
     input_names::Set{Symbol}
@@ -23,7 +24,8 @@ function ODEElement(
     ; id::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
-    funcs::Vector{AbstractFunc}
+    funcs::Vector{AbstractFunc},
+    get_du::Function
 ) where {T<:Number}
     param_names = Set(keys(parameters))
 
@@ -46,6 +48,7 @@ function ODEElement(
         init_states,
         state_names,
         funcs,
+        get_du,
         input_names,
         output_names
     )
@@ -99,14 +102,15 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
     function ode_func!(du, u, p, t)
         # interpolate value by fitted functions
         tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
-        tmp_du = get_du(ele, state=u, input=tmp_input)
+        tmp_fluxes = get_fluxes(ele, state=u, input=tmp_input)
+        tmp_du = ele.get_du(tmp_fluxes,ele.parameters)
         # return du
         for k in keys(ele.init_states)
             du[k] = tmp_du[k]
         end
     end
     prob = ODEProblem(ode_func!, ele.init_states, tspan)
-    sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, saveat=dt)
+    sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
     solved_u = sol.u
     solved_u_matrix = hcat(solved_u...)
     solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
@@ -121,20 +125,6 @@ function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVec
         fluxes = ComponentVector(fluxes; temp_flux...)
     end
     return fluxes
-end
-
-function get_du(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
-    fluxes = get_fluxes(ele, state=state, input=input)
-    du_dict = Dict{Symbol,T}()
-    for k in ele.state_names
-        tmp_value = 0.0
-        for func in ele.funcs
-            tmp_value += func.weights[k] * fluxes[first(func.output_names)]
-        end
-        du_dict[k] = tmp_value
-    end
-    du = ComponentVector(; du_dict...)
-    return du
 end
 
 function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}

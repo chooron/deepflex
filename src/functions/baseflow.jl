@@ -2,11 +2,10 @@
     input_names::Vector{Symbol}
     output_names::Vector{Symbol} = [:Baseflow]
     parameters::ComponentVector{T}
-    weights::ComponentVector{T}
 end
 
-function Baseflow(input_names::Vector{Symbol}; parameters::ComponentVector{T}, weights::ComponentVector{T}) where {T<:Number}
-    Baseflow{T}(input_names=input_names, parameters=parameters, weights=weights)
+function Baseflow(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    Baseflow{T}(input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Baseflow; input::ComponentVector{T}) where {T<:Number}

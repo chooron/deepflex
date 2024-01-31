@@ -69,6 +69,7 @@ include("functions/transparent.jl")
 include("functions/nn.jl")
 # Implements Models
 include("implements/ExpHydro.jl")
+include("implements/HydroNode.jl")
 # utils
 include("utils/smooth_func.jl")
 include("utils/loss_func.jl")

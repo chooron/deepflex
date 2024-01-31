@@ -67,7 +67,7 @@ function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<
     end
 end
 
-function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) where {T<:Number}
+function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwargs...) where {T<:Number}
     # 开始计算
     if step
         # * This function is calculated element by element
@@ -84,8 +84,6 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
         xs = 1:dt:length(input[first(keys(input))])
         # fit interpolation functions
         itp = Dict(k => linear_interpolation(xs, input[k]) for k in keys(input))
-        # 判断是否存在LuxElement,如果有就是NeuralODE问题
-        node = false
         # 获取ODEsElement的所有state初始值
         u_init = get_init_states(unit.elements)
         # 定义整体的ode函数
@@ -97,13 +95,13 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
             for tmp_ele in unit.elements
                 # 判断是否为ODEsElement
                 if isa(tmp_ele, ODEElement)
+                    # 计算出各个flux，更新至tmp_input中
+                    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
                     # 求解du并更新du
-                    tmp_du = get_du(tmp_ele, state=u, input=tmp_input)
+                    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
                     for k in tmp_ele.state_names
                         du[k] = tmp_du[k]
                     end
-                    # 计算出各个flux，更新至tmp_input中
-                    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
                 else
                     # 计算出各个flux，更新至tmp_input中
                     tmp_fluxes = get_fluxes(tmp_ele, input=tmp_input)
@@ -114,11 +112,14 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
 
         # *求解这个函数
         prob = ODEProblem(ode_function!, u_init, (xs[1], maximum(xs)))
-        if node
-            sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
-        else
-            sol = solve(prob, BS3(), p=(), saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
-        end
+        sol = solve(
+            prob,
+            get(kwargs, :alg, BS3()),
+            saveat=xs,
+            reltol=get(kwargs, :reltol, 1e-3),
+            abstol=get(kwargs, :abstol, 1e-3),
+            sensealg=get(kwargs, :sensealg, ForwardDiffSensitivity())
+        )
         solved_u = sol.u
         solved_u_matrix = hcat(solved_u...)
         solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
@@ -126,7 +127,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true) wher
             ele.states = solved_u[collect(ele.state_names)]
         end
         unit.fluxes = input
-        # 带入求解的结果计算最终的输出结果
+        # *带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
             if isa(tmp_ele, ODEElement)
                 tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)

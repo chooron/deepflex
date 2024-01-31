@@ -2,11 +2,10 @@
     input_names::Vector{Symbol}
     output_names::Vector{Symbol} = [:Pet]
     parameters::ComponentVector{T}
-    weights::ComponentVector{T}
 end
 
-function Pet(input_names::Vector{Symbol}; parameters::ComponentVector{T}, weights::ComponentVector{T}) where {T<:Number}
-    Pet{T}(input_names=input_names, parameters=parameters,weights=weights)
+function Pet(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    Pet{T}(input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Pet; input::ComponentVector{T}) where {T<:Number}

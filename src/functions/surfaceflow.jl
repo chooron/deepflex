@@ -2,11 +2,10 @@
     input_names::Vector{Symbol}
     output_names::Vector{Symbol} = [:Surfaceflow]
     parameters::ComponentVector{T}
-    weights::ComponentVector{T}
 end
 
-function Surfaceflow(input_names::Vector{Symbol}; parameters::ComponentVector{T}, weights::ComponentVector{T}) where {T<:Number}
-    Surfaceflow{T}(input_names=input_names, parameters=parameters, weights=weights)
+function Surfaceflow(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    Surfaceflow{T}(input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Surfaceflow; input::ComponentVector{T}) where {T<:Number}

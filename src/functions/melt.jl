@@ -2,11 +2,10 @@
     input_names::Vector{Symbol}
     output_names::Vector{Symbol} = [:Melt]
     parameters::ComponentVector{T}
-    weights::ComponentVector{T}
 end
 
-function Melt(input_names::Vector{Symbol}; parameters::ComponentVector{T}, weights::ComponentVector{T}) where {T<:Number}
-    Melt{T}(input_names=input_names, parameters=parameters, weights=weights)
+function Melt(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    Melt{T}(input_names=input_names, parameters=parameters)
 end
 
 function get_output(ele::Melt; input::ComponentVector{T}) where {T<:Number}
