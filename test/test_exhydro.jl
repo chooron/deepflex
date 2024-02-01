@@ -25,10 +25,10 @@ temp_vec = df[1:1000, "tmean(C)"]
 flow_vec = df[1:1000, "flow(mm)"]
 
 inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec)
-result = DeepFlex.get_output(model, input=inputs, step=true)
+result = DeepFlex.get_output(model, input=inputs, step=false, sensealg=DeepFlex.default_ode_sensealg)
 
 result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
-result_df[!,:Real] = flow_vec
+
 # plot result
 fig = Figure(size=(400, 300))
 ax = Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")

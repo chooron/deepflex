@@ -1,5 +1,5 @@
 
-function get_parameters(func::Func; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
+function get_parameters(func::AbstractFunc; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
     if isnothing(names)
         return func.parameters
     else
@@ -7,10 +7,13 @@ function get_parameters(func::Func; names::Vector{Symbol}=nothing)::Dict{Symbol,
     end
 end
 
-function set_parameters!(func::Func; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
+function set_parameters!(func::AbstractFunc; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
     for p in paraminfos
         if p.name in keys(func.parameters)
             func.parameters[p.name] = p.value
         end
     end
+end
+
+function pretrain!(func::LuxNNFunc; input::ComponentVector{T})
 end

@@ -91,6 +91,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
             # element input
             # 使用插值方法获取该时段下的输入值
             tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
+            println(tmp_input)
             # 遍历Unit中所有的Element进行求解
             for tmp_ele in unit.elements
                 # 判断是否为ODEsElement
@@ -116,26 +117,31 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
             prob,
             get(kwargs, :alg, BS3()),
             saveat=xs,
+            dt=dt,
             reltol=get(kwargs, :reltol, 1e-3),
             abstol=get(kwargs, :abstol, 1e-3),
             sensealg=get(kwargs, :sensealg, ForwardDiffSensitivity())
         )
-        solved_u = sol.u
-        solved_u_matrix = hcat(solved_u...)
-        solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
-        for ele in unit.elements
-            ele.states = solved_u[collect(ele.state_names)]
-        end
-        unit.fluxes = input
-        # *带入求解的结果计算最终的输出结果
-        for tmp_ele in unit.elements
-            if isa(tmp_ele, ODEElement)
-                tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
-            else
-                tmp_fluxes = get_fluxes(tmp_ele, input=unit.fluxes)
-            end
-            update_fluxes!(unit, fluxes=tmp_fluxes)
-        end
+        return sol
+        # solved_u = sol.u
+        # println(sol)
+        # solved_u_matrix = hcat(solved_u...)
+        # solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
+        # for ele in unit.elements
+        #     ele.states = solved_u[collect(ele.state_names)]
+        # end
+        # unit.fluxes = input
+        # # *带入求解的结果计算最终的输出结果
+        # for tmp_ele in unit.elements
+        #     if isa(tmp_ele, ODEElement)
+        #         println(tmp_ele.states)
+        #         tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
+        #     else
+        #         tmp_fluxes = get_fluxes(tmp_ele, input=unit.fluxes)
+        #     end
+        #     update_fluxes!(unit, fluxes=tmp_fluxes)
+        # end
     end
+    # return unit.fluxes
     return get_fluxes(unit, flux_names=unit.output_names)
 end

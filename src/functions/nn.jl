@@ -1,4 +1,4 @@
-mutable struct LuxNN <: AbstractFunc
+mutable struct LuxNN <: LuxNNFunc
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
     model::Any
@@ -43,9 +43,10 @@ function update_lux_element!(ele::LuxNN, tstate)
 end
 
 function get_output(ele::LuxNN; input::ComponentVector{T}) where {T<:Number}
-    x = hcat([input[k] for k in keys(ele.input_names)]...)'
+    x = hcat([input[nm] for nm in ele.input_names]...)'
     y_pred = cpu_device()(Lux.apply(ele.model, ele.device(x), ele.parameters, ele.states)[1])
-    y_pred = dropdims(y_pred, dims=1)
-    output = ComponentVector(; Dict(k => y_pred[i] for (i, k) in enumerate(ele.output_names))...)
+    y_predv2 = dropdims(y_pred, dims=1)
+    # println("x size $(size(x)), origin size $(size(y_pred)), drop size $(size(y_predv2))")
+    output = ComponentVector(; Dict(k => y_predv2[i] for (i, k) in enumerate(ele.output_names))...)
     return output
 end

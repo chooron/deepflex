@@ -40,7 +40,17 @@ abstract type Component end
 abstract type AbstractUnit <: Component end
 abstract type AbstractElement <: Component end
 abstract type AbstractFunc <: Component end
+abstract type SimpleFunc <: AbstractFunc end
+abstract type LuxNNFunc <: AbstractFunc end
 abstract type AbstractNetwork <: Component end
+
+
+## Sensealg type
+const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
+const default_ode_sensealg = ForwardDiffSensitivity()
+export default_node_sensealg
+export default_ode_sensealg
+
 ## Abstract Element Types
 # abstract type LagElement <: AbstractElement end
 # abstract type ODEElement <: AbstractElement end

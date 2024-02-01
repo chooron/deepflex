@@ -91,6 +91,14 @@ function set_states!(ele::AbstractElement; paraminfos::Vector{ParamInfo{T}}) whe
     end
 end
 
+function pretrain!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
+    for func in ele.funcs
+        # todo 构建pretrain!函数来优化模型内部模型
+        pretrain!(func, input)
+    end
+end
+
+
 function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
@@ -103,12 +111,13 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
         # interpolate value by fitted functions
         tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
         tmp_fluxes = get_fluxes(ele, state=u, input=tmp_input)
-        tmp_du = ele.get_du(tmp_fluxes,ele.parameters)
+        tmp_du = ele.get_du(tmp_fluxes, ele.parameters)
         # return du
         for k in keys(ele.init_states)
             du[k] = tmp_du[k]
         end
     end
+
     prob = ODEProblem(ode_func!, ele.init_states, tspan)
     sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
     solved_u = sol.u
