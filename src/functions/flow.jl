@@ -16,3 +16,7 @@ end
 function flow(Baseflow::T, Surfaceflow::T) where {T<:Number}
     Baseflow + Surfaceflow
 end
+
+function flow(Rainfall::T, Saturation::T, Percolation::T) where {T<:Number}
+    Rainfall + Percolation - Saturation
+end

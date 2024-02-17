@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "b8004a974327e82a2a3bc59734b270716dc482bf"
+project_hash = "f7e46e1b2d83f2a7f73c0d6cb679c4ef4761b5ba"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -1860,6 +1860,12 @@ weakdeps = ["Enzyme", "FiniteDiff", "ForwardDiff", "ModelingToolkit", "ReverseDi
 deps = ["BlackBoxOptim", "Optimization", "Reexport"]
 git-tree-sha1 = "ae0742c7c4e17271fc713ce4c61c10c9ccdb15a4"
 uuid = "3e6eede4-6085-4f62-9a71-46d9bc1eb92b"
+version = "0.2.1"
+
+[[deps.OptimizationOptimisers]]
+deps = ["Optimisers", "Optimization", "Printf", "ProgressLogging", "Reexport"]
+git-tree-sha1 = "6c12ab297301d706b542d8876e55bfadfe773b00"
+uuid = "42dfb2eb-d2b4-4451-abcd-913932933ac1"
 version = "0.2.1"
 
 [[deps.Opus_jll]]

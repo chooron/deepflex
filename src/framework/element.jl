@@ -4,7 +4,6 @@ mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
 
     # parameters
     parameters::ComponentVector{T}
-    param_names::Set{Symbol}
 
     # states
     states::ComponentVector
@@ -13,6 +12,8 @@ mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
 
     # functions
     funcs::Vector{AbstractFunc}
+
+    # solve config
     get_du::Function
 
     # attribute
@@ -20,14 +21,58 @@ mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
     output_names::Set{Symbol}
 end
 
-function ODEElement(
+mutable struct DCTElement{T} <: AbstractElement where {T<:Number}
+    id::String
+
+    # parameters
+    parameters::ComponentVector{T}
+
+    # states
+    states::ComponentVector
+    init_states::ComponentVector{T}
+    state_names::Set{Symbol}
+
+    # functions
+    funcs::Vector{AbstractFunc}
+
+    # solve config
+    get_du::Function
+
+    # attribute
+    input_names::Set{Symbol}
+    output_names::Set{Symbol}
+end
+
+mutable struct LAGElement{T}  <: AbstractElement where {T<:Number}
+    id::String
+
+    # parameters
+    parameters::ComponentVector{T}
+
+    # states
+    states::ComponentVector
+    init_states::ComponentVector{T}
+    state_names::Set{Symbol}
+
+    # functions
+    funcs::Vector{AbstractFunc}
+
+    # solve config
+    get_du::Function
+
+    # attribute
+    input_names::Set{Symbol}
+    output_names::Set{Symbol}
+end
+
+function build_element(
     ; id::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
     funcs::Vector{AbstractFunc},
-    get_du::Function
+    get_du::Function,
+    solve_type::String=ode_solve,
 ) where {T<:Number}
-    param_names = Set(keys(parameters))
 
     states = ComponentVector{T}(; Dict(k => [init_states[k]] for k in keys(init_states))...)
     state_names = Set(keys(init_states))
@@ -39,26 +84,40 @@ function ODEElement(
         union!(input_names, func.input_names)
         union!(output_names, func.output_names)
     end
-
-    ODEElement{T}(
-        id,
-        parameters,
-        param_names,
-        states,
-        init_states,
-        state_names,
-        funcs,
-        get_du,
-        input_names,
-        output_names
-    )
+    if solve_type == ode_solve
+        return ODEElement{T}(
+            id,
+            parameters,
+            states,
+            init_states,
+            state_names,
+            funcs,
+            get_du,
+            input_names,
+            output_names
+        )
+    elseif solve_type == dct_solve
+        return DCTElement{T}(
+            id,
+            parameters,
+            states,
+            init_states,
+            state_names,
+            funcs,
+            get_du,
+            input_names,
+            output_names
+        )
+    else
+        @error "$solve_type is not available!"
+    end
 end
 
 function get_id(ele::AbstractElement)::String
     return ele.id
 end
 
-function get_parameters(ele::AbstractElement; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
+function get_parameters(ele::AbstractElement; names::Vector{Symbol}=nothing)
     if isnothing(names)
         return ele.parameters
     else
@@ -75,31 +134,25 @@ function set_parameters!(ele::AbstractElement; paraminfos::Vector{ParamInfo{T}})
     end
 end
 
-function get_states(ele::AbstractElement; names::Vector{Symbol}=nothing)::Dict{Symbol,Vector{<:Number}}
-    if isnothing(names)
+function get_states(ele::AbstractElement; state_names::Union{Set{Symbol},Nothing}=nothing)
+    if isnothing(state_names)
         return ele.states
     else
-        return Dict(name => ele.states[name] for name in names)
+        available_state_names = [nm for nm in state_names if nm in ele.state_names]
+        return ele.states[available_state_names]
     end
 end
 
-function set_states!(ele::AbstractElement; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
-    for p in paraminfos
-        if p.name in ele.state_names
-            setfield!(ele, p.name, p.value)
+
+function pretrain!(ele::AbstractElement; input::ComponentVector{T}, train_config...) where {T<:Number}
+    for func in ele.funcs
+        if isa(func, LuxNNFunc)
+            pretrain!(func, input=input, train_config...)
         end
     end
 end
 
-function pretrain!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
-    for func in ele.funcs
-        # todo 构建pretrain!函数来优化模型内部模型
-        pretrain!(func, input)
-    end
-end
-
-
-function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
+function solve_prob!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
     tspan = (xs[1], xs[end])
@@ -117,17 +170,32 @@ function solve_prob(ele::ODEElement; input::ComponentVector{T}) where {T<:Number
             du[k] = tmp_du[k]
         end
     end
-
+    
     prob = ODEProblem(ode_func!, ele.init_states, tspan)
     sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
     solved_u = sol.u
     solved_u_matrix = hcat(solved_u...)
     solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
     ele.states = solved_u
-    return solved_u
 end
 
-function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
+function solve_prob!(ele::DCTElement; input::ComponentVector{T}) where {T<:Number}
+    data_len = length(input[first(keys(input))])
+    tmp_state = ele.init_states
+    for idx in 1:data_len
+        tmp_input = ComponentVector(; Dict(k => input[k][idx] for k in keys(input))...)
+        tmp_fluxes = get_fluxes(ele, state=tmp_state, input=tmp_input)
+        tmp_du = ele.get_du(tmp_fluxes, ele.parameters)
+        for k in keys(tmp_state)
+            update_state = tmp_state[k] + tmp_du[k]
+            tmp_state[k] = update_state
+            push!(ele.states[k], update_state)
+        end
+        tmp_state = ComponentVector(; Dict(k => tmp_state[k] + tmp_du[k] for k in keys(tmp_state))...)
+    end
+end
+
+function get_fluxes(ele::AbstractElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = ComponentVector(input; state...)
     for func in ele.funcs
         temp_flux = get_output(func; input=fluxes)
@@ -136,37 +204,8 @@ function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVec
     return fluxes
 end
 
-function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
-    state = solve_prob(ele, input=input)
-    fluxes = get_fluxes(ele, state=state, input=input)
+function get_output(ele::AbstractElement; input::ComponentVector{T}) where {T<:Number}
+    solve_prob!(ele, input=input)
+    fluxes = get_fluxes(ele, state=ele.states, input=input)
     return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
-end
-
-# function get_output(ele::LagElement; input::Dict{Symbol,Vector{T}}) where {T<:Number}
-#     weight = build_weight(ele)
-#     states = solve_lag(weight, ele.lag_state, input)
-#     # Get the new lag value to restart
-#     final_states = states[end, :, :]
-#     final_states[:, 1:end-1] = final_states[:, 2:end]
-#     final_states[:, end] = 0
-#     [states[:, i, 0] for i in 1:1:length(input[first(keys(input))])]
-# end
-
-# function solve_lag(weight::Vector{T}, lag_state::Vector{T}, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-#     max_length = max([len(w) for w in weight])
-
-#     # output = np.zeros((len(input[0]), len(weight), max_length))  # num_ts, num_fluxes, len_lag
-
-#     # for flux_num, (w, ls, i) in enumerate(zip(weight, lag_state, input)):
-#     #     for ts in range(len(input[0])):
-#     #         updated_state = ls + i[ts] * w
-#     #         output[ts, flux_num, :len(w)] = updated_state[:]
-#     #         ls = np.append(updated_state[1:], 0)
-# end
-
-
-function NeuralodeElement(in_dims::Int, out_dims::Int; node_layer)
-    input_layer = Dense(in_dims, model_no_ode.layers[1].in_dims)
-    output_layer = Dense(model_no_ode.layers[end].out_dims, out_dims)
-    node_layer = node_layer
 end

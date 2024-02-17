@@ -1,4 +1,4 @@
-mutable struct Node{U,T} <: Component where {U<:Unit,T<:Number}
+mutable struct Node{U,T} <: AbstractComponent where {U<:Unit,T<:Number}
     id::String
     units::Dict{Symbol,U}
     weights::Dict{Symbol,T}

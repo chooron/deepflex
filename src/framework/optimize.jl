@@ -5,7 +5,7 @@ function hyper_params_optimize(
     output::Dict{Symbol,Vector{T}},
     weight::Dict{Symbol,T}=Dict{Symbol,T}(),
     errfunc::Dict{Symbol,T}=Dict{Symbol,T}()
-) where {C<:Component,T<:Number}
+) where {C<:AbstractComponent,T<:Number}
     """
     针对模型超参数进行优化
     """
@@ -52,8 +52,9 @@ function hybrid_params_optimize()
 
 end
 
+
 function nn_params_optimize!(
-    nn::LuxNN;
+    nn::LuxNNFunc;
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}},
     epochs::Int=100,
@@ -86,7 +87,6 @@ function nn_params_optimize!(
     end
     update_lux_element!(nn, tstate)
 end
-
 
 function node_params_optimize(
     nn::LuxNN;

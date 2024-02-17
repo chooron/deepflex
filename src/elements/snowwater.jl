@@ -1,7 +1,7 @@
 """
 SnowWaterReservoir in Exp-Hydro
 """
-function SnowWater_ExpHydro_ODE(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function SnowWater_ExpHydro(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:Tmin]])
         Melt([:SnowWater, :Temp], parameters=parameters[[:Tmax, :Df]])
@@ -11,7 +11,49 @@ function SnowWater_ExpHydro_ODE(; id::String, parameters::ComponentVector{T}, in
         ComponentVector(SnowWater=input[:Snowfall] - input[:Melt])
     end
 
-    ODEElement(
+    build_element(
+        id=id,
+        parameters=parameters,
+        init_states=init_states,
+        funcs=funcs,
+        get_du=get_du
+    )
+end
+
+function SnowWater_M100(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+    funcs = [
+        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater], parameters=ComponentVector{T}()),
+    ]
+
+    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
+        ComponentVector(SnowWater=begin
+            relu(sinh(input[:Snowfall]) * step_fct(input[:Temp]))
+            -relu(step_func(input[:SnowWater]) * sinh(input[:Melt]))
+        end)
+    end
+
+    build_element(
+        id=id,
+        parameters=parameters,
+        init_states=init_states,
+        funcs=funcs,
+        get_du=get_du
+    )
+end
+
+function SnowWater_M100(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+    funcs = [
+        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater], parameters=ComponentVector{T}()),
+    ]
+
+    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
+        ComponentVector(SnowWater=begin
+            relu(sinh(input[:Snowfall]) * step_fct(input[:Temp]))
+            -relu(step_func(input[:SnowWater]) * sinh(input[:Melt]))
+        end)
+    end
+
+    build_element(
         id=id,
         parameters=parameters,
         init_states=init_states,

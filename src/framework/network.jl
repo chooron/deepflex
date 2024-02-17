@@ -1,4 +1,4 @@
-mutable struct Network{T<:Number} <: Component
+mutable struct Network{T<:Number} <: AbstractComponent
     id::String
     topology::AbstractGraph
 end

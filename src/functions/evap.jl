@@ -16,3 +16,7 @@ end
 function evap(SoilWater::T, Pet::T; Smax::T) where {T<:Number}
     step_func(SoilWater) * step_func(SoilWater - Smax) * Pet + step_func(SoilWater) * step_func(Smax - SoilWater) * Pet * (SoilWater / Smax)
 end
+
+function evap(SoilWater::T, Prcp::T, Pet::T; x1::T) where {T<:Number}
+    step_func(Pet - Prcp) * (Pet - Prcp) * (2 * SoilWater / x1 - (SoilWater / x1)^2)
+end

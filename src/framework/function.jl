@@ -14,6 +14,3 @@ function set_parameters!(func::AbstractFunc; paraminfos::Vector{ParamInfo{T}}) w
         end
     end
 end
-
-function pretrain!(func::LuxNNFunc; input::ComponentVector{T})
-end

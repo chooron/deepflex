@@ -14,5 +14,5 @@ function get_output(ele::Surfaceflow; input::ComponentVector{T}) where {T<:Numbe
 end
 
 function surfaceflow(SoilWater::T; Smax::T) where {T<:Number}
-    step_func(SoilWater) * step_func(SoilWater .- Smax) .* (SoilWater .- Smax)
+    step_func(SoilWater) * step_func(SoilWater - Smax) * (SoilWater - Smax)
 end
