@@ -38,11 +38,10 @@ const dct_solve = "dct_solve"
 
 ## Abstract Component Types
 abstract type AbstractComponent end
+abstract type AbstractParamInfo <: AbstractComponent end
+abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractUnit <: AbstractComponent end
 abstract type AbstractElement <: AbstractComponent end
-abstract type AbstractFunc <: AbstractComponent end
-abstract type SimpleFunc <: AbstractFunc end
-abstract type LuxNNFunc <: AbstractFunc end
 abstract type AbstractNetwork <: AbstractComponent end
 
 
@@ -50,18 +49,20 @@ abstract type AbstractNetwork <: AbstractComponent end
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 const default_ode_sensealg = ForwardDiffSensitivity()
 
-## Abstract Element Types
-# abstract type LagElement <: AbstractElement end
-# abstract type ODEElement <: AbstractElement end
-# abstract type DiscElement <: AbstractElement end
-# abstract type LuxElement <: StateParameterizedElement end
-
 # framework Methods
 include("framework/paraminfo.jl")
+
+include("framework/nnflux.jl")
+include("framework/routingflux.jl")
+include("framework/simpleflux.jl")
+
 include("framework/element.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
 include("framework/network.jl")
+
+include("framework/optimize.jl")
+
 # Implement Element
 include("elements/routingstore.jl")
 include("elements/snowwater.jl")
@@ -71,12 +72,10 @@ include("functions/baseflow.jl")
 include("functions/evap.jl")
 include("functions/flow.jl")
 include("functions/melt.jl")
-include("functions/nn.jl")
 include("functions/percolation.jl")
 include("functions/pet.jl")
 include("functions/rainfall.jl")
 include("functions/recharge.jl")
-include("functions/routing.jl")
 include("functions/saturation.jl")
 include("functions/snowfall.jl")
 include("functions/splitter.jl")

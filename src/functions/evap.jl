@@ -1,22 +1,28 @@
-@kwdef struct Evap{T<:Number} <: AbstractFunc
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Evap]
-    parameters::ComponentVector{T}
+function Evap(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
+    SimpleFlux{T}(
+        input_names,
+        [:Evap],
+        parameters,
+        evap_func
+    )
 end
 
-function Evap(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    Evap{T}(input_names=input_names, parameters=parameters)
+function evap_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(SoilWater=1, Pet=2)}}},
+    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(Smax=1,)}}}
+) where {T<:Number}
+    soil_water, pet = input[:SoilWater], input[:Pet]
+    Smax = parameters[:Smax]
+    ComponentVector(Evap=step_func(soil_water) * step_func(soil_water - Smax) * Pet +
+                             step_func(soil_water) * step_func(Smax - soil_water) * pet * (soil_water / Smax))
 end
 
-function get_output(ele::Evap; input::ComponentVector{T}) where {T<:Number}
-    args = [input[input_nm] for input_nm in ele.input_names]
-    ComponentVector(; Dict(first(ele.output_names) => evap.(args...; ele.parameters...))...)
+function evap_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(SoilWater=1, Prcp=2, Pet=3)}}},
+    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(x1=1,)}}}
+) where {T<:Number}
+    soil_water, prcp, pet = input[:SoilWater], input[:Prcp], input[:Pet]
+    x1 = parameters[:x1]
+    step_func(pet - prcp) * (pet - prcp) * (2 * soil_water / x1 - (soil_water / x1)^2)
 end
 
-function evap(SoilWater::T, Pet::T; Smax::T) where {T<:Number}
-    step_func(SoilWater) * step_func(SoilWater - Smax) * Pet + step_func(SoilWater) * step_func(Smax - SoilWater) * Pet * (SoilWater / Smax)
-end
-
-function evap(SoilWater::T, Prcp::T, Pet::T; x1::T) where {T<:Number}
-    step_func(Pet - Prcp) * (Pet - Prcp) * (2 * SoilWater / x1 - (SoilWater / x1)^2)
-end

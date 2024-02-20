@@ -1,22 +1,22 @@
-@kwdef struct Rainfall{T<:Number} <: AbstractFunc
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Rainfall]
-    parameters::ComponentVector{T}
+function Rainfall(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
+    SimpleFlux{T}(
+        input_names,
+        [:Rainfall],
+        parameters,
+        rainfall_func
+    )
 end
 
-function Rainfall(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    Rainfall{T}(input_names=input_names, parameters=parameters)
+function rainfall_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(Prcp=1, Temp=2)}}},
+    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(Tmin=1,)}}}
+) where {T<:Number}
+    ComponentVector(Rainfall=step_func(input[:Temp] - parameters[:Tmin]) * input[:Prcp])
 end
 
-function get_output(ele::Rainfall; input::ComponentVector{T}) where {T<:Number}
-    args = [input[input_nm] for input_nm in ele.input_names]
-    ComponentVector(; Dict(first(ele.output_names) => rainfall.(args...; ele.parameters...))...)
-end
-
-function rainfall(Prcp::T, Temp::T; Tmin::T) where {T<:Number}
-    step_func(Temp - Tmin) * Prcp
-end
-
-function rainfall(Prcp::T, Pet::T) where {T<:Number}
-    step_func(Prcp - Pet) * (Prcp - Pet)
+function rainfall_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(Prcp=1, Pet=2)}}},
+    parameters::Nothing
+) where {T<:Number}
+    ComponentVector(Rainfall=step_func(input[:Prcp] - input[:Pet]) * (input[:Prcp] - input[:Pet]))
 end

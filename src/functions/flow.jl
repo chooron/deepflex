@@ -1,22 +1,22 @@
-@kwdef struct Flow{T<:Number} <: AbstractFunc
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Flow]
-    parameters::ComponentVector{T}
+function Flow(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
+    SimpleFlux{T}(
+        input_names,
+        [:Flow],
+        parameters,
+        flow_func
+    )
 end
 
-function Flow(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    Flow{T}(input_names=input_names, parameters=parameters)
+function flow_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(Baseflow=1, Surfaceflow=2)}}},
+    parameters::Nothing=nothing
+) where {T<:Number}
+    ComponentVector(Flow=input[:Baseflow] + input[:Surfaceflow])
 end
 
-function get_output(ele::Flow; input::ComponentVector{T}) where {T<:Number}
-    args = [input[input_nm] for input_nm in ele.input_names]
-    ComponentVector(; Dict(first(ele.output_names) => flow.(args...; ele.parameters...))...)
-end
-
-function flow(Baseflow::T, Surfaceflow::T) where {T<:Number}
-    Baseflow + Surfaceflow
-end
-
-function flow(Rainfall::T, Saturation::T, Percolation::T) where {T<:Number}
-    Rainfall + Percolation - Saturation
+function flow_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(Rainfall=1, Saturation=2, Percolation=3)}}},
+    parameters::Nothing=nothing
+) where {T<:Number}
+    ComponentVector(Flow=input[:Rainfall] + input[:Percolation] - input[:Saturation])
 end

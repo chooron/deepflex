@@ -1,11 +1,11 @@
 function hyper_params_optimize(
     component::C,
-    paraminfos::Vector{ParamInfo{T}},
+    paraminfos::Vector{P},
     input::Dict{Symbol,Vector{T}},
     output::Dict{Symbol,Vector{T}},
     weight::Dict{Symbol,T}=Dict{Symbol,T}(),
     errfunc::Dict{Symbol,T}=Dict{Symbol,T}()
-) where {C<:AbstractComponent,T<:Number}
+) where {C<:AbstractComponent,P<:AbstractParamInfo,T<:Number}
     """
     针对模型超参数进行优化
     """
@@ -52,57 +52,22 @@ function hybrid_params_optimize()
 
 end
 
+function pretrain!(nn::NNFlux; input::ComponentVector{T}, train_config...) where {T<:Number}
+    x = hcat([input[nm] for nm in nn.input_names]...)
+    y = hcat([input[nm] for nm in nn.output_names]...)'
 
-function nn_params_optimize!(
-    nn::LuxNNFunc;
-    input::Dict{Symbol,Vector{T}},
-    output::Dict{Symbol,Vector{T}},
-    epochs::Int=100,
-    opt=Adam(0.01f0)) where {T<:Number}
-    """
-    基于Lux实现深度学习模型内部参数优化(pretrain)
-    """
-    x = hcat(values(input)...)'
-    y = hcat(values(output)...)
-
-    # define loss function
-    function loss_function(model, ps, st, data)
-        y_pred, st = Lux.apply(model, data[1], ps, st)
-        mse_loss = mean(abs2, y_pred .- data[2])
-        return mse_loss, st, ()
+    function prep_pred_NN_pretrain(model_, input_)
+        (params) -> model_(input_, params)
     end
 
-    # define random seed
-    rng = MersenneTwister()
-    Random.seed!(rng, 12345)
-    tstate = Lux.Training.TrainState(rng, nn.model, opt)
-    vjp = Lux.Training.AutoZygote()
-    # model training
-    (x, y) = (x, y) .|> nn.device
-    for epoch in 1:epochs
-        grads, loss, stats, tstate = Lux.Training.compute_gradients(vjp,
-            loss_function, (x, y), tstate)
-        println("Epoch: $(epoch) || Loss: $(loss)")
-        tstate = Lux.Training.apply_gradients(tstate, grads)
-    end
-    update_lux_element!(nn, tstate)
-end
+    pred_NN_pretrain_fct = prep_pred_NN_pretrain(nn.func, permutedims(x))
 
-function node_params_optimize(
-    nn::LuxNN;
-    input::Dict{Symbol,Vector{T}},
-    output::Dict{Symbol,Vector{T}}) where {T<:Number}
-    """
-    基于NeuralODE技术实现深度学习模型内部参数优化(pretrain)
-    """
-    x = nn.device(hcat(values(input)...)')
-    y = nn.device(hcat(values(output)...))
-
-    function loss_function(ps, x, y)
-        pred, st_ = nn.model(x, ps, nn.states)
-        return mse(pred, y), pred
+    function loss_NN_pretrain(params, batch)
+        sum((pred_NN_pretrain_fct(params)' .- batch) .^ 2)
     end
-    opt_func = OptimizationFunction((ps, _, x, y) -> loss_function(ps, x, y), Optimization.AutoZygote())
-    opt_prob = OptimizationProblem(opt_func, nn.parameters)
-    res = Optimization.solve(opt_prob, opt, zip(x_train, y_train); callback)
+
+    optf = Optimization.OptimizationFunction((θ, p) -> loss_NN_pretrain(θ, y), Optimization.AutoZygote())
+    optprob = Optimization.OptimizationProblem(optf, nn.parameters[:ps])
+    sol = Optimization.solve(optprob, Adam(0.01), maxiters=100)
+    nn.parameters = ComponentArray(nn.parameters; Dict(:ps => sol.u)...)
 end

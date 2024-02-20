@@ -1,4 +1,4 @@
-mutable struct Routing{T<:Number} <: AbstractFunc
+mutable struct RoutingFlux{T<:Number} <: AbstractFlux
 
     # attribute
     input_names::Vector{Symbol}
@@ -18,7 +18,7 @@ mutable struct Routing{T<:Number} <: AbstractFunc
 
 end
 
-function Routing(input_names::Vector{Symbol}; lag_time::Union{T,ComponentVector{T}}, lag_func::Function) where {T<:Number}
+function RoutingFlux(input_names::Vector{Symbol}; lag_time::Union{T,ComponentVector{T}}, lag_func::Function) where {T<:Number}
     if typeof(lag_time) == T
         lag_time = ComponentVector(; Dict(nm => lag_time for nm in input_names)...)
     end
@@ -35,7 +35,7 @@ function Routing(input_names::Vector{Symbol}; lag_time::Union{T,ComponentVector{
         ]
     end for k in keys(lag_time))...)
 
-    Routing{T}(
+    RoutingFlux{T}(
         input_names,
         input_names,
         lag_time,
@@ -44,13 +44,13 @@ function Routing(input_names::Vector{Symbol}; lag_time::Union{T,ComponentVector{
         lag_weights)
 end
 
-function solve_lag(ele::Routing; input::ComponentVector{T}, lag_state::ComponentVector{T}) where {T<:Number}
-    max_weight_len = max([length(weight(k)) for k in keys(ele.weight)])
+function solve_lag(flux::RoutingFlux; input::ComponentVector{T}, lag_state::ComponentVector{T}) where {T<:Number}
+    max_weight_len = max([length(weight(k)) for k in keys(flux.weight)])
     max_input_len = max([length(input(k)) for k in keys(input)])
     output = ComponentVector(; Dict(k => zeros(T, max_input_len, max_weight_len))...)
 
     for k in keys(output)
-        for (w, ls, i) in zip(ele.weight[k], lag_state[k], input[k])
+        for (w, ls, i) in zip(flux.weight[k], lag_state[k], input[k])
             for ts in 1:max_input_len
                 updated_state = ls .+ i[ts] .* w
                 output[k][ts, 1:length(w)] = updated_state
@@ -61,21 +61,22 @@ function solve_lag(ele::Routing; input::ComponentVector{T}, lag_state::Component
     return output
 end
 
-function get_output(ele::Routing; input::ComponentVector{T}) where {T<:Number}
-    solved_state = solve_lag(ele, input=input, lag_state=ele.lag_state)
+function get_output(flux::RoutingFlux; input::ComponentVector{T}) where {T<:Number}
+    solved_state = solve_lag(flux, input=input, lag_state=flux.lag_state)
 
     # Get the new lag value to restart
     final_states = ComponentVector(; Dict(k => begin
         tmp_state = solved_state[k][end, :]
         tmp_state[:, 1:end-1] = tmp_state[:, 2:end]
         tmp_state[:, end] = T(0)
-    end for k in keys(ele.input_names))...)
+    end for k in keys(flux.input_names))...)
 
-    ele.lag_states = final_states
+    flux.lag_states = final_states
 
-    output = ComponentVector(; Dict(k => solved_state[k][:, 1] for k in ele.input_names)...)
+    output = ComponentVector(; Dict(k => solved_state[k][:, 1] for k in flux.input_names)...)
     return output
 end
+
 
 function unit_hydro1(bin, len)
     value = begin

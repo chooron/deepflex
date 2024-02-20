@@ -1,18 +1,17 @@
-@kwdef struct Recharge{T<:Number} <: AbstractFunc
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Rainfall]
-    parameters::ComponentVector{T}
+function Recharge(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
+    SimpleFlux{T}(
+        input_names,
+        [:Recharge],
+        parameters,
+        recharge_func
+    )
 end
 
-function Recharge(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    Recharge{T}(input_names=input_names, parameters=parameters)
-end
-
-function get_output(ele::Recharge; input::ComponentVector{T}) where {T<:Number}
-    args = [input[input_nm] for input_nm in ele.input_names]
-    ComponentVector(; Dict(first(ele.output_names) => rainfall.(args...; ele.parameters...))...)
-end
-
-function recharge(RoutingStore::T; x2::T, x3::T, ω::T) where {T<:Number}
-    x2 / (x3^ω) * RoutingStore^ω
+function recharge_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(RoutingStore=1,)}}},
+    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(x2=1, x3=2, ω=3)}}}
+) where {T<:Number}
+    routing_store = input[:RoutingStore]
+    x2, x3, ω = parameters[:x2], parameters[:x3], parameters[:ω]
+    ComponentVector(Recharge=x2 / (x3^ω) * routing_store^ω)
 end

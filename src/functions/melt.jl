@@ -1,18 +1,17 @@
-@kwdef struct Melt{T<:Number} <: AbstractFunc
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol} = [:Melt]
-    parameters::ComponentVector{T}
+function Melt(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
+    SimpleFlux{T}(
+        input_names,
+        [:Melt],
+        parameters,
+        melt_func
+    )
 end
 
-function Melt(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    Melt{T}(input_names=input_names, parameters=parameters)
-end
-
-function get_output(ele::Melt; input::ComponentVector{T}) where {T<:Number}
-    args = [input[input_nm] for input_nm in ele.input_names]
-    ComponentVector(; Dict(first(ele.output_names) => melt.(args...; ele.parameters...))...)
-end
-
-function melt(SnowWater::T, Temp::T; Tmax::T, Df::T) where {T<:Number}
-    step_func(Temp - Tmax) * step_func(SnowWater) * min(SnowWater, Df * (Temp - Tmax))
+function melt_func(
+    input::ComponentVector{T,Vector{T},Tuple{Axis{(SnowWater=1, Temp=2)}}},
+    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(Tmax=1, Df=2)}}}
+) where {T<:Number}
+    snow_water, temp = input[:SnowWater], input[:Temp]
+    Tmax, Df = parameters[:Tmax], parameters[:Df]
+    ComponentVector(Melt=step_func(temp - Tmax) * step_func(snow_water) * min(snow_water, Df * (temp - Tmax)))
 end
