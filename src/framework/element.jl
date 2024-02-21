@@ -1,12 +1,12 @@
 # Element Methods
 mutable struct Element{T} <: AbstractElement where {T<:Number}
-    id::String
+    name::String
 
     # parameters
     parameters::ComponentVector{T}
 
     # states
-    states::ComponentVector
+    states::ComponentVector{T}
     init_states::ComponentVector{T}
     state_names::Set{Symbol}
 
@@ -23,7 +23,7 @@ mutable struct Element{T} <: AbstractElement where {T<:Number}
 end
 
 function build_element(
-    ; id::String,
+    ; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
     funcs::Vector{F},
@@ -31,7 +31,7 @@ function build_element(
     solve_type::String=ode_solve,
 ) where {F<:AbstractFlux,T<:Number}
 
-    states = ComponentVector{T}(; Dict(k => [init_states[k]] for k in keys(init_states))...)
+    states = ComponentVector(; Dict(k => [init_states[k]] for k in keys(init_states))...)
     state_names = Set(keys(init_states))
 
     input_names = Set{Symbol}()
@@ -42,7 +42,7 @@ function build_element(
         union!(output_names, func.output_names)
     end
     return Element{T}(
-        id,
+        name,
         parameters,
         states,
         init_states,
@@ -113,7 +113,7 @@ function solve_prob!(ele::AbstractElement; input::ComponentVector{T}) where {T<:
         end
     end
 
-    prob = ODEProblem(ode_func!, ele.init_states, tspan)
+    prob = ODEProblem(ode_func!, ComponentVector(ele.init_states), tspan)
     sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
     solved_u = sol.u
     solved_u_matrix = hcat(solved_u...)
@@ -124,11 +124,7 @@ end
 function get_fluxes(ele::AbstractElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = ComponentVector(input; state...)
     for func in ele.funcs
-        if length(fluxes[first(keys(fluxes))]) == 1
-            temp_flux = func(fluxes)
-        else
-            temp_flux = get_output(func, fluxes)
-        end
+        temp_flux = func(fluxes)
         fluxes = ComponentVector(fluxes; temp_flux...)
     end
     return fluxes

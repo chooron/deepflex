@@ -1,5 +1,5 @@
 function Saturation(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux{T}(
+    SimpleFlux(
         input_names,
         [:Saturation],
         parameters,
@@ -8,8 +8,8 @@ function Saturation(input_names::Vector{Symbol}; parameters::Union{ComponentVect
 end
 
 function saturation_func(
-    input::ComponentVector{T,Vector{T},Tuple{Axis{(SoilWater=1, Rainfall=2)}}},
-    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(x1=1,)}}}
-) where {T<:Number}
-    ComponentVector(Saturation=input[:Rainfall] * (1 - (input[:SoilWater] / parameters[:x1])^2))
+    input::(@NamedTuple{SoilWater::Union{T,Vector{T}},Rainfall::Union{T,Vector{T}}}),
+    parameters::(@NamedTuple{x1::Union{T,Vector{T}}})
+)::(@NamedTuple{Saturation::Union{T,Vector{T}}}) where {T<:Number}
+    (Saturation=@.(input[:Rainfall] * (1 - (input[:SoilWater] / parameters[:x1])^2)),)
 end

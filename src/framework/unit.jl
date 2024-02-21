@@ -1,5 +1,5 @@
 @kwdef mutable struct Unit{T,E} <: AbstractUnit where {T<:Number,E<:AbstractElement}
-    id::String
+    name::String
 
     # parameters
     parameters::ComponentVector{T}
@@ -16,7 +16,7 @@
     fluxes::ComponentVector = ComponentVector()
 end
 
-function build_unit(; id::String, elements::Vector{E}) where {E<:AbstractElement}
+function build_unit(; name::String, elements::Vector{E}) where {E<:AbstractElement}
     parameters = ComponentVector()
     input_names = Set{Symbol}()
     output_names = Set{Symbol}()
@@ -28,12 +28,12 @@ function build_unit(; id::String, elements::Vector{E}) where {E<:AbstractElement
         union!(state_names, ele.state_names)
     end
     Unit(
-        id=id,
+        name=name,
         parameters=parameters,
         elements=elements,
         input_names=input_names,
         output_names=output_names,
-        state_names=state_names
+        state_names=state_names,
     )
 end
 
@@ -60,13 +60,7 @@ function get_states(unit::AbstractUnit; state_names::Union{Set{Symbol},Nothing}=
 end
 
 function get_init_states(sort_eles::Vector{E}) where {E<:AbstractElement}
-    u_init = ComponentVector()
-    for tmp_ele in sort_eles
-        if isa(tmp_ele, ODEElement)
-            u_init = ComponentVector(u_init; tmp_ele.init_states...)
-        end
-    end
-    return u_init
+    return ComponentVector(merge([ele.init_states for ele in sort_eles]...))
 end
 
 function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
@@ -90,7 +84,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         # traversal of the directed graph
         for tmp_ele in unit.elements
             tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
-            unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
+            unit.fluxes = merge(unit.fluxes, tmp_fluxes)
         end
     else
         # * This function is calculated based on the whole Unit
@@ -104,7 +98,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         function ode_function!(du, u, p, t)
             # element input
             # 使用插值方法获取该时段下的输入值
-            tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
+            tmp_input = (; Dict(k => itp[k](t) for k in keys(itp))...)
             # 遍历Unit中所有的Element进行求解
             for tmp_ele in unit.elements
                 # 判断是否为ODEsElement
@@ -120,7 +114,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
                     # 计算出各个flux，更新至tmp_input中
                     tmp_fluxes = get_fluxes(tmp_ele, input=tmp_input)
                 end
-                tmp_input = ComponentVector(tmp_input; tmp_fluxes...)
+                tmp_input = merge(tmp_input, tmp_fluxes)
             end
         end
 

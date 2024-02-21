@@ -12,7 +12,7 @@ include("../src/DeepFlex.jl")
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 parameters = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 init_states = ComponentVector(SnowWater=0.0, SoilWater=1303.004248)
-model = DeepFlex.ExpHydro(id="exp-hydro", parameters=parameters, init_states=init_states)
+model = DeepFlex.ExpHydro(name="exp-hydro", parameters=parameters, init_states=init_states)
 
 # load data
 file_path = "data/camels/01013500.csv"

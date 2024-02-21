@@ -1,5 +1,5 @@
 function Pet(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux{T}(
+    SimpleFlux(
         input_names,
         [:Percolation],
         parameters,
@@ -8,9 +8,9 @@ function Pet(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},N
 end
 
 function pet_func(
-    input::ComponentVector{T,Vector{T},Tuple{Axis{(Temp=1, Lday=2)}}},
-    parameters::Nothing
-) where {T<:Number}
+    input::(@NamedTuple{Temp::Union{T,Vector{T}}, Lday::Union{T,Vector{T}}}),
+    parameters::Nothing=nothing
+)::(@NamedTuple{Temp::Union{T,Vector{T}}}) where {T<:Number}
     temp, lday = input[:Temp], input[:Lday]
-    ComponentVector(Pet=29.8 * lday * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2))
+    (Pet=@.(29.8 * lday * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)),)
 end

@@ -1,5 +1,5 @@
-function Splitter(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
-    SimpleFlux{T}(
+function Splitter(input_names::Vector{Symbol}; parameters::(ComponentVector{T})) where {T<:Number}
+    SimpleFlux(
         input_names,
         collect(keys(parameters)),
         parameters,
@@ -8,9 +8,9 @@ function Splitter(input_names::Vector{Symbol}; parameters::ComponentVector{T}) w
 end
 
 function splitter_func(
-    input::ComponentVector{T},
-    parameters::ComponentVector{T}
-) where {T<:Number}
+    input::NamedTuple,
+    parameters::NamedTuple
+)::NamedTuple
     tmp_input = input(first(input_names))
-    ComponentVector(;Dict(k=parameters[k] * tmp_input for k in keys(parameters))...)
+    (;Dict(k=parameters[k] .* tmp_input for k in keys(parameters))...)
 end

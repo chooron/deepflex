@@ -1,5 +1,5 @@
 function Recharge(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux{T}(
+    SimpleFlux(
         input_names,
         [:Recharge],
         parameters,
@@ -8,10 +8,10 @@ function Recharge(input_names::Vector{Symbol}; parameters::Union{ComponentVector
 end
 
 function recharge_func(
-    input::ComponentVector{T,Vector{T},Tuple{Axis{(RoutingStore=1,)}}},
-    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(x2=1, x3=2, ω=3)}}}
-) where {T<:Number}
+    input::(@NamedTuple{RoutingStore::Union{T,Vector{T}}}),
+    parameters::(@NamedTuple{x2::Union{T,Vector{T}}, x3::Union{T,Vector{T}}, ω::Union{T,Vector{T}}})
+)::(@NamedTuple{Recharge::Union{T,Vector{T}}}) where {T<:Number}
     routing_store = input[:RoutingStore]
     x2, x3, ω = parameters[:x2], parameters[:x3], parameters[:ω]
-    ComponentVector(Recharge=x2 / (x3^ω) * routing_store^ω)
+    (Recharge=@.(x2 / (x3^ω) * routing_store^ω),)
 end

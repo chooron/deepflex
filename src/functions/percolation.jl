@@ -1,5 +1,5 @@
 function Percolation(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux{T}(
+    SimpleFlux(
         input_names,
         [:Percolation],
         parameters,
@@ -8,8 +8,8 @@ function Percolation(input_names::Vector{Symbol}; parameters::Union{ComponentVec
 end
 
 function percolation_func(
-    input::ComponentVector{T,Vector{T},Tuple{Axis{(SoilWater=1,)}}},
-    parameters::ComponentVector{T,Vector{T},Tuple{Axis{(x1=1,)}}}
-) where {T<:Number}
-    ComponentVector(Percolation=(parameters[:x1]^(-4)) / 4 * ((4 / 9)^(-4)) * (input[:SoilWater]^5))
+    input::(@NamedTuple{SoilWater::Union{T,Vector{T}}}),
+    parameters::(@NamedTuple{x1::Union{T,Vector{T}}})
+)::(@NamedTuple{Percolation::Union{T,Vector{T}}}) where {T<:Number}
+    (Percolation=@.((parameters[:x1]^(-4)) / 4 * ((4 / 9)^(-4)) * (input[:SoilWater]^5)),)
 end

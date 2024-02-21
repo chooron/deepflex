@@ -1,7 +1,9 @@
 """
 RoutingStore in GR4J
 """
-function RoutingStore_GR4J(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function RoutingStore_GR4J(; name::String,
+    parameters::ComponentVector{T},
+    init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
         Splitter([:Flow], parameters=ComponentVector{T}(Q9=0.9, Q1=0.1)),
         Routing([:Q9], lag_time=parameters[:x4], lag_func=unit_hydro1),
@@ -15,7 +17,7 @@ function RoutingStore_GR4J(; id::String, parameters::ComponentVector{T}, init_st
     end
 
     build_element(
-        id=id,
+        name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,

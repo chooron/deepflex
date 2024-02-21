@@ -1,27 +1,11 @@
-using ComponentArrays
-using ComponentArrays:Axis
+using DifferentialEquations
+f(u, p, t) = 1.01 * u
 
-function cv_type(arr::List, dtype)
-    return ComponentVector{dtype,Vector{dtype},Tuple{Axis{(a=1, b=2)}}}
+u0 = (1 / 2,)
+tspan = (0.0, 1.0)
+prob = ODEProblem(f, u0, tspan)
+sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
+
+function f3(a::NamedTuple{T}) where {T<:Number}
+    println("ok")
 end
-
-function fun(input::ComponentVector{T,Vector{T},Tuple{Axis{(a=1, b=2)}}}; ) where {T<:Number}
-    println(a + b + c)
-end
-
-function fun(input::ComponentVector{T,Vector{T},Tuple{Axis{(a=1, c=2)}}}; ) where {T<:Number}
-    println(a + b + c)
-end
-
-function fun(a; d, e)
-    println(a * d * e)
-end
-
-tmp_a = 1
-tmp_b = 2
-tmp_c = 3
-tmp_d = 3
-tmp_e = 4
-fun((tmp_a)...; Dict(:b => tmp_b, :c => tmp_c, :d => tmp_c, :e => tmp_c)...)
-
-@variable $a

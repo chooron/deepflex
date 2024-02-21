@@ -1,18 +1,21 @@
 """
 SnowWaterReservoir in Exp-Hydro
 """
-function SnowWater_ExpHydro(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function SnowWater_ExpHydro(; name::String,
+    parameters::ComponentVector{T},
+    init_states::ComponentVector{T}) where {T<:Number}
+
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:Tmin]])
         Melt([:SnowWater, :Temp], parameters=parameters[[:Tmax, :Df]])
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SnowWater=input[:Snowfall] - input[:Melt])
+        ComponentVector(SnowWater=input[:Snowfall] .- input[:Melt],)
     end
 
     build_element(
-        id=id,
+        name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
@@ -20,9 +23,36 @@ function SnowWater_ExpHydro(; id::String, parameters::ComponentVector{T}, init_s
     )
 end
 
-function SnowWater_M100(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function SnowWater_M100(; name::String,
+    parameters::ComponentVector{T},
+    init_states::ComponentVector{T}) where {T<:Number}
+
     funcs = [
-        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater], parameters=ComponentVector{T}()),
+        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater]),
+    ]
+
+    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
+        ComponentVector(SnowWater=begin
+            relu(sinh(input[:Snowfall]) .* step_fct(input[:Temp]))
+            .-relu(step_func(input[:SnowWater]) .* sinh(input[:Melt]))
+        end)
+    end
+
+    build_element(
+        name=name,
+        parameters=parameters,
+        init_states=init_states,
+        funcs=funcs,
+        get_du=get_du
+    )
+end
+
+function SnowWater_M100(; name::String,
+    parameters::ComponentVector{T},
+    init_states::ComponentVector{T}) where {T<:Number}
+    
+    funcs = [
+        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater]),
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
@@ -33,28 +63,7 @@ function SnowWater_M100(; id::String, parameters::ComponentVector{T}, init_state
     end
 
     build_element(
-        id=id,
-        parameters=parameters,
-        init_states=init_states,
-        funcs=funcs,
-        get_du=get_du
-    )
-end
-
-function SnowWater_M100(; id::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
-    funcs = [
-        Tranparent([:Melt, :Snowfall, :Temp, :SnowWater], parameters=ComponentVector{T}()),
-    ]
-
-    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SnowWater=begin
-            relu(sinh(input[:Snowfall]) * step_fct(input[:Temp]))
-            -relu(step_func(input[:SnowWater]) * sinh(input[:Melt]))
-        end)
-    end
-
-    build_element(
-        id=id,
+        name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
