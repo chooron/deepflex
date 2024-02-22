@@ -1,8 +1,8 @@
-function Tranparent(input_names::Vector{Symbol}; parameters::Nothing=nothing)
-    build_flux(
+function Tranparent(input_names::Vector{Symbol}; parameters::ComponentVector=ComponentVector())
+    SimpleFlux(
         input_names,
         input_names,
-        nothing,
+        parameters,
         (i::NamedTuple, parameters::Nothing=nothing) -> i
     )
 end

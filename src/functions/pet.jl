@@ -1,5 +1,5 @@
-function Pet(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    build_flux(
+function Pet(input_names::Vector{Symbol}; parameters::ComponentVector=ComponentVector())
+    SimpleFlux(
         input_names,
         [:Pet],
         parameters,

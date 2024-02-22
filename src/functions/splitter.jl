@@ -1,5 +1,5 @@
-function Splitter(input_names::Vector{Symbol}; parameters::(ComponentVector{T})) where {T<:Number}
-    build_flux(
+function Splitter(input_names::Vector{Symbol}; parameters::ComponentVector{T}) where {T<:Number}
+    SimpleFlux(
         input_names,
         collect(keys(parameters)),
         parameters,

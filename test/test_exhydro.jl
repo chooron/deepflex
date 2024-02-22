@@ -43,4 +43,4 @@ states = DeepFlex.get_states(model) # , state_names=Set([:SnowWater,:SoilWater])
 result_df[!,:SoilWater] = states[:SoilWater]
 result_df[!,:SnowWater] = states[:SnowWater]
 
-CSV.write("data/cache/01013500.csv", result_df);
+CSV.write("data/cache/01013500.csv", result_df)

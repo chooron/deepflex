@@ -51,11 +51,7 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 
 # framework Methods
 include("framework/paraminfo.jl")
-
-include("framework/nnflux.jl")
-include("framework/routingflux.jl")
-include("framework/simpleflux.jl")
-
+include("framework/fluxes.jl")
 include("framework/element.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
@@ -63,10 +59,6 @@ include("framework/network.jl")
 
 include("framework/optimize.jl")
 
-# Implement Element
-include("elements/routingstore.jl")
-include("elements/snowwater.jl")
-include("elements/soilWater.jl")
 # Implement Flux
 include("functions/baseflow.jl")
 include("functions/evap.jl")
@@ -81,6 +73,11 @@ include("functions/snowfall.jl")
 include("functions/splitter.jl")
 include("functions/surfaceflow.jl")
 include("functions/transparent.jl")
+include("functions/unithydro.jl")
+# Implement Element
+include("elements/routingstore.jl")
+include("elements/snowwater.jl")
+include("elements/soilWater.jl")
 # Implements Models
 include("implements/ExpHydro.jl")
 include("implements/GR4J.jl")

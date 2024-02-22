@@ -52,7 +52,7 @@ function hybrid_params_optimize()
 
 end
 
-function pretrain!(nn::NNFlux; input::ComponentVector{T}, train_config...) where {T<:Number}
+function pretrain!(nn::LuxNNFlux; input::ComponentVector{T}, train_config...) where {T<:Number}
     x = hcat([input[nm] for nm in nn.input_names]...)
     y = hcat([input[nm] for nm in nn.output_names]...)'
 
