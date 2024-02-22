@@ -100,7 +100,7 @@ function SoilWater_GR4J(; name::String,
         Saturation([:SoilWater, :Rainfall], parameters=parameters[[:x1]])
         Evap([:SoilWater, :Prcp, :Pet], parameters=parameters[[:x1]])
         Percolation([:SoilWater], parameters=parameters[[:x1]])
-        Flow([:Rainfall, :Saturation, :Saturation])
+        Flow([:Rainfall, :Percolation, :Saturation])
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin

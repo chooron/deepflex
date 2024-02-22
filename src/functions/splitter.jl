@@ -11,6 +11,6 @@ function splitter_func(
     input::NamedTuple,
     parameters::NamedTuple
 )::NamedTuple
-    tmp_input = input(first(input_names))
-    (;Dict(k=parameters[k] .* tmp_input for k in keys(parameters))...)
+    tmp_input = input[first(keys(input))]
+    (;Dict(k=>parameters[k] .* tmp_input for k in keys(parameters))...)
 end
