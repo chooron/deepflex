@@ -3,7 +3,6 @@ using CSV
 using DataFrames
 using CairoMakie
 using ComponentArrays
-using CairoMakie:Axis
 
 # test exphydro model
 include("../src/DeepFlex.jl")
@@ -19,20 +18,20 @@ file_path = "data/camels/01013500.csv"
 
 data = CSV.File(file_path);
 df = DataFrame(data);
-lday_vec = df[1:1000, "dayl(day)"]
-prcp_vec = df[1:1000, "prcp(mm/day)"]
-temp_vec = df[1:1000, "tmean(C)"]
-flow_vec = df[1:1000, "flow(mm)"]
+lday_vec = df[1:10000, "dayl(day)"]
+prcp_vec = df[1:10000, "prcp(mm/day)"]
+temp_vec = df[1:10000, "tmean(C)"]
+flow_vec = df[1:10000, "flow(mm)"]
 
 inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec)
-result = DeepFlex.get_output(model, input=inputs, step=true, sensealg=DeepFlex.default_ode_sensealg)
+result = DeepFlex.get_output(model, input=inputs, step=false, sensealg=DeepFlex.default_ode_sensealg)
 
 result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
 
 # plot result
 fig = Figure(size=(400, 300))
-ax = Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-x = range(1, 1000, length=1000)
+ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+x = range(1, 10000, length=10000)
 lines!(ax, x, flow_vec, color=:red)
 lines!(ax, x, result[:Surfaceflow], color=:blue)
 lines!(ax, x, result[:Baseflow], color=:blue)

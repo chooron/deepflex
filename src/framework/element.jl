@@ -1,12 +1,12 @@
 # Element Methods
-mutable struct Element{T} <: AbstractElement where {T<:Number}
+@kwdef mutable struct Element{T} <: AbstractElement where {T<:Number}
     name::String
 
     # parameters
     parameters::ComponentVector{T}
 
     # states
-    states::ComponentVector{T}
+    states::ComponentVector=ComponentVector()
     init_states::ComponentVector{T}
     state_names::Set{Symbol}
 
@@ -31,7 +31,6 @@ function build_element(
     solve_type::String=ode_solve,
 ) where {F<:AbstractFlux,T<:Number}
 
-    states = ComponentVector(; Dict(k => [init_states[k]] for k in keys(init_states))...)
     state_names = Set(keys(init_states))
 
     input_names = Set{Symbol}()
@@ -41,17 +40,17 @@ function build_element(
         union!(input_names, func.input_names)
         union!(output_names, func.output_names)
     end
+
     return Element{T}(
-        name,
-        parameters,
-        states,
-        init_states,
-        state_names,
-        funcs,
-        get_du,
-        solve_type,
-        input_names,
-        output_names
+        name=name,
+        parameters=parameters,
+        init_states=init_states,
+        state_names=state_names,
+        funcs=funcs,
+        get_du=get_du,
+        solve_type=solve_type,
+        input_names=input_names,
+        output_names=output_names
     )
 end
 

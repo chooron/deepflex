@@ -1,11 +1,17 @@
-using DifferentialEquations
-f(u, p, t) = 1.01 * u
-
-u0 = (1 / 2,)
-tspan = (0.0, 1.0)
-prob = ODEProblem(f, u0, tspan)
-sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
-
-function f3(a::NamedTuple{T}) where {T<:Number}
-    println("ok")
+function func(
+    input::Union{@NamedTuple{A::T},@NamedTuple{A::Vector{T}}},
+    p::(@NamedTuple{B::T})
+) where {T<:Number}
+    @info input
+    @info p
 end
+
+function func2(
+    input::Union{Vector{T},T}
+) where {T<:Number}
+    @info input
+end
+
+
+func((A=[1],), (B=1,))
+func2([1])

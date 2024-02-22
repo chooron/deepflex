@@ -1,5 +1,5 @@
 function Saturation(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux(
+    build_flux(
         input_names,
         [:Saturation],
         parameters,
@@ -8,8 +8,8 @@ function Saturation(input_names::Vector{Symbol}; parameters::Union{ComponentVect
 end
 
 function saturation_func(
-    input::(@NamedTuple{SoilWater::Union{T,Vector{T}},Rainfall::Union{T,Vector{T}}}),
-    parameters::(@NamedTuple{x1::Union{T,Vector{T}}})
-)::(@NamedTuple{Saturation::Union{T,Vector{T}}}) where {T<:Number}
+    input::gen_namedtuple_type([:SoilWater,:Rainfall], T),
+    parameters::gen_namedtuple_type([:x1], T)
+)::gen_namedtuple_type([:Saturation], T) where {T<:Number}
     (Saturation=@.(input[:Rainfall] * (1 - (input[:SoilWater] / parameters[:x1])^2)),)
 end

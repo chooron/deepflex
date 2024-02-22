@@ -1,5 +1,5 @@
 function Rainfall(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux(
+    build_flux(
         input_names,
         [:Rainfall],
         parameters,
@@ -8,15 +8,15 @@ function Rainfall(input_names::Vector{Symbol}; parameters::Union{ComponentVector
 end
 
 function rainfall_func(
-    input::(@NamedTuple{Prcp::Union{T,Vector{T}},Temp::Union{T,Vector{T}}}),
-    parameters::(@NamedTuple{x1::Union{T,Vector{T}}})
-)::(@NamedTuple{Rainfall::Union{T,Vector{T}}}) where {T<:Number}
+    input::gen_namedtuple_type([:Prcp,:Temp], T),
+    parameters::gen_namedtuple_type([:Tmin], T)
+)::gen_namedtuple_type([:Rainfall], T) where {T<:Number}
     (Rainfall=@.(step_func(input[:Temp] - parameters[:Tmin]) * input[:Prcp]),)
 end
 
 function rainfall_func(
-    input::(@NamedTuple{Prcp::Union{T,Vector{T}},Pet::Union{T,Vector{T}}}),
-    parameters::Nothing
-)::(@NamedTuple{Rainfall::Union{T,Vector{T}}}) where {T<:Number}
+    input::gen_namedtuple_type([:Prcp,:Pet], T),
+    parameters::Nothing=nothing
+)::gen_namedtuple_type([:Rainfall], T) where {T<:Number}
     (Rainfall=@.(step_func(input[:Prcp] - input[:Pet]) * (input[:Prcp] - input[:Pet])),)
 end

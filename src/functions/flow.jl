@@ -1,5 +1,5 @@
 function Flow(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},Nothing}=nothing) where {T<:Number}
-    SimpleFlux(
+    build_flux(
         input_names,
         [:Flow],
         parameters,
@@ -8,15 +8,15 @@ function Flow(input_names::Vector{Symbol}; parameters::Union{ComponentVector{T},
 end
 
 function flow_func(
-    input::(@NamedTuple{Baseflow::Union{T,Vector{T}}, Surfaceflow::Union{T,Vector{T}}}),
+    input::gen_namedtuple_type([:Baseflow,:Surfaceflow], T),
     parameters::Nothing=nothing
-)::(@NamedTuple{Flow::Union{T,Vector{T}}}) where {T<:Number}
+)::gen_namedtuple_type([:Flow], T) where {T<:Number}
     (Flow=input[:Baseflow] .+ input[:Surfaceflow],)
 end
 
 function flow_func(
-    input::(@NamedTuple{Rainfall::Union{T,Vector{T}}, Percolation::Union{T,Vector{T}}, Saturation::Union{T,Vector{T}}}),
+    input::gen_namedtuple_type([:Rainfall,:Percolation,:Saturation], T),
     parameters::Nothing=nothing
-)::(@NamedTuple{Flow::Union{T,Vector{T}}}) where {T<:Number}
+)::gen_namedtuple_type([:Flow], T) where {T<:Number}
     (Flow=input[:Rainfall] .+ input[:Percolation] .- input[:Saturation],)
 end

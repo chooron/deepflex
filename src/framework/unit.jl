@@ -60,7 +60,11 @@ function get_states(unit::AbstractUnit; state_names::Union{Set{Symbol},Nothing}=
 end
 
 function get_init_states(sort_eles::Vector{E}) where {E<:AbstractElement}
-    return ComponentVector(merge([ele.init_states for ele in sort_eles]...))
+    init_states = ComponentVector()
+    for ele in sort_eles
+        init_states = ComponentVector(init_states; ele.init_states...)
+    end
+    return init_states
 end
 
 function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
@@ -84,7 +88,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         # traversal of the directed graph
         for tmp_ele in unit.elements
             tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
-            unit.fluxes = merge(unit.fluxes, tmp_fluxes)
+            unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
         end
     else
         # * This function is calculated based on the whole Unit
@@ -98,23 +102,17 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         function ode_function!(du, u, p, t)
             # element input
             # 使用插值方法获取该时段下的输入值
-            tmp_input = (; Dict(k => itp[k](t) for k in keys(itp))...)
+            tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
             # 遍历Unit中所有的Element进行求解
             for tmp_ele in unit.elements
-                # 判断是否为ODEsElement
-                if isa(tmp_ele, ODEElement)
-                    # 计算出各个flux，更新至tmp_input中
-                    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
-                    # 求解du并更新du
-                    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
-                    for k in tmp_ele.state_names
-                        du[k] = tmp_du[k]
-                    end
-                else
-                    # 计算出各个flux，更新至tmp_input中
-                    tmp_fluxes = get_fluxes(tmp_ele, input=tmp_input)
+                # 计算出各个flux，更新至tmp_input中
+                tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
+                # 求解du并更新du
+                tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
+                for k in tmp_ele.state_names
+                    du[k] = tmp_du[k]
                 end
-                tmp_input = merge(tmp_input, tmp_fluxes)
+                tmp_input = ComponentVector(tmp_input; tmp_fluxes...)
             end
         end
 
@@ -138,11 +136,7 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         unit.fluxes = input
         # *带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
-            if isa(tmp_ele, ODEElement)
-                tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
-            else
-                tmp_fluxes = get_fluxes(tmp_ele, input=unit.fluxes)
-            end
+            tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
             unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
         end
     end

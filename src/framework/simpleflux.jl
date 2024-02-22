@@ -1,22 +1,26 @@
 """
 水文非状态计算公式，对应superflexpy的ParameterizeElement
 """
-struct SimpleFlux{T} <: AbstractFlux where {T<:Number}
+struct SimpleFlux <: AbstractFlux
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    parameters::Union{@NamedTuple{T},Nothing}
+    parameters::Union{NamedTuple,Nothing}
     func::Function
 end
 
-function SimpleFlux(input_names::Vector{Symbol},
+function build_flux(input_names::Vector{Symbol},
     output_names::Vector{Symbol},
     parameters::Union{ComponentVector{T},Nothing},
     func::Function) where {T<:Number}
 
-    SimpleFlux{T}(
+    if parameters !== nothing
+        parameters = (; parameters...)
+    end
+
+    SimpleFlux(
         input_names,
         output_names,
-        (;parameters...),
+        parameters,
         func
     )
 end
@@ -24,6 +28,11 @@ end
 function (flux::SimpleFlux)(input::ComponentVector{T}) where {T<:Number}
     tmp_input = (; input[flux.input_names]...)
     flux.func(tmp_input, flux.parameters)
+end
+
+function gen_namedtuple_type(input_names::Vector{Symbol}, dtype::Union{Type,TypeVar})
+    Union{NamedTuple{tuple(input_names...),NTuple{length(input_names),dtype}},
+        NamedTuple{tuple(input_names...),NTuple{length(input_names),Vector{dtype}}}}
 end
 
 function get_parameters(func::SimpleFlux; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
