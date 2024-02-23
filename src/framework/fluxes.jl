@@ -67,6 +67,7 @@ function (flux::LuxNNFlux)(input::ComponentVector{T}) where {T<:Number}
     end
     return output
 end
+
 ## ----------------------------------------------------------------------
 
 ## *namedtuple type generation function for SimpleFlux
@@ -101,4 +102,3 @@ function update!(flux::LuxNNFlux, tstate)
     flux.parameters = tstate.parameters
 end
 ## ----------------------------------------------------------------------
-
