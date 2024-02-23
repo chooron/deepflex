@@ -213,7 +213,7 @@ LAGElement
 end
 
 function LAGElement(
-    ;name::String
+    ;name::String,
     lag_time::Union{T,ComponentVector{T}},
     lag_func::ComponentVector
 ) where {T<:Number}
