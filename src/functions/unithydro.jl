@@ -1,3 +1,14 @@
+function unit_hydro(bin, len)
+    if bin < 0
+        value = 0
+    elseif bin < len
+        value = (bin / len)^2.5
+    else
+        value = 1
+    end
+    return value
+end
+
 function unit_hydro1(bin, len)
     value = begin
         step_func(bin - len) +

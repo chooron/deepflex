@@ -96,11 +96,12 @@ function SoilWater_GR4J(; name::String,
     init_states::ComponentVector{T}) where {T<:Number}
     
     funcs = [
-        Rainfall([:Prcp, :Pet], parameters=ComponentVector())
+        Rainfall([:Prcp, :Pet])
         Saturation([:SoilWater, :Rainfall], parameters=parameters[[:x1]])
         Evap([:SoilWater, :Prcp, :Pet], parameters=parameters[[:x1]])
         Percolation([:SoilWater], parameters=parameters[[:x1]])
-        Flow([:Rainfall, :Saturation, :Saturation])
+        Flow([:Rainfall, :Percolation, :Saturation])
+        Splitter([:Flow], parameters=ComponentVector{T}(Q9=0.9, Q1=0.1))
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin

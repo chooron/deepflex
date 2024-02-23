@@ -1,5 +1,68 @@
 # Element Methods
-@kwdef mutable struct Element{T} <: AbstractElement where {T<:Number}
+function get_name(ele::AbstractElement)::String
+    return ele.name
+end
+
+function get_output(ele::AbstractElement)
+    return nothing
+end
+
+"""
+SimpleElement
+
+SimpleElement是由多个AbstractFlux组成，无中间状态，对应RRMG的一些模型
+"""
+@kwdef mutable struct SimpleElement{T} <: AbstractElement where {T<:Number}
+    name::String
+
+    # parameters
+    parameters::ComponentVector{T}
+
+    # functions
+    funcs::Vector{AbstractFlux}
+
+    # attribute
+    input_names::Set{Symbol}
+    output_names::Set{Symbol}
+end
+
+function SimpleElement(
+    ; name::String,
+    parameters::ComponentVector{T},
+    funcs::Vector{F},
+) where {F<:AbstractFlux,T<:Number}
+
+    input_names = Set{Symbol}()
+    output_names = Set{Symbol}()
+
+    for func in funcs
+        union!(input_names, func.input_names)
+        union!(output_names, func.output_names)
+    end
+
+    return SimpleElement{T}(
+        name=name,
+        parameters=parameters,
+        funcs=funcs,
+        input_names=input_names,
+        output_names=output_names
+    )
+end
+
+function get_output(ele::SimpleElement; input::ComponentVector{T}) where {T<:Number}
+    fluxes = ComponentVector(input; state...)
+    for func in ele.funcs
+        fluxes = ComponentVector(fluxes; func(fluxes)...)
+    end
+    return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
+end
+
+"""
+ODEElement
+
+ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含continuous和discrete两种
+"""
+@kwdef mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
     name::String
 
     # parameters
@@ -22,7 +85,7 @@
     output_names::Set{Symbol}
 end
 
-function build_element(
+function ODEElement(
     ; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
@@ -41,7 +104,7 @@ function build_element(
         union!(output_names, func.output_names)
     end
 
-    return Element{T}(
+    return ODEElement{T}(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -54,11 +117,8 @@ function build_element(
     )
 end
 
-function get_id(ele::AbstractElement)::String
-    return ele.id
-end
 
-function get_parameters(ele::AbstractElement; names::Vector{Symbol}=nothing)
+function get_parameters(ele::ODEElement; names::Vector{Symbol}=nothing)
     if isnothing(names)
         return ele.parameters
     else
@@ -66,7 +126,7 @@ function get_parameters(ele::AbstractElement; names::Vector{Symbol}=nothing)
     end
 end
 
-function set_parameters!(ele::AbstractElement; paraminfos::Vector{P}) where {P<:AbstractParamInfo}
+function set_parameters!(ele::ODEElement; paraminfos::Vector{P}) where {P<:AbstractParamInfo}
     for p in paraminfos
         ele.parameters[p.name] = p.value
         for func in ele.funcs
@@ -75,7 +135,7 @@ function set_parameters!(ele::AbstractElement; paraminfos::Vector{P}) where {P<:
     end
 end
 
-function get_states(ele::AbstractElement; state_names::Union{Set{Symbol},Nothing}=nothing)
+function get_states(ele::ODEElement; state_names::Union{Set{Symbol},Nothing}=nothing)
     if isnothing(state_names)
         return ele.states
     else
@@ -84,8 +144,7 @@ function get_states(ele::AbstractElement; state_names::Union{Set{Symbol},Nothing
     end
 end
 
-
-function pretrain!(ele::AbstractElement; input::ComponentVector{T}, train_config...) where {T<:Number}
+function pretrain!(ele::ODEElement; input::ComponentVector{T}, train_config...) where {T<:Number}
     for func in ele.funcs
         if isa(func, LuxNNFunc)
             pretrain!(func, input=input, train_config...)
@@ -93,7 +152,7 @@ function pretrain!(ele::AbstractElement; input::ComponentVector{T}, train_config
     end
 end
 
-function solve_prob!(ele::AbstractElement; input::ComponentVector{T}) where {T<:Number}
+function solve_prob!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     dt = 1
     xs = 1:dt:length(input[first(keys(input))])
     tspan = (xs[1], xs[end])
@@ -120,20 +179,107 @@ function solve_prob!(ele::AbstractElement; input::ComponentVector{T}) where {T<:
     ele.states = solved_u
 end
 
-function get_fluxes(ele::AbstractElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
+function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
     fluxes = ComponentVector(input; state...)
     for func in ele.funcs
-        temp_flux = func(fluxes)
-        fluxes = ComponentVector(fluxes; temp_flux...)
+        fluxes = ComponentVector(fluxes; func(fluxes)...)
     end
     return fluxes
 end
 
-function get_output(ele::AbstractElement; input::ComponentVector{T}) where {T<:Number}
+function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     solve_prob!(ele, input=input)
     fluxes = get_fluxes(ele, state=ele.states, input=input)
     return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
 end
+
+
+"""
+LAGElement
+"""
+@kwdef mutable struct LAGElement{T} <: AbstractElement where {T<:Number}
+    name::String
+
+    # parameters
+    lag_time::ComponentVector{T}
+
+    # states
+    lag_states::ComponentVector{T}
+    lag_weights::ComponentVector{T}
+
+    # attribute
+    input_names::Set{Symbol}
+    output_names::Set{Symbol}
+end
+
+function LAGElement(
+    ;name::String
+    lag_time::Union{T,ComponentVector{T}},
+    lag_func::ComponentVector
+) where {T<:Number}
+
+    input_names = Set(keys(lag_func))
+
+    if typeof(lag_time) == T
+        lag_time = ComponentVector(; Dict(nm => lag_time for nm in input_names)...)
+    end
+
+    # init lag states
+    lag_states = ComponentVector(; Dict(nm => begin
+        zeros(Int(ceil(lag_time[nm])))
+    end for nm in input_names)...)
+
+    # build weight
+    lag_weights = ComponentVector(; Dict(k => begin
+        [
+            lag_func[k](i, lag_time[k]) - lag_func[k](i - 1, lag_time[k])
+            for i in 1:(ceil(lag_time[k])|>Int)
+        ]
+    end for k in keys(lag_time))...)
+
+    LAGElement{T}(
+        name=name,
+        lag_time=lag_time,
+        lag_states=lag_states,
+        lag_weights=lag_weights,
+        input_names=input_names,
+        output_names=input_names)
+end
+
+function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
+    max_weight_len = maximum([length(ele.lag_weights[k]) for k in keys(ele.lag_weights)])
+    max_input_len = maximum([length(input[k]) for k in keys(input)])
+
+    output = Dict(k => zeros(T, max_input_len, max_weight_len) for k in keys(input))
+
+    for k in keys(output)
+        w, ls, ip = ele.lag_weights[k], ele.lag_states[k], input[k]
+        for t in 1:max_input_len
+            updated_state = ls .+ ip[t] .* w
+            output[k][t, 1:length(w)] .= updated_state
+            ls = vcat(updated_state[2:end], 0)
+        end
+    end
+    return output
+end
+
+function get_output(ele::LAGElement,input::ComponentVector{T}) where {T<:Number}
+    input = input[ele.input_names]
+    solved_state = solve_lag(ele, input=input)
+
+    for k in ele.input_names
+        solved_state[k][end, 1:end-1] = solved_state[k][end, 2:end]
+        solved_state[k][end, end] = 0
+        solved_state[k][end, :]
+    end
+
+    # Get the new lag value to restart
+    ele.lag_states = ComponentVector(; Dict(k => solved_state[k][end, :] for k in ele.input_names)...)
+
+    output = ComponentVector(; Dict(k => solved_state[k][:, 1] for k in ele.input_names)...)
+    return output
+end
+
 
 # function solve_prob!(ele::DCTElement; input::ComponentVector{T}) where {T<:Number}
 #     data_len = length(input[first(keys(input))])
