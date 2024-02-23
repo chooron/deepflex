@@ -25,7 +25,9 @@ function build_unit(; name::String, elements::Vector{E}) where {E<:AbstractEleme
         parameters = ComponentVector(parameters; ele.parameters...)
         union!(input_names, ele.input_names)
         union!(output_names, ele.output_names)
-        union!(state_names, ele.state_names)
+        if ele isa ODEElement
+            union!(state_names, ele.state_names)
+        end
     end
     Unit(
         name=name,
@@ -35,6 +37,17 @@ function build_unit(; name::String, elements::Vector{E}) where {E<:AbstractEleme
         output_names=output_names,
         state_names=state_names,
     )
+end
+
+function has_ode(unit::Unit)
+    has_flag = false
+    for ele in unit.elements
+        if ele isa ODEElement
+            has_flag = true
+            break
+        end
+    end
+    return has_flag
 end
 
 function pretrain!(unit::AbstractUnit; input::ComponentVector{T}, train_config...) where {T<:Number}
@@ -70,10 +83,8 @@ end
 function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
     for idx in topological_sort(unit.structure)
         tmp_ele = get_prop(unit.structure, idx, :ele)
-        if isa(tmp_ele, ParameterizedElement) | isa(tmp_ele, StateParameterizedElement)
-            set_parameters!(tmp_ele, paraminfos=paraminfos)
-        end
-        if isa(tmp_ele, StateElement) | isa(tmp_ele, StateParameterizedElement)
+        set_parameters!(tmp_ele, paraminfos=paraminfos)
+        if isa(tmp_ele, ODEElement)
             set_states!(tmp_ele, paraminfos=paraminfos)
         end
     end
@@ -87,10 +98,16 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         unit.fluxes = input
         # traversal of the directed graph
         for tmp_ele in unit.elements
-            tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
+            if tmp_ele isa ODEElement
+                solve_prob!(tmp_ele, input=input)
+            end
+            tmp_fluxes = get_output(tmp_ele, input=input)
             unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
         end
     else
+        if !has_ode(unit)
+            @error "$(unit) don't contain ODEElement, please setting step to true"
+        end
         # * This function is calculated based on the whole Unit
         dt = 1
         xs = 1:dt:length(input[first(keys(input))])
@@ -105,12 +122,16 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
             tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
             # 遍历Unit中所有的Element进行求解
             for tmp_ele in unit.elements
-                # 计算出各个flux，更新至tmp_input中
-                tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
-                # 求解du并更新du
-                tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
-                for k in tmp_ele.state_names
-                    du[k] = tmp_du[k]
+                if tmp_ele isa ODEElement
+                    # 计算出各个flux，更新至tmp_input中
+                    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
+                    # 求解du并更新du
+                    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
+                    for k in tmp_ele.state_names
+                        du[k] = tmp_du[k]
+                    end
+                else
+                    tmp_fluxes = get_output(tmp_ele, input=tmp_input)
                 end
                 tmp_input = ComponentVector(tmp_input; tmp_fluxes...)
             end
@@ -136,8 +157,8 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         unit.fluxes = input
         # *带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
-            tmp_fluxes = get_fluxes(tmp_ele, state=solved_u, input=unit.fluxes)
-            unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
+
+            unit.fluxes = ComponentVector(unit.fluxes; get_output(tmp_ele, input=unit.fluxes)...)
         end
     end
     # return get_fluxes(unit, flux_names=unit.output_names)

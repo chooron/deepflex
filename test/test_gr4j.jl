@@ -23,6 +23,9 @@ P[81:83] = rand(30.0:0.01:50.0, 3)
 x1, x2, x3, x4 = 50.0, 0.1, 20.0, 3.5
 parameters = ComponentVector(x1=x1, x2=x2, x3=x3, x4=x4, ω=3.5, γ=5.0)
 init_states = ComponentVector(SoilWater=0.0, RoutingStore=10.0)
+
+ele = DeepFlex.LAGElement(name="lag", lag_time=3.5, lag_func=Dict(:Q9=>DeepFlex.unit_hydro1, :Q1=>DeepFlex.unit_hydro2))
+
 model = DeepFlex.GR4J(
     name="gr4j",
     parameters=parameters,

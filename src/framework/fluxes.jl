@@ -15,13 +15,6 @@ mutable struct LuxNNFlux <: AbstractFlux
     parameters::Any
 end
 
-mutable struct RoutingFlux <: AbstractFlux
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
-    lag_states::ComponentVector
-    lag_weights::ComponentVector
-end
-
 ## build flux
 ## ----------------------------------------------------------------------
 function SimpleFlux(input_names::Vector{Symbol},

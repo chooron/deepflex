@@ -3,7 +3,7 @@ function get_name(ele::AbstractElement)::String
     return ele.name
 end
 
-function get_output(ele::AbstractElement)
+function get_output(ele::AbstractElement, input::ComponentVector)
     return nothing
 end
 
@@ -69,7 +69,7 @@ ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含c
     parameters::ComponentVector{T}
 
     # states
-    states::ComponentVector=ComponentVector()
+    states::ComponentVector = ComponentVector()
     init_states::ComponentVector{T}
     state_names::Set{Symbol}
 
@@ -188,7 +188,6 @@ function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVec
 end
 
 function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
-    solve_prob!(ele, input=input)
     fluxes = get_fluxes(ele, state=ele.states, input=input)
     return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
 end
@@ -201,6 +200,7 @@ LAGElement
     name::String
 
     # parameters
+    parameters::ComponentVector{T}
     lag_time::ComponentVector{T}
 
     # states
@@ -213,9 +213,9 @@ LAGElement
 end
 
 function LAGElement(
-    ;name::String,
+    ; name::String,
     lag_time::Union{T,ComponentVector{T}},
-    lag_func::ComponentVector
+    lag_func::Dict{Symbol,Function}
 ) where {T<:Number}
 
     input_names = Set(keys(lag_func))
@@ -223,6 +223,8 @@ function LAGElement(
     if typeof(lag_time) == T
         lag_time = ComponentVector(; Dict(nm => lag_time for nm in input_names)...)
     end
+
+    parameters = ComponentVector(; Dict(Symbol("$(k)_lag_time") => lag_time[k] for k in keys(lag_time))...)
 
     # init lag states
     lag_states = ComponentVector(; Dict(nm => begin
@@ -239,6 +241,7 @@ function LAGElement(
 
     LAGElement{T}(
         name=name,
+        parameters=parameters,
         lag_time=lag_time,
         lag_states=lag_states,
         lag_weights=lag_weights,
@@ -263,8 +266,8 @@ function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
     return output
 end
 
-function get_output(ele::LAGElement,input::ComponentVector{T}) where {T<:Number}
-    input = input[ele.input_names]
+function get_output(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
+    input = input[collect(ele.input_names)]
     solved_state = solve_lag(ele, input=input)
 
     for k in ele.input_names

@@ -16,7 +16,7 @@ function SoilWater_ExpHydro(; name::String, parameters::ComponentVector{T}, init
         ComponentVector(SoilWater=input[:Rainfall] .+ input[:Melt] .- input[:Evap] .- input[:Flow])
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -51,7 +51,7 @@ function SoilWater_M50(; name::String,
                                   step_func(input[:SoilWater]) .* exp(input[:Flow]))
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -79,7 +79,7 @@ function SoilWater_M100(; name::String,
         end)
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -108,7 +108,7 @@ function SoilWater_GR4J(; name::String,
         ComponentVector(SoilWater=input[:Rainfall] .- input[:Evap] .- input[:Percolation])
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,

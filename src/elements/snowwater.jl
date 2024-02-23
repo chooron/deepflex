@@ -14,7 +14,7 @@ function SnowWater_ExpHydro(; name::String,
         ComponentVector(SnowWater=input[:Snowfall] .- input[:Melt],)
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -38,7 +38,7 @@ function SnowWater_M100(; name::String,
         end)
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
@@ -62,7 +62,7 @@ function SnowWater_M100(; name::String,
         end)
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,

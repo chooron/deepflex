@@ -6,8 +6,6 @@ function RoutingStore_GR4J(; name::String,
     init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
         Tranparent([:Q9]),
-        RoutingFlux([:Q9], lag_time=parameters[:x4], lag_func=unit_hydro1),
-        RoutingFlux([:Q1], lag_time=parameters[:x4], lag_func=unit_hydro2),
         Baseflow([:RoutingStore], parameters=parameters[[:x3, :γ]]),
         Recharge([:RoutingStore], parameters=parameters[[:x2, :x3, :ω]]),
     ]
@@ -16,7 +14,7 @@ function RoutingStore_GR4J(; name::String,
         ComponentVector(SoilWater=input[:Q9] + input[:Recharge] - input[:Baseflow])
     end
 
-    build_element(
+    ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
