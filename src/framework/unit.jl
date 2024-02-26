@@ -99,9 +99,9 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         # traversal of the directed graph
         for tmp_ele in unit.elements
             if tmp_ele isa ODEElement
-                solve_prob!(tmp_ele, input=input)
+                solve_prob!(tmp_ele, input=unit.fluxes)
             end
-            tmp_fluxes = get_output(tmp_ele, input=input)
+            tmp_fluxes = get_output(tmp_ele, input=unit.fluxes)
             unit.fluxes = ComponentVector(unit.fluxes; tmp_fluxes...)
         end
     else

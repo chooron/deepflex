@@ -2,7 +2,7 @@
 水文非状态计算公式，对应superflexpy的ParameterizeElement
 """
 @kwdef mutable struct SimpleFlux <: AbstractFlux
-    input_names::Vector{Symbol}
+    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}}
     output_names::Vector{Symbol}
     parameters::Union{NamedTuple,Nothing} = nothing
     func::Function
@@ -17,8 +17,9 @@ end
 
 ## build flux
 ## ----------------------------------------------------------------------
-function SimpleFlux(input_names::Vector{Symbol},
-    output_names::Vector{Symbol},
+function SimpleFlux(
+    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+    output_names::Vector{Symbol};
     parameters::ComponentVector{T},
     func::Function
 ) where {T<:Number}
@@ -47,7 +48,8 @@ end
 ## callable function
 function (flux::SimpleFlux)(input::ComponentVector{T}) where {T<:Number}
     tmp_input = (; input[flux.input_names]...)
-    flux.func(tmp_input, flux.parameters)
+    tmp_output = flux.func(tmp_input, flux.parameters)
+    ComponentVector(; Dict(flux.output_names[i] => tmp_output[i] for i in 1:length(flux.output_names))...)
 end
 
 function (flux::LuxNNFlux)(input::ComponentVector{T}) where {T<:Number}

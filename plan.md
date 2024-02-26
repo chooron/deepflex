@@ -1,9 +1,13 @@
+# 当前问题
+- [ ] 模型构建中需要调整fluxes的输入变量名称和输出变量名称
+- [ ] fluxes的function返回值过于固定，不够灵活
+
 # 工作计划
 
 - [ ] routing function 编写
 - [x] 创建模型搭建基础类
 - [x] 针对之前的模型进行ComponentArrays改造
-- [ ] 直接将element分为三个大类：ODE，Dis和Lag, NN，其他的公式计算就放入fluxes中
+- [x] 直接将element分为三个大类：ODE，Lag和Simple
 
 
 # 未来计划

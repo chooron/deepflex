@@ -45,7 +45,7 @@ function hyper_params_optimize(
     return paraminfos
 end
 
-function hybrid_params_optimize()
+function hybrid_params_optimize!()
     """
     混合参数(包括模型超参数和模型内部权重)优化
     """

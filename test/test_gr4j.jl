@@ -34,3 +34,10 @@ model = DeepFlex.GR4J(
 input = ComponentVector(Prcp=P, Pet=E)
 
 output = DeepFlex.get_output(model, input=input, step=true)
+
+# plot result
+fig = Figure(size=(400, 300))
+ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+x = range(1, 100, length=100)
+lines!(ax, x, output[:Flow], color=:blue)
+fig

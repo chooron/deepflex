@@ -1,28 +1,41 @@
-function Evap(input_names::Vector{Symbol}; parameters::ComponentVector=ComponentVector())
+function Evap(
+    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+    output_names::Vector{Symbol}=[:Evap];
+    parameters::ComponentVector=ComponentVector())
     SimpleFlux(
         input_names,
-        [:Evap],
-        parameters,
-        evap_func
+        output_names,
+        parameters=parameters,
+        func=evap_func
     )
 end
 
 function evap_func(
-    input::gen_namedtuple_type([:SoilWater,:Pet], T),
+    input::gen_namedtuple_type([:SoilWater, :Pet], T),
     parameters::gen_namedtuple_type([:Smax], T)
-)::gen_namedtuple_type([:Evap], T) where {T<:Number}
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
     soil_water, pet = input[:SoilWater], input[:Pet]
     Smax = parameters[:Smax]
-    (Evap=@.(step_func(soil_water) * step_func(soil_water - Smax) * pet +
-             step_func(soil_water) * step_func(Smax - soil_water) * pet * (soil_water / Smax)),)
+    [@.(step_func(soil_water) * step_func(soil_water - Smax) * pet +
+        step_func(soil_water) * step_func(Smax - soil_water) * pet * (soil_water / Smax))]
 end
 
 function evap_func(
-    input::gen_namedtuple_type([:SoilWater,:Prcp,:Pet], T),
+    input::gen_namedtuple_type([:SoilWater, :Prcp, :Pet], T),
     parameters::gen_namedtuple_type([:x1], T)
-)::gen_namedtuple_type([:Evap], T) where {T<:Number}
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
     soil_water, prcp, pet = input[:SoilWater], input[:Prcp], input[:Pet]
     x1 = parameters[:x1]
-    (Evap=@.(step_func(pet - prcp) * (pet - prcp) * (2 * soil_water / x1 - (soil_water / x1)^2)),)
+    [@.(step_func(pet - prcp) * (pet - prcp) * (2 * soil_water / x1 - (soil_water / x1)^2))]
 end
 
+function evap_func(
+    input::gen_namedtuple_type([:TensionWater, :Pet], T),
+    parameters::gen_namedtuple_type([:c, :LM], T)
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
+    tension_water, pet = input[:TensionWater], input[:Pet]
+    c, LM = parameters[:c], parameters[:LM]
+    [@.(step_func(tension_water - LM) * pet +
+       step_func(LM - tension_water) * step_func(tension_water - c * LM) * tension_water / LM * pet +
+       step_func(c * LM - tension_water) * c * pet)]
+end
