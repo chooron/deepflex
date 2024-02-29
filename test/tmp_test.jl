@@ -1,5 +1,7 @@
-function bas(a,b=[:a])
-    @info b
+function bas!(a, c)
+    a[:c] = c
+    @info a
 end
 
-bas(1,[:b],nothing...)
+inp = (a = [1, 3], b = [2.5],)
+bas!(inp, [4, 7])

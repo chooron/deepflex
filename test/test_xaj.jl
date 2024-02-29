@@ -20,17 +20,24 @@ P[41:60] = rand(0.0:0.01:5.0, 20)
 P[81:83] = rand(30.0:0.01:50.0, 3)
 
 # build model
-x1, x2, x3, x4 = 50.0, 0.1, 20.0, 3.5
-parameters = ComponentVector(x1=x1, x2=x2, x3=x3, x4=x4, ω=3.5, γ=5.0)
-init_states = ComponentVector(SoilWater=0.0, RoutingStore=10.0)
+aim, b, a, stot, fwm, flm, c, ex, ki, kg, ci, cg = 0.6, 0.1, 5, 500, 0.5, 0.5, 0.5, 5, 0.5, 0.5, 0.5, 0.5
+parameters = ComponentVector(Aim=aim, Wmax=fwm * stot, Smax=(1 - fwm) * stot,
+    b=b, a=a, c=c, LM=flm * fwm * stot,
+    stot=stot, fwm=fwm, flm=flm,
+    ex=ex, ki=ki, kg=kg, ci=ci, cg=cg)
 
-model = DeepFlex.GR4J(
-    name="gr4j",
+init_states = ComponentVector(
+    TensionWater=10.0, FreeWater=10.0,
+    InterRouting=5.0, BaseRouting=5.0
+)
+
+model = DeepFlex.XAJ(
+    name="xaj",
     parameters=parameters,
     init_states=init_states
 )
-input = ComponentVector(Prcp=P, Pet=E)
 
+input = ComponentVector(Prcp=P, Pet=E)
 output = DeepFlex.get_output(model, input=input, step=true)
 
 # plot result

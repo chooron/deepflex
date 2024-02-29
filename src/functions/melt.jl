@@ -17,3 +17,12 @@ function melt_func(
     Tmax, Df = parameters[:Tmax], parameters[:Df]
     [@.(step_func(temp - Tmax) * step_func(snow_water) * min(snow_water, Df * (temp - Tmax)))]
 end
+
+function melt_func(
+    input::gen_namedtuple_type([:Temp], T),
+    parameters::gen_namedtuple_type([:cfmax, :ttm], T)
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
+    temp = input[:Temp]
+    cfmax, ttm = parameters[:cfmax], parameters[:ttm]
+    [@.(step_func(temp - ttm) * (temp - ttm) * cfmax)]
+end

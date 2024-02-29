@@ -29,3 +29,13 @@ function rainfall_func(
 )::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
     [input[:Prcp]]
 end
+
+function rainfall_func(
+    input::gen_namedtuple_type([:Prcp, :Temp], T),
+    parameters::gen_namedtuple_type([:tt, :tti], T)
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
+    tmp_t1 = parameters[:tt] - 0.5 * parameters[:tti]
+    tmp_t2 = parameters[:tt] + 0.5 * parameters[:tti]
+    [@.(step_func(input[:Temp] - tmp_t2) * input[:Prcp] +
+        step_func(tmp_t2 - input[:Temp]) * step_func(input[:Temp] - tmp_t1) * input[:Prcp] * (input[:Temp] - tmp_t1) / parameters[:tti])]
+end

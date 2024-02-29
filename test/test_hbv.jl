@@ -14,23 +14,40 @@ seed = 42
 Random.seed!(42)
 P = zeros(100)
 E = zeros(100)
+T = zeros(100)
 P[1:10] = rand(0.0:0.01:10.0, 10)
 P[26:30] = rand(0.0:0.01:20.0, 5)
 P[41:60] = rand(0.0:0.01:5.0, 20)
 P[81:83] = rand(30.0:0.01:50.0, 3)
 
-# build model
-x1, x2, x3, x4 = 50.0, 0.1, 20.0, 3.5
-parameters = ComponentVector(x1=x1, x2=x2, x3=x3, x4=x4, ω=3.5, γ=5.0)
-init_states = ComponentVector(SoilWater=0.0, RoutingStore=10.0)
+T[20:30] .= 1
+T[50:70] .= 10
+T[70:90] .= 5
 
-model = DeepFlex.GR4J(
-    name="gr4j",
+# build model
+tt, tti, cfr, cfmax, ttm, whc = 0, 4, 0.5, 10, 0, 0.5
+cflux, fc, lp, k0, k1, α, β, c = 2.0, 500, 0.5, 0.5, 0.5, 2, 5, 10
+maxbas = 5
+
+parameters = ComponentVector(
+    tt=tt, tti=tti, cfr=cfr, cfmax=cfmax, ttm=ttm, whc=whc,
+    cflux=cflux, fc=fc, lp=lp, k0=k0, k1=k1, α=α, β=β, c=c, maxbas=maxbas
+)
+init_states = ComponentVector(
+    SnowWater=0.0,
+    LiquidWater=0.0,
+    SoilWater=10.0,
+    UpperZone=5.0,
+    LowerZone=5.0,
+)
+
+model = DeepFlex.HBV(
+    name="hbv",
     parameters=parameters,
     init_states=init_states
 )
-input = ComponentVector(Prcp=P, Pet=E)
 
+input = ComponentVector(Prcp=P, Pet=E, Temp=T)
 output = DeepFlex.get_output(model, input=input, step=true)
 
 # plot result

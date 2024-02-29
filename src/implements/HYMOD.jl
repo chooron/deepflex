@@ -1,7 +1,9 @@
-function HYMOD(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function HyMOD(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
-        SoilWater_HYMOD(name="sr", parameters=parameters, init_states=init_states[[:SoilWater]]),
-        RoutingStore_HYMOD(name="rs", parameters=parameters, init_states=init_states[[:F1, :F2, :F3, :S1]]),
+        Surface_GR4J(name="sf"),
+        Soil_HyMOD(name="sl", parameters=parameters[[:Smax, :a, :b]], init_states=init_states[[:SoilWater]]),
+        Routing_HyMOD(name="rt", parameters=parameters[[:kf, :ks]],
+            init_states=init_states[[:FastRouting1, :FastRouting2, :FastRouting3, :SlowRouting]]),
     ]
     build_unit(name=name, elements=elements)
 end

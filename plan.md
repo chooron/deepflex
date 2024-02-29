@@ -1,6 +1,22 @@
 # 当前问题
-- [ ] 模型构建中需要调整fluxes的输入变量名称和输出变量名称
-- [ ] fluxes的function返回值过于固定，不够灵活
+- [x] 模型构建中需要调整fluxes的输入变量名称和输出变量名称
+- [x] fluxes的function返回值过于固定，不够灵活
+
+# 创新点
+- 耦合神经网络模型，提供一个PINN的水文模型构建框架
+- 继承superflex和MARRMoT各自的优缺点，构建新的水文模型构建框架，具体来说：
+    - 沿用superflex的构建框架，即element，node，network等
+    - 沿用MARRMoT的flux function构建思路，使不同计算模块实现分类管理
+    - **保证各模块的随机组合的可行性，当前计算模块可粗略分为SnowWater, SoilWater和RoutingStore三种**
+
+## SoilWater的一些共性
+- 水文模型的核心计算模块，通常代表模型的基本输入
+- 模型输出为flow，包括：
+    - (1) 单一flow，如Exphydro
+    - (2) Fastflow和Slowflow, 如GR4J
+    - (3) Surfaceflow, Interflow, Baseflow三层
+- 模型输入需要统一，比如Infiltration，Pet
+
 
 # 工作计划
 

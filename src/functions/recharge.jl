@@ -17,3 +17,12 @@ function recharge_func(
     x2, x3, ω = parameters[:x2], parameters[:x3], parameters[:ω]
     [@.(x2 / (x3^ω) * routing_store^ω)]
 end
+
+function recharge_func(
+    input::gen_namedtuple_type([:SoilWater, :Infiltration], T),
+    parameters::gen_namedtuple_type([:fc, :β], T)
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
+    soil_water, infiltration = input[:SoilWater], input[:Infiltration]
+    fc, β = parameters[:fc], parameters[:β]
+    [@.((infiltration) * (soil_water / fc)^β)]
+end

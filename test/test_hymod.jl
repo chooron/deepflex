@@ -20,17 +20,20 @@ P[41:60] = rand(0.0:0.01:5.0, 20)
 P[81:83] = rand(30.0:0.01:50.0, 3)
 
 # build model
-x1, x2, x3, x4 = 50.0, 0.1, 20.0, 3.5
-parameters = ComponentVector(x1=x1, x2=x2, x3=x3, x4=x4, ω=3.5, γ=5.0)
-init_states = ComponentVector(SoilWater=0.0, RoutingStore=10.0)
+s_max, b, a, kf, ks = 1000, 5, 0.5, 0.5, 0.5
+parameters = ComponentVector(Smax=s_max, b=b, a=a, kf=kf, ks=ks)
+init_states = ComponentVector(SoilWater=0.0,
+    FastRouting1=5.0, FastRouting2=5.0,
+    FastRouting3=5.0, SlowRouting=5.0
+)
 
-model = DeepFlex.GR4J(
-    name="gr4j",
+model = DeepFlex.HyMOD(
+    name="hymod",
     parameters=parameters,
     init_states=init_states
 )
-input = ComponentVector(Prcp=P, Pet=E)
 
+input = ComponentVector(Prcp=P, Pet=E)
 output = DeepFlex.get_output(model, input=input, step=true)
 
 # plot result

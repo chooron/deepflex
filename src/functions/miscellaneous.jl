@@ -1,3 +1,18 @@
+function Summation(input_names::Vector{Symbol},
+    output_names::Vector{Symbol};
+    parameters::ComponentVector=ComponentVector())
+    SimpleFlux(
+        input_names,
+        output_names,
+        parameters=parameters,
+        func=(i, p) -> begin
+            [sum([i[k] for k in keys(i)])]
+        end
+    )
+end
+
+
+
 """
 将一个通量按比例拆分
 """
@@ -9,7 +24,7 @@ function Splitter(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}}
         output_names,
         parameters=parameters,
         func=(i::NamedTuple, p::NamedTuple) -> begin
-            tmp_input = i[first(keys(input))]
+            tmp_input = i[first(keys(i))]
             [p[k] .* tmp_input for k in keys(p)]
         end
     )

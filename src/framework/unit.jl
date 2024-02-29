@@ -67,7 +67,9 @@ end
 function get_states(unit::AbstractUnit; state_names::Union{Set{Symbol},Nothing}=nothing)
     states = ComponentVector()
     for ele in unit.elements
-        states = ComponentVector(states; get_states(ele, state_names=state_names)...)
+        if ele isa ODEElement
+            states = ComponentVector(states; get_states(ele, state_names=state_names)...)
+        end
     end
     return states
 end
@@ -75,7 +77,9 @@ end
 function get_init_states(sort_eles::Vector{E}) where {E<:AbstractElement}
     init_states = ComponentVector()
     for ele in sort_eles
-        init_states = ComponentVector(init_states; ele.init_states...)
+        if ele isa ODEElement
+            init_states = ComponentVector(init_states; ele.init_states...)
+        end
     end
     return init_states
 end
@@ -152,12 +156,13 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         solved_u_matrix = hcat(solved_u...)
         solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
         for ele in unit.elements
-            ele.states = solved_u[collect(ele.state_names)]
+            if ele isa ODEElement
+                ele.states = solved_u[collect(ele.state_names)]
+            end
         end
         unit.fluxes = input
         # *带入求解的结果计算最终的输出结果
         for tmp_ele in unit.elements
-
             unit.fluxes = ComponentVector(unit.fluxes; get_output(tmp_ele, input=unit.fluxes)...)
         end
     end

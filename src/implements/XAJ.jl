@@ -1,9 +1,12 @@
-function HYMOD(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function XAJ(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
-        TensionWater_XAJ(name="tw", parameters=parameters, init_states=init_states[[:TensionWater]]),
-        FreeWater_XAJ(name="fw", parameters=parameters, init_states=init_states[[:FreeWater]]),
-        RoutingStore_XAJ(name="rs", parameters=parameters, init_states=init_states[[:InterRoutingStore, :BaseRoutingStore]]),
-        SimpleElement(name="out", parameters=parameters, funcs=[SimpleFlux([:Surfaceflow, :Interflow, :Baseflow], [:Flow], parameters[:Aim])])
+        Surface_GR4J(name="sf"),
+        Soil_XAJ(name="sl",
+            parameters=parameters[[:Aim, :Wmax, :a, :b, :c, :LM, :Smax, :ex]],
+            init_states=init_states[[:TensionWater, :FreeWater]]),
+        Routing_XAJ(name="rt",
+            parameters=parameters[[:ci, :cg, :Aim]],
+            init_states=init_states[[:InterRouting, :BaseRouting]])
     ]
     build_unit(name=name, elements=elements)
 end

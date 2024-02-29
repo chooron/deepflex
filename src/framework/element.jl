@@ -50,7 +50,7 @@ function SimpleElement(
 end
 
 function get_output(ele::SimpleElement; input::ComponentVector{T}) where {T<:Number}
-    fluxes = ComponentVector(input; state...)
+    fluxes = input
     for func in ele.funcs
         fluxes = ComponentVector(fluxes; func(fluxes)...)
     end
@@ -215,8 +215,8 @@ end
 function LAGElement(
     ; name::String,
     lag_time::Union{T,ComponentVector{T}},
-    lag_func::Dict{Symbol,Function}
-) where {T<:Number}
+    lag_func::Dict{Symbol,F}
+) where {T<:Number,F<:Function}
 
     input_names = Set(keys(lag_func))
 

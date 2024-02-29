@@ -3,8 +3,9 @@ Exp-Hydro model
 """
 function ExpHydro(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
-        SnowWater_ExpHydro(name="sr", parameters=parameters, init_states=init_states[[:SnowWater]]),
-        SoilWater_ExpHydro(name="wr", parameters=parameters, init_states=init_states[[:SoilWater]])
+        Surface_ExpHydro(name="sf", parameters=parameters[[:Tmin,:Tmax,:Df]], init_states=init_states[[:SnowWater]]),
+        Soil_ExpHydro(name="sl", parameters=parameters[[:Smax,:Qmax,:f]], init_states=init_states[[:SoilWater]]),
+        Routing_ExpHydro(name="rt")
     ]
     build_unit(name=name, elements=elements)
 end

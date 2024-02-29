@@ -17,10 +17,10 @@ function flow_func(
 end
 
 function flow_func(
-    input::gen_namedtuple_type([:Baseflow, :Recharge, :Q1], T),
+    input::gen_namedtuple_type([:Routedflow, :Recharge, :Fastflow], T),
     parameters::Nothing=nothing
 )::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
-    [@.(input[:Baseflow] + step_func(input[:Q1] + input[:Recharge]) * (input[:Q1] + input[:Recharge]))]
+    [@.(input[:Routedflow] + step_func(input[:Fastflow] + input[:Recharge]) * (input[:Fastflow] + input[:Recharge]))]
 end
 
 function flow_func(

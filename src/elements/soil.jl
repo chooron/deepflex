@@ -1,11 +1,10 @@
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SoilWater_ExpHydro(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function Soil_ExpHydro(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
-        Rainfall([:Prcp, :Temp], parameters=parameters[[:Tmin]]),
-        Tranparent([:Melt]),
-        Pet([:Temp, :Lday]),
+        # Pet([:Temp, :Lday]),
+        Tranparent([:Infiltration]),
         Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]]),
         Baseflow([:SoilWater], parameters=parameters[[:Smax, :Qmax, :f]]),
         Surfaceflow([:SoilWater], parameters=parameters[[:Smax]]),
@@ -13,7 +12,7 @@ function SoilWater_ExpHydro(; name::String, parameters::ComponentVector{T}, init
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SoilWater=input[:Rainfall] .+ input[:Melt] .- input[:Evap] .- input[:Flow])
+        ComponentVector(SoilWater=input[:Infiltration] .- input[:Evap] .- input[:Flow])
     end
 
     ODEElement(
@@ -29,7 +28,7 @@ end
 """
 SoilWaterReservoir in M50
 """
-function SoilWater_M50(; name::String,
+function Soil_M50(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
@@ -37,7 +36,7 @@ function SoilWater_M50(; name::String,
     q_ann = Lux.Chain(Lux.Dense(2, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
 
     funcs = [
-        Rainfall([:Prcp, :Temp], parameters=parameters[[:Tmin]]),
+        Tranparent([:Infiltration]),
         # ET ANN
         NNFlux([:SnowWater, :SoilWater, :Temp], [:Evap], model=et_ann, seed=42),
         # Q ANN
@@ -45,8 +44,7 @@ function SoilWater_M50(; name::String,
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SoilWater=input[:Rainfall] .+
-                                  input[:Melt] .-
+        ComponentVector(SoilWater=input[:Infiltration] .-
                                   step_func(input[:SoilWater]) .* input[:Lday] .* exp(input[:Evap]) .-
                                   step_func(input[:SoilWater]) .* exp(input[:Flow]))
     end
@@ -63,11 +61,16 @@ end
 """
 SoilWaterReservoir in M100
 """
-function SoilWater_M100(; name::String,
+function Soil_M100(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
+
+    ann = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
+
     funcs = [
         Tranparent([:Melt, :Rainfall, :Temp, :SnowWater, :SoilWater, :Evap, :Lday]),
+        NNFlux([:SnowWater, :SoilWater, :Temp], [:Evap], model=et_ann, seed=42)
+        #TODO 还没写完
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
@@ -91,19 +94,18 @@ end
 """
 SoilWaterReservoir in GR4J
 """
-function SoilWater_GR4J(; name::String,
+function Soil_GR4J(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
-        Rainfall([:Prcp, :Pet]),
-        Saturation([:SoilWater, :Rainfall], parameters=parameters[[:x1]]),
-        Evap([:SoilWater, :Prcp, :Pet], parameters=parameters[[:x1]]),
+        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:x1]]),
+        Evap([:SoilWater, :Pet], parameters=parameters[[:x1]]),
         Percolation([:SoilWater], parameters=parameters[[:x1]]),
-        SimpleFlux([:Rainfall, :Percolation, :Saturation], [:Q9, :Q1],
+        SimpleFlux([:Infiltration, :Percolation, :Saturation], [:SlowFlow, :FastFlow],
             ComponentVector{T}(),
-            (i, p) -> [@.((i[:Rainfall] - i[:Saturation] + i[:Percolation]) * 0.9),
-                @.((i[:Rainfall] - i[:Saturation] + i[:Percolation]) * 0.1)])
+            (i, p) -> [@.((i[:Infiltration] - i[:Saturation] + i[:Percolation]) * 0.9),
+                @.((i[:Infiltration] - i[:Saturation] + i[:Percolation]) * 0.1)])
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
@@ -122,18 +124,19 @@ end
 """
 SoilWaterReservoir in HYMOD
 """
-function SoilWater_HYMOD(; name::String,
+function Soil_HyMOD(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
-        Rainfall([:Prcp]),
-        Saturation([:SoilWater, :Rainfall], parameters=parameters[[:Smax, :b]]),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]])
+        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:Smax, :b]]),
+        Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]]),
+        Splitter([:Saturation], [:FastFlow, :SlowFlow],
+            parameters=ComponentVector(FastFlow=parameters[:a], SlowFlow=(1 .- parameters[:a])))
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SoilWater=input[:Rainfall] .- input[:Evap] .- input[:Saturation])
+        ComponentVector(SoilWater=input[:Infiltration] .- input[:Evap] .- input[:Saturation])
     end
 
     ODEElement(
@@ -149,17 +152,33 @@ end
 """
 SoilWaterReservoir in XAJ
 """
-function TensionWater_XAJ(; name::String,
+function Soil_XAJ(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
+    tmp_func = (i, p) -> begin
+        free_water, flux_in = i[:FreeWater], i[:FluxIn]
+        Smax, ex = p[:Smax], p[:ex]
+        tmp_re = @.(step_func(1 - free_water / Smax) * (1 - free_water / Smax))
+        @.[1 - (step_func(1 - tmp_re) * (1 - tmp_re) + step_func(tmp_re - 1) * (tmp_re - 1))^ex * flux_in]
+    end
+
     funcs = [
-        Saturation([:TensionWater, :Prcp], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
-        Evap([:TensionWater, :Pet], parameters=parameters[[:c, :LM]])
+        Saturation([:TensionWater, :Infiltration], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
+        Evap([:TensionWater, :Pet], parameters=parameters[[:c, :LM]]),
+        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Saturation => :FluxIn)], [:SurfaceFlow],
+            parameters=parameters[[:Smax, :ex]], func=tmp_func),
+        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Surfaceflow => :FluxIn)], [:InterFlow],
+            parameters=parameters[[:Smax, :ex]], func=tmp_func),
+        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Interflow => :FluxIn)], [:BaseFlow],
+            parameters=parameters[[:Smax, :ex]], func=tmp_func),
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(TensionWater=@.(input[:Prcp] * (1 - parameters[:Aim]) - input[:Evap] - input[:Saturation]))
+        ComponentVector(
+            TensionWater=@.(input[:Infiltration] - input[:Evap] - input[:Saturation]),
+            FreeWater=@.(input[:Saturation] - input[:SurfaceFlow] - input[:InterFlow] - input[:BaseFlow])
+        )
     end
 
     ODEElement(
@@ -171,18 +190,29 @@ function TensionWater_XAJ(; name::String,
     )
 end
 
-function FreeWater_XAJ(; name::String,
+
+"""
+HBV
+"""
+function Soil_HBV(; name::String,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
-        Saturation([Dict(:FreeWater => :FreeWater), Dict(:Saturation => :FluxIn)], [:SurfaceRunoff], parameters=parameters[[:Smax, :ex]]),
-        Saturation([Dict(:FreeWater => :FreeWater), Dict(:SurfaceRunoff => :FluxIn)], [:InterRunoff], parameters=parameters[[:Smax, :ex]]),
-        Saturation([Dict(:FreeWater => :FreeWater), Dict(:InterRunoff => :FluxIn)], [:BaseRunoff], parameters=parameters[[:Smax, :ex]]),
+        SimpleFlux([:SoilWater], [:Capillary], parameters=parameters[[:cflux, :fc]], func=(i, p) -> @.[p[:cflux] * (1 - i[:SoilWater] / p[:fc])]),
+        Evap([:SoilWater, :Pet], parameters=parameters[[:lp, :fc]]),
+        Recharge([:SoilWater, :Infiltration], parameters=parameters[[:fc, :β]]),
+        SimpleFlux([:UpperZone], [:InterFlow], parameters=parameters[[:k0, :α]], func=(i, p) -> @.[p[:k0] * i[:UpperZone]^(1 + p[:α])]),
+        SimpleFlux([:LowerZone], [:BaseFlow], parameters=parameters[[:k1]], func=(i, p) -> @.[p[:k1] * i[:LowerZone]]),
+        Summation([:InterFlow, :BaseFlow], [:Flow])
     ]
 
     get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(FreeWater=@.(input[:Saturation] - input[:SurfaceRunoff] - input[:InnerRunoff] - input[:BaseRunoff]))
+        ComponentVector(
+            SoilWater=@.(input[:Infiltration] + input[:Capillary] - input[:Evap] - input[:Recharge]),
+            UpperZone=@.(input[:Recharge] - input[:Capillary] - input[:InterFlow] - parameters[:c]),
+            LowerZone=@.(parameters[:c] - input[:BaseFlow])
+        )
     end
 
     ODEElement(

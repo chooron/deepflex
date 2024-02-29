@@ -21,12 +21,12 @@ function evap_func(
 end
 
 function evap_func(
-    input::gen_namedtuple_type([:SoilWater, :Prcp, :Pet], T),
+    input::gen_namedtuple_type([:SoilWater, :Pet], T),
     parameters::gen_namedtuple_type([:x1], T)
 )::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
-    soil_water, prcp, pet = input[:SoilWater], input[:Prcp], input[:Pet]
+    soil_water, pet = input[:SoilWater], input[:Pet]
     x1 = parameters[:x1]
-    [@.(step_func(pet - prcp) * (pet - prcp) * (2 * soil_water / x1 - (soil_water / x1)^2))]
+    [@.(pet* (2 * soil_water / x1 - (soil_water / x1)^2))]
 end
 
 function evap_func(
@@ -36,6 +36,16 @@ function evap_func(
     tension_water, pet = input[:TensionWater], input[:Pet]
     c, LM = parameters[:c], parameters[:LM]
     [@.(step_func(tension_water - LM) * pet +
-       step_func(LM - tension_water) * step_func(tension_water - c * LM) * tension_water / LM * pet +
-       step_func(c * LM - tension_water) * c * pet)]
+        step_func(LM - tension_water) * step_func(tension_water - c * LM) * tension_water / LM * pet +
+        step_func(c * LM - tension_water) * c * pet)]
+end
+
+function evap_func(
+    input::gen_namedtuple_type([:SoilWater, :Pet], T),
+    parameters::gen_namedtuple_type([:lp, :fc], T)
+)::Union{Vector{T},Vector{Vector{T}}} where {T<:Number}
+    soil_water, pet = input[:SoilWater], input[:Pet]
+    lp, fc = parameters[:lp], parameters[:fc]
+    [@.(step_func(soil_water - lp * fc) * pet +
+        step_func(lp * fc - soil_water) * pet * soil_water / (lp * fc))]
 end
