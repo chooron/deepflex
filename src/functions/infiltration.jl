@@ -1,5 +1,5 @@
 function Infiltration(
-    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol}=[:Infiltration];
     parameters::ComponentVector=ComponentVector())
     SimpleFlux(

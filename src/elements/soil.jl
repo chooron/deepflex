@@ -166,11 +166,11 @@ function Soil_XAJ(; name::String,
     funcs = [
         Saturation([:TensionWater, :Infiltration], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
         Evap([:TensionWater, :Pet], parameters=parameters[[:c, :LM]]),
-        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Saturation => :FluxIn)], [:SurfaceFlow],
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :Saturation => :FluxIn), [:SurfaceFlow],
             parameters=parameters[[:Smax, :ex]], func=tmp_func),
-        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Surfaceflow => :FluxIn)], [:InterFlow],
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :SurfaceFlow => :FluxIn), [:InterFlow],
             parameters=parameters[[:Smax, :ex]], func=tmp_func),
-        SimpleFlux([Dict(:FreeWater => :FreeWater), Dict(:Interflow => :FluxIn)], [:BaseFlow],
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :InterFlow => :FluxIn), [:BaseFlow],
             parameters=parameters[[:Smax, :ex]], func=tmp_func),
     ]
 

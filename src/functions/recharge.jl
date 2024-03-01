@@ -1,4 +1,4 @@
-function Recharge(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+function Recharge(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol}=[:Recharge];
     parameters::ComponentVector=ComponentVector())
     SimpleFlux(

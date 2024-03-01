@@ -3,7 +3,6 @@ using CSV
 using Random
 using DataFrames
 using CairoMakie
-using ComponentArrays
 using CairoMakie: Axis
 using Interpolations
 

@@ -1,4 +1,4 @@
-function Percolation(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+function Percolation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol}=[:Percolation];
     parameters::ComponentVector=ComponentVector())
     SimpleFlux(

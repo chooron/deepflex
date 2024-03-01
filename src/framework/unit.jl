@@ -94,6 +94,28 @@ function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<
     end
 end
 
+function single_unit_ode_function!(du, u, p, t)
+    # element input
+    # 使用插值方法获取该时段下的输入值
+    tmp_unit = p[:unit]
+    tmp_input = ComponentVector(namedtuple(p[:input_names], [p[:itp][nm](t) for nm in p[:input_names]]))
+    # 遍历Unit中所有的Element进行求解
+    for tmp_ele in tmp_unit.elements
+        if tmp_ele isa ODEElement
+            # 计算出各个flux，更新至tmp_input中
+            tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
+            # 求解du并更新du
+            tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
+            for k in tmp_ele.state_names
+                du[k] = tmp_du[k]
+            end
+        else
+            tmp_fluxes = get_output(tmp_ele, input=tmp_input)
+        end
+        tmp_input = ComponentVector(tmp_input; tmp_fluxes...)
+    end
+end
+
 function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwargs...) where {T<:Number}
     # 开始计算
     if step
@@ -115,34 +137,14 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         # * This function is calculated based on the whole Unit
         dt = 1
         xs = 1:dt:length(input[first(keys(input))])
+        cur_input_names = collect(keys(input))
         # fit interpolation functions
-        itp = Dict(k => linear_interpolation(xs, input[k]) for k in keys(input))
+        itp = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
         # 获取ODEsElement的所有state初始值
         u_init = get_init_states(unit.elements)
-        # 定义整体的ode函数
-        function ode_function!(du, u, p, t)
-            # element input
-            # 使用插值方法获取该时段下的输入值
-            tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
-            # 遍历Unit中所有的Element进行求解
-            for tmp_ele in unit.elements
-                if tmp_ele isa ODEElement
-                    # 计算出各个flux，更新至tmp_input中
-                    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
-                    # 求解du并更新du
-                    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
-                    for k in tmp_ele.state_names
-                        du[k] = tmp_du[k]
-                    end
-                else
-                    tmp_fluxes = get_output(tmp_ele, input=tmp_input)
-                end
-                tmp_input = ComponentVector(tmp_input; tmp_fluxes...)
-            end
-        end
-
+        ode_parameters = (itp=itp_dict, unit=unit, input_names=cur_input_names)
         # *求解这个函数
-        prob = ODEProblem(ode_function!, u_init, (xs[1], maximum(xs)))
+        prob = ODEProblem(single_unit_ode_function!, u_init, (xs[1], maximum(xs)), ode_parameters)
         sol = solve(
             prob,
             get(kwargs, :alg, BS3()),

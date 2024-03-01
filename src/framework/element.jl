@@ -71,7 +71,7 @@ ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含c
     # states
     states::ComponentVector = ComponentVector()
     init_states::ComponentVector{T}
-    state_names::Set{Symbol}
+    state_names::Vector{Symbol}
 
     # functions
     funcs::Vector{AbstractFlux}
@@ -81,8 +81,8 @@ ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含c
     solve_type::String
 
     # attribute
-    input_names::Set{Symbol}
-    output_names::Set{Symbol}
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
 end
 
 function ODEElement(
@@ -94,13 +94,15 @@ function ODEElement(
     solve_type::String=ode_solve,
 ) where {F<:AbstractFlux,T<:Number}
 
-    state_names = Set(keys(init_states))
-
     input_names = Set{Symbol}()
     output_names = Set{Symbol}()
 
     for func in funcs
-        union!(input_names, func.input_names)
+        if func.input_names isa Dict
+            union!(input_names, Set(keys(func.input_names)))
+        else
+            union!(input_names, func.input_names)
+        end
         union!(output_names, func.output_names)
     end
 
@@ -108,12 +110,12 @@ function ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
-        state_names=state_names,
+        state_names=collect(keys(init_states)),
         funcs=funcs,
         get_du=get_du,
         solve_type=solve_type,
-        input_names=input_names,
-        output_names=output_names
+        input_names=collect(input_names),
+        output_names=collect(output_names)
     )
 end
 
@@ -152,30 +154,33 @@ function pretrain!(ele::ODEElement; input::ComponentVector{T}, train_config...) 
     end
 end
 
+function single_ele_ode_func!(du, u, p, t)
+    # interpolate value by fitted functions
+    tmp_ele = p[:element]
+    tmp_input = ComponentVector(namedtuple(p[:input_names], [p[:itp][nm](t) for nm in p[:input_names]]))
+    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
+    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
+    # return du
+    for k in tmp_ele.state_names
+        du[k] = tmp_du[k]
+    end
+end
+
 function solve_prob!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
     dt = 1
-    xs = 1:dt:length(input[first(keys(input))])
+    cur_input_names = collect(keys(input))
+    xs = 1:dt:length(input[cur_input_names[1]])
     tspan = (xs[1], xs[end])
 
     # fit interpolation functions
-    itp = Dict(k => linear_interpolation(xs, input[k]) for k in keys(input))
+    itp_dict = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
 
-    function ode_func!(du, u, p, t)
-        # interpolate value by fitted functions
-        tmp_input = ComponentVector(; Dict(k => itp[k](t) for k in keys(itp))...)
-        tmp_fluxes = get_fluxes(ele, state=u, input=tmp_input)
-        tmp_du = ele.get_du(tmp_fluxes, ele.parameters)
-        # return du
-        for k in keys(ele.init_states)
-            du[k] = tmp_du[k]
-        end
-    end
-
-    prob = ODEProblem(ode_func!, ComponentVector(ele.init_states), tspan)
+    ode_parameters = (itp=itp_dict, element=ele, input_names=cur_input_names)
+    # solve the problem
+    prob = ODEProblem(single_ele_ode_func!, ele.init_states, tspan, ode_parameters)
     sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
-    solved_u = sol.u
-    solved_u_matrix = hcat(solved_u...)
-    solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
+    solved_u_matrix = hcat(sol.u...)
+    solved_u = ComponentVector(namedtuple(ele.state_names, [solved_u_matrix[idx, :] for idx in 1:length(ele.state_names)]))
     ele.states = solved_u
 end
 
@@ -208,8 +213,8 @@ LAGElement
     lag_weights::ComponentVector{T}
 
     # attribute
-    input_names::Set{Symbol}
-    output_names::Set{Symbol}
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
 end
 
 function LAGElement(
@@ -218,13 +223,13 @@ function LAGElement(
     lag_func::Dict{Symbol,F}
 ) where {T<:Number,F<:Function}
 
-    input_names = Set(keys(lag_func))
+    input_names = collect(keys(lag_func))
 
     if typeof(lag_time) == T
-        lag_time = ComponentVector(; Dict(nm => lag_time for nm in input_names)...)
+        lag_time = ComponentVector(namedtuple(input_names, repeat([lag_time], length(input_names))))
     end
 
-    parameters = ComponentVector(; Dict(Symbol("$(k)_lag_time") => lag_time[k] for k in keys(lag_time))...)
+    parameters = ComponentVector(namedtuple(["$(k)_lag_time" for k in keys(lag_time)], [lag_time[k] for k in keys(lag_time)]))
 
     # init lag states
     lag_states = ComponentVector(; Dict(nm => begin

@@ -2,7 +2,7 @@
 水文非状态计算公式，对应superflexpy的ParameterizeElement
 """
 @kwdef mutable struct SimpleFlux <: AbstractFlux
-    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}}
+    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}}
     output_names::Vector{Symbol}
     parameters::Union{NamedTuple,Nothing} = nothing
     func::Function
@@ -18,7 +18,7 @@ end
 ## build flux
 ## ----------------------------------------------------------------------
 function SimpleFlux(
-    input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol};
     parameters::ComponentVector{T},
     func::Function
@@ -47,9 +47,18 @@ end
 ## ----------------------------------------------------------------------
 ## callable function
 function (flux::SimpleFlux)(input::ComponentVector{T}) where {T<:Number}
-    tmp_input = (; input[flux.input_names]...)
+    tmp_input = extract_input(input, flux.input_names)
     tmp_output = flux.func(tmp_input, flux.parameters)
-    ComponentVector(; Dict(flux.output_names[i] => tmp_output[i] for i in 1:length(flux.output_names))...)
+    ComponentVector(namedtuple(flux.output_names, tmp_output))
+    # ComponentVector(; Dict(flux.output_names[i] => tmp_output[i] for i in 1:length(flux.output_names))...)
+end
+
+function extract_input(input::ComponentVector{T}, input_names::Vector{Symbol}) where {T<:Number}
+    namedtuple(input_names, [input[k] for k in input_names])
+end
+
+function extract_input(input::ComponentVector{T}, input_names::Dict{Symbol}) where {T<:Number}
+    namedtuple(collect(values(input_names)), [input[k] for k in keys(input_names)])
 end
 
 function (flux::LuxNNFlux)(input::ComponentVector{T}) where {T<:Number}

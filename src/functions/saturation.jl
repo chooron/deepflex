@@ -1,4 +1,4 @@
-function Saturation(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+function Saturation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol}=[:Saturation];
     parameters::ComponentVector=ComponentVector())
     SimpleFlux(
@@ -41,6 +41,6 @@ function saturation_func(
     tension_water, infiltration = input[:TensionWater], input[:Infiltration]
     Aim, Wmax, a, b = parameters[:Aim], parameters[:Wmax], parameters[:a], parameters[:b]
     p_i = infiltration .* (1 .- Aim)
-    [@.(step_func((0.5 - a) - tension_water / Wmax) * (p_i * (abs(0.5 - a)^(1 - b) * (tension_water / Wmax)^b)) +
-        (step_func(tension_water / Wmax - (0.5 - a)) * (p_i * (1 - (0.5 + a)^(1 - b) * (1 - tension_water / Wmax)^b))))]
+    [@.(step_func((0.5 - a) - tension_water / Wmax) * (p_i * (abs(0.5 - a)^(1 - b) * abs(tension_water / Wmax)^b)) +
+        (step_func(tension_water / Wmax - (0.5 - a)) * (p_i * (1 - (0.5 + a)^(1 - b) * abs(1 - tension_water / Wmax)^b))))]
 end

@@ -1,4 +1,4 @@
-function Melt(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
+function Melt(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Vector{Symbol}=[:Melt];
     parameters::ComponentVector=ComponentVector())
     SimpleFlux(

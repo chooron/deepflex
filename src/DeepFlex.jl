@@ -5,6 +5,7 @@ using TOML
 using Statistics
 using Random
 using ComponentArrays
+using NamedTupleTools
 
 # graph compute
 using Graphs
