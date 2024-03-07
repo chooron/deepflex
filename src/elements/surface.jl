@@ -96,7 +96,7 @@ function Surface_XAJ(; name::Symbol,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
-        get_du=get_du
+        d_funcs=d_funcs
     )
 end
 
@@ -109,18 +109,17 @@ function Surface_M100(; name::Symbol,
         Tranparent([:Melt, :Snowfall, :Temp, :SnowWater]),
     ]
 
-    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SnowWater=begin
-            relu(sinh(input[:Snowfall]) .* step_fct(input[:Temp]))
-            .-relu(step_func(input[:SnowWater]) .* sinh(input[:Melt]))
-        end)
-    end
+    d_funcs = [
+        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], [:SnowWater], parameters=ComponentVector(),
+            func=(i, p, sf) -> @.(relu(sinh(i[:Snowfall]) * sf(i[:Temp])) -
+                                  relu(sf(i[:SnowWater]) * sinh(i[:Melt])))),
+    ]
 
     ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
-        get_du=get_du
+        d_funcs=d_funcs
     )
 end
