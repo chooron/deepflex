@@ -12,8 +12,8 @@ SimpleElement
 
 SimpleElement是由多个AbstractFlux组成，无中间状态，对应RRMG的一些模型
 """
-@kwdef mutable struct SimpleElement{T} <: AbstractElement where {T<:Number}
-    name::String
+struct SimpleElement{T} <: AbstractElement where {T<:Number}
+    name::Symbol
 
     # parameters
     parameters::ComponentVector{T}
@@ -22,12 +22,12 @@ SimpleElement是由多个AbstractFlux组成，无中间状态，对应RRMG的一
     funcs::Vector{AbstractFlux}
 
     # attribute
-    input_names::Set{Symbol}
-    output_names::Set{Symbol}
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
 end
 
 function SimpleElement(
-    ; name::String,
+    ; name::Symbol,
     parameters::ComponentVector{T},
     funcs::Vector{F},
 ) where {F<:AbstractFlux,T<:Number}
@@ -41,11 +41,11 @@ function SimpleElement(
     end
 
     return SimpleElement{T}(
-        name=name,
-        parameters=parameters,
-        funcs=funcs,
-        input_names=input_names,
-        output_names=output_names
+        name,
+        parameters,
+        funcs,
+        collect(input_names),
+        collect(output_names)
     )
 end
 
@@ -63,7 +63,7 @@ ODEElement
 ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含continuous和discrete两种
 """
 @kwdef mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
-    name::String
+    name::Symbol
 
     # parameters
     parameters::ComponentVector{T}
@@ -75,10 +75,10 @@ ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含c
 
     # functions
     funcs::Vector{AbstractFlux}
+    d_funcs::Vector{AbstractFlux}
 
-    # solve config
-    get_du::Function
-    solve_type::String
+    # solver
+    solver::Union{ODESolver,Nothing} = nothing
 
     # attribute
     input_names::Vector{Symbol}
@@ -86,12 +86,11 @@ ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含c
 end
 
 function ODEElement(
-    ; name::String,
+    ; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
     funcs::Vector{F},
-    get_du::Function,
-    solve_type::String=ode_solve,
+    d_funcs::Vector{F},
 ) where {F<:AbstractFlux,T<:Number}
 
     input_names = Set{Symbol}()
@@ -112,8 +111,7 @@ function ODEElement(
         init_states=init_states,
         state_names=collect(keys(init_states)),
         funcs=funcs,
-        get_du=get_du,
-        solve_type=solve_type,
+        d_funcs=d_funcs,
         input_names=collect(input_names),
         output_names=collect(output_names)
     )
@@ -146,6 +144,10 @@ function get_states(ele::ODEElement; state_names::Union{Set{Symbol},Nothing}=not
     end
 end
 
+function set_solver!(ele::ODEElement, solver::ODESolver)
+    setproperty!(ele, :solver, solver)
+end
+
 function pretrain!(ele::ODEElement; input::ComponentVector{T}, train_config...) where {T<:Number}
     for func in ele.funcs
         if isa(func, LuxNNFunc)
@@ -170,18 +172,13 @@ function solve_prob!(ele::ODEElement; input::ComponentVector{T}) where {T<:Numbe
     dt = 1
     cur_input_names = collect(keys(input))
     xs = 1:dt:length(input[cur_input_names[1]])
-    tspan = (xs[1], xs[end])
 
     # fit interpolation functions
     itp_dict = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
 
-    ode_parameters = (itp=itp_dict, element=ele, input_names=cur_input_names)
     # solve the problem
-    prob = ODEProblem(single_ele_ode_func!, ele.init_states, tspan, ode_parameters)
-    sol = solve(prob, BS3(), dt=1.0, saveat=xs, reltol=1e-3, abstol=1e-3, sensealg=ForwardDiffSensitivity())
-    solved_u_matrix = hcat(sol.u...)
-    solved_u = ComponentVector(namedtuple(ele.state_names, [solved_u_matrix[idx, :] for idx in 1:length(ele.state_names)]))
-    ele.states = solved_u
+    ode_parameters = (itp=itp_dict, element=ele, input_names=cur_input_names)
+    ele.states = ele.solver(single_ele_ode_func!, ode_parameters, ele.init_states)
 end
 
 function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
@@ -251,7 +248,8 @@ function LAGElement(
         lag_states=lag_states,
         lag_weights=lag_weights,
         input_names=input_names,
-        output_names=input_names)
+        output_names=input_names
+    )
 end
 
 function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
@@ -287,20 +285,3 @@ function get_output(ele::LAGElement; input::ComponentVector{T}) where {T<:Number
     output = ComponentVector(; Dict(k => solved_state[k][:, 1] for k in ele.input_names)...)
     return output
 end
-
-
-# function solve_prob!(ele::DCTElement; input::ComponentVector{T}) where {T<:Number}
-#     data_len = length(input[first(keys(input))])
-#     tmp_state = ele.init_states
-#     for idx in 1:data_len
-#         tmp_input = ComponentVector(; Dict(k => input[k][idx] for k in keys(input))...)
-#         tmp_fluxes = get_fluxes(ele, state=tmp_state, input=tmp_input)
-#         tmp_du = ele.get_du(tmp_fluxes, ele.parameters)
-#         for k in keys(tmp_state)
-#             update_state = tmp_state[k] + tmp_du[k]
-#             tmp_state[k] = update_state
-#             push!(ele.states[k], update_state)
-#         end
-#         tmp_state = ComponentVector(; Dict(k => tmp_state[k] + tmp_du[k] for k in keys(tmp_state))...)
-#     end
-# end

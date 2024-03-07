@@ -7,6 +7,9 @@
     # model structure
     elements::Vector{E}
 
+    # prob solver
+    solver::AbstractSolver
+
     # attribute
     input_names::Set{Symbol}
     output_names::Set{Symbol}
@@ -16,7 +19,7 @@
     fluxes::ComponentVector = ComponentVector()
 end
 
-function build_unit(; name::String, elements::Vector{E}) where {E<:AbstractElement}
+function build_unit(; name::String, elements::Vector{E}, solver::AbstractSolver) where {E<:AbstractElement}
     parameters = ComponentVector()
     input_names = Set{Symbol}()
     output_names = Set{Symbol}()
@@ -27,12 +30,14 @@ function build_unit(; name::String, elements::Vector{E}) where {E<:AbstractEleme
         union!(output_names, ele.output_names)
         if ele isa ODEElement
             union!(state_names, ele.state_names)
+            set_solver!(ele, solver)
         end
     end
     Unit(
         name=name,
         parameters=parameters,
         elements=elements,
+        solver=solver,
         input_names=input_names,
         output_names=output_names,
         state_names=state_names,
@@ -43,6 +48,17 @@ function has_ode(unit::Unit)
     has_flag = false
     for ele in unit.elements
         if ele isa ODEElement
+            has_flag = true
+            break
+        end
+    end
+    return has_flag
+end
+
+function has_lag(unit::Unit)
+    has_flag = false
+    for ele in unit.elements
+        if ele isa LAGElement
             has_flag = true
             break
         end
@@ -74,9 +90,9 @@ function get_states(unit::AbstractUnit; state_names::Union{Set{Symbol},Nothing}=
     return states
 end
 
-function get_init_states(sort_eles::Vector{E}) where {E<:AbstractElement}
+function get_init_states(elements::Vector{E}) where {E<:AbstractElement}
     init_states = ComponentVector()
-    for ele in sort_eles
+    for ele in elements
         if ele isa ODEElement
             init_states = ComponentVector(init_states; ele.init_states...)
         end
@@ -91,6 +107,12 @@ function set_parameters!(unit::Unit; paraminfos::Vector{ParamInfo{T}}) where {T<
         if isa(tmp_ele, ODEElement)
             set_states!(tmp_ele, paraminfos=paraminfos)
         end
+    end
+end
+
+function set_solver!(unit::Unit, solver::AbstractSolver)
+    for ele in unit.elements
+        set_solver!(ele, solver)
     end
 end
 
@@ -134,29 +156,20 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
         if !has_ode(unit)
             @error "$(unit) don't contain ODEElement, please setting step to true"
         end
+        if has_lag(unit)
+            @error "$(unit) contain LAGElement, please setting step to true"
+        end
         # * This function is calculated based on the whole Unit
         dt = 1
         xs = 1:dt:length(input[first(keys(input))])
         cur_input_names = collect(keys(input))
-        # fit interpolation functions
-        itp = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
-        # 获取ODEsElement的所有state初始值
+        # *fit interpolation functions
+        itp_dict = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
+        # *获取ODEsElement的所有state初始值
         u_init = get_init_states(unit.elements)
         ode_parameters = (itp=itp_dict, unit=unit, input_names=cur_input_names)
-        # *求解这个函数
-        prob = ODEProblem(single_unit_ode_function!, u_init, (xs[1], maximum(xs)), ode_parameters)
-        sol = solve(
-            prob,
-            get(kwargs, :alg, BS3()),
-            saveat=xs,
-            dt=dt,
-            reltol=get(kwargs, :reltol, 1e-3),
-            abstol=get(kwargs, :abstol, 1e-3),
-            sensealg=get(kwargs, :sensealg, ForwardDiffSensitivity())
-        )
-        solved_u = sol.u
-        solved_u_matrix = hcat(solved_u...)
-        solved_u = ComponentVector(; Dict(nm => solved_u_matrix[idx, :] for (idx, nm) in enumerate(keys(solved_u[1])))...)
+        # *求解函数
+        solved_u = unit.solver(single_unit_ode_function!, ode_parameters, u_init)
         for ele in unit.elements
             if ele isa ODEElement
                 ele.states = solved_u[collect(ele.state_names)]
@@ -168,6 +181,5 @@ function get_output(unit::Unit; input::ComponentVector{T}, step::Bool=true, kwar
             unit.fluxes = ComponentVector(unit.fluxes; get_output(tmp_ele, input=unit.fluxes)...)
         end
     end
-    # return get_fluxes(unit, flux_names=unit.output_names)
     return unit.fluxes
 end

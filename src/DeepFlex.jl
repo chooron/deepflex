@@ -6,6 +6,10 @@ using Statistics
 using Random
 using ComponentArrays
 using NamedTupleTools
+using DataFrames
+
+# run time stats
+using BenchmarkTools
 
 # graph compute
 using Graphs
@@ -25,26 +29,23 @@ using Zygote
 # parameters Optimization
 using Optimization
 using OptimizationBBO
-# using Optimisers
 using OptimizationOptimisers
 
 
-# , DiffEqFlux, OrdinaryDiffEq, Optimization, OptimizationOptimJL,
-#     OptimizationOptimisers, Random, Plots
-
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
-const ode_solve = "ode_solve"
-const dct_solve = "dct_solve"
 
 ## Abstract Component Types
 abstract type AbstractComponent end
-abstract type AbstractParamInfo <: AbstractComponent end
-abstract type AbstractFlux <: AbstractComponent end
+
+abstract type AbstractParamInfo end
+abstract type AbstractSmoother end
+abstract type AbstractSolver end
+abstract type AbstractFlux end
+
 abstract type AbstractUnit <: AbstractComponent end
 abstract type AbstractElement <: AbstractComponent end
 abstract type AbstractNetwork <: AbstractComponent end
-
 
 ## Sensealg type
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
@@ -52,14 +53,13 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 
 # framework Methods
 include("framework/paraminfo.jl")
-include("framework/smooth.jl")
+include("framework/solver.jl")
 include("framework/fluxes.jl")
 include("framework/element.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
 include("framework/network.jl")
 include("framework/optimize.jl")
-
 # Implement Flux
 include("functions/baseflow.jl")
 include("functions/evap.jl")
@@ -72,7 +72,9 @@ include("functions/pet.jl")
 include("functions/rainfall.jl")
 include("functions/recharge.jl")
 include("functions/saturation.jl")
+include("functions/smoother.jl")
 include("functions/snowfall.jl")
+include("functions/soilwater.jl")
 include("functions/surfaceflow.jl")
 include("functions/unithydro.jl")
 # Implement Element
@@ -88,7 +90,6 @@ include("implements/HBV.jl")
 include("implements/XAJ.jl")
 include("implements/HydroNODE.jl")
 # utils
-include("utils/smooth_func.jl")
 include("utils/loss_func.jl")
 include("utils/graph_utils.jl")
 # Optimization

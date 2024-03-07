@@ -1,11 +1,30 @@
+
+"""
+简单计算公式，包括split，sum，transparent
+"""
+struct SimpleFlux <: AbstractFlux
+    # attribute
+    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}}
+    output_names::Vector{Symbol}
+    # parameters
+    parameters::ComponentVector
+    # function 
+    func::Function
+end
+
 """
 水文非状态计算公式，对应superflexpy的ParameterizeElement
 """
-@kwdef mutable struct SimpleFlux <: AbstractFlux
+struct HydroFlux <: AbstractFlux
+    # attribute
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}}
     output_names::Vector{Symbol}
-    parameters::Union{NamedTuple,Nothing} = nothing
+    # parameters
+    parameters::ComponentVector
+    # function 
     func::Function
+    # step function
+    step_func::Function
 end
 
 mutable struct LuxNNFlux <: AbstractFlux
@@ -13,22 +32,6 @@ mutable struct LuxNNFlux <: AbstractFlux
     output_names::Vector{Symbol}
     func::Function
     parameters::Any
-end
-
-## build flux
-## ----------------------------------------------------------------------
-function SimpleFlux(
-    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol};
-    parameters::ComponentVector{T},
-    func::Function
-) where {T<:Number}
-    if length(parameters) == 0
-        parameters = nothing
-    else
-        parameters = (; parameters...)
-    end
-    SimpleFlux(input_names, output_names, parameters, func)
 end
 
 function LuxNNFlux(
@@ -48,9 +51,14 @@ end
 ## callable function
 function (flux::SimpleFlux)(input::ComponentVector{T}) where {T<:Number}
     tmp_input = extract_input(input, flux.input_names)
-    tmp_output = flux.func(tmp_input, flux.parameters)
-    ComponentVector(namedtuple(flux.output_names, tmp_output))
-    # ComponentVector(; Dict(flux.output_names[i] => tmp_output[i] for i in 1:length(flux.output_names))...)
+    func_output = flux.func(tmp_input, NamedTuple(flux.parameters))
+    ComponentVector(namedtuple(flux.output_names, func_output))
+end
+
+function (flux::HydroFlux)(input::ComponentVector{T}) where {T<:Number}
+    tmp_input = extract_input(input, flux.input_names)
+    tmp_output = flux.func(tmp_input, NamedTuple(flux.parameters), flux.step_func)
+    ComponentVector(namedtuple(flux.output_names, [tmp_output]))
 end
 
 function extract_input(input::ComponentVector{T}, input_names::Vector{Symbol}) where {T<:Number}
@@ -84,7 +92,7 @@ end
 
 ## *parameters getter setter
 ## ----------------------------------------------------------------------
-function get_parameters(func::SimpleFlux; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
+function get_parameters(func::Union{SimpleFlux,HydroFlux}; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
     if isnothing(names)
         return func.parameters
     else
@@ -92,7 +100,7 @@ function get_parameters(func::SimpleFlux; names::Vector{Symbol}=nothing)::Dict{S
     end
 end
 
-function set_parameters!(func::SimpleFlux; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
+function set_parameters!(func::Union{SimpleFlux,HydroFlux}; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
     for p in paraminfos
         if p.name in keys(func.parameters)
             func.parameters[p.name] = p.value

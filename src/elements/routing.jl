@@ -1,7 +1,7 @@
 """
 RoutingStore in GR4J
 """
-function Routing_ExpHydro(; name::String)
+function Routing_ExpHydro(; name::Symbol)
 
     funcs = [
         Flow([:Baseflow, :Surfaceflow])
@@ -18,7 +18,7 @@ end
 """
 RoutingStore in GR4J
 """
-function Routing_GR4J(; name::String,
+function Routing_GR4J(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
@@ -42,7 +42,7 @@ function Routing_GR4J(; name::String,
     )
 end
 
-function Routing_HyMOD(; name::String,
+function Routing_HyMOD(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
     funcs = [
@@ -73,7 +73,7 @@ function Routing_HyMOD(; name::String,
 end
 
 
-function Routing_XAJ(; name::String,
+function Routing_XAJ(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
     funcs = [

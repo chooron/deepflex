@@ -1,10 +1,10 @@
 function XAJ(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
-        Surface_GR4J(name="sf"),
-        Soil_XAJ(name="sl",
+        Surface_GR4J(name=:sf),
+        Soil_XAJ(name=:sl,
             parameters=parameters[[:Aim, :Wmax, :a, :b, :c, :LM, :Smax, :ex]],
             init_states=init_states[[:TensionWater, :FreeWater]]),
-        Routing_XAJ(name="rt",
+        Routing_XAJ(name=:rt,
             parameters=parameters[[:ci, :cg, :Aim]],
             init_states=init_states[[:InterRouting, :BaseRouting]])
     ]

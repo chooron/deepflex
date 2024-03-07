@@ -4,13 +4,12 @@ function Summation(input_names::Vector{Symbol},
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
-        func=(i, p) -> begin
+        parameters,
+        (i, p) -> begin
             [sum([i[k] for k in keys(i)])]
         end
     )
 end
-
 
 
 """
@@ -22,8 +21,8 @@ function Splitter(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}}
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
-        func=(i::NamedTuple, p::NamedTuple) -> begin
+        parameters,
+        (i::NamedTuple, p::NamedTuple) -> begin
             tmp_input = i[first(keys(i))]
             [p[k] .* tmp_input for k in keys(p)]
         end
@@ -44,7 +43,20 @@ function Tranparent(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
-        func=(i::NamedTuple, p::Nothing=nothing) -> [i[k] for k in keys(i)]
+        parameters,
+        (i::NamedTuple, p::NamedTuple) -> [i[k] for k in keys(i)]
+    )
+end
+
+function Differ(
+    input_names::Vector{Dict{Symbol,Vector{Symbol}}},
+    output_names::Vector{Symbol};
+)
+    tmp_input_names = vcat([collect(nms) for nms in values(input_names)])
+    SimpleFlux(
+        tmp_input_names,
+        output_names,
+        parameters,
+        (i::NamedTuple, p::NamedTuple) -> sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])
     )
 end

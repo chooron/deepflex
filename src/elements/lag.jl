@@ -1,4 +1,4 @@
-function Lag_GR4J(; name::String,
+function Lag_GR4J(; name::Symbol,
     parameters::ComponentVector{T}) where {T<:Number}
 
     LAGElement(name=name,
@@ -7,7 +7,7 @@ function Lag_GR4J(; name::String,
     )
 end
 
-function Lag_HBV(; name::String,
+function Lag_HBV(; name::Symbol,
     parameters::ComponentVector{T}) where {T<:Number}
 
     LAGElement(

@@ -1,7 +1,7 @@
 """
 SnowWaterReservoir in Exp-Hydro
 """
-function Surface_ExpHydro(; name::String,
+function Surface_ExpHydro(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
@@ -13,28 +13,28 @@ function Surface_ExpHydro(; name::String,
         Infiltration([:Rainfall, :Melt])
     ]
 
-    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(SnowWater=input[:Snowfall] .- input[:Melt])
-    end
+    d_funcs = [
+        Differ(Dict(:In => [:Snowfall], :Out => [:Melt]), [:SnowWater]),
+    ]
 
     ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
-        get_du=get_du
+        d_funcs=d_funcs
     )
 end
 
 """
 SnowWaterReservoir in Exp-Hydro
 """
-function Surface_GR4J(; name::String)
+function Surface_GR4J(; name::Symbol)
 
     funcs = [
         Rainfall([:Prcp, :Pet]),
         SimpleFlux([:Prcp, :Pet], [:Pet], parameters=ComponentVector(),
-            func=(i, p) -> @.[step_func(i[:Pet] - i[:Prcp]) * (i[:Pet] - i[:Prcp])]),
+            func=(i, p, sf) -> @.(sf(i[:Pet] - i[:Prcp]) * (i[:Pet] - i[:Prcp]))),
         Infiltration([:Rainfall])
     ]
 
@@ -43,58 +43,53 @@ function Surface_GR4J(; name::String)
         parameters=ComponentVector(),
         funcs=funcs
     )
-
 end
 
 
-function Surface_HBV(; name::String,
+function Surface_HBV(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
         SimpleFlux([:Temp], [:Refreeze], parameters=parameters[[:cfr, :cfmax, :ttm]],
-            func=(i, p) -> @.[step_func(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp])]),
+            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
         Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
         Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
         Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], parameters=parameters[[:whc]]),
     ]
 
-    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(
-            SnowWater=input[:Snowfall] + input[:Refreeze] - input[:Melt],
-            LiquidWater=input[:Rainfall] + input[:Melt] - input[:Refreeze] - input[:Infiltration]
-        )
-    end
+    d_funcs = [
+        Differ(Dict(:In => [:Snowfall, :Refreeze], :Out => [:Melt]), [:SnowWater]),
+        Differ(Dict(:In => [:Rainfall, :Melt], :Out => [:Refreeze, :Infiltration]), [:LiquidWater]),
+    ]
 
     ODEElement(
         name=name,
         parameters=parameters,
         init_states=init_states,
         funcs=funcs,
-        get_du=get_du
+        d_funcs=d_funcs
     )
 end
 
-function Surface_XAJ(; name::String,
+function Surface_XAJ(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
         SimpleFlux([:Temp], [:Refreeze], parameters=parameters[[:cfr, :cfmax, :ttm]],
-            func=(i, p) -> [step_func(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp])]),
+            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
         Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
         Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
         Infiltration([:LiquidWater, :Rainfall, :Melt], parameters=parameters[[:whc, :sp]]),
     ]
 
-    get_du = (input::ComponentVector{T}, parameters::ComponentVector{T}) -> begin
-        ComponentVector(
-            SnowWater=input[:Snowfall] + input[:Refreeze] - input[:Melt],
-            LiquidWater=input[:Rainfall] + input[:Melt] - input[:Refreeze] - input[:Infiltration]
-        )
-    end
+    d_funcs = [
+        Differ(Dict(:In => [:Snowfall, :Refreeze], :Out => [:Melt]), [:SnowWater]),
+        Differ(Dict(:In => [:Rainfall, :Melt], :Out => [:Refreeze, :Infiltration]), [:LiquidWater]),
+    ]
 
     ODEElement(
         name=name,
@@ -106,7 +101,7 @@ function Surface_XAJ(; name::String,
 end
 
 
-function Surface_M100(; name::String,
+function Surface_M100(; name::Symbol,
     parameters::ComponentVector{T},
     init_states::ComponentVector{T}) where {T<:Number}
 

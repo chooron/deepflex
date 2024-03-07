@@ -21,3 +21,5 @@ function update_paraminfos!(paraminfos::Vector{P}, paramvalues::Vector{T}) where
         update_paraminfo!(paraminfos[idx], value)
     end
 end
+
+const NO_PARAMETER = NamedTuple()
