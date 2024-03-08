@@ -27,7 +27,7 @@ init_states = ComponentVector(SnowWater=0.0, SoilWater=1303.004248)
 model = DeepFlex.ExpHydro(name="exp-hydro", parameters=parameters, init_states=init_states, solver=solver)
 
 inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec)
-@time result = DeepFlex.get_output(model, input=inputs, step=true, sensealg=DeepFlex.default_ode_sensealg)
+result = DeepFlex.get_output(model, input=inputs, step=true, sensealg=DeepFlex.default_ode_sensealg);
 
 result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
 

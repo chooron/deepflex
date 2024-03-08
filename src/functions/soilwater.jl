@@ -1,14 +1,13 @@
 function D_Soilwater(
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Soilwater];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Soilwater;
+    parameters::ComponentVector=ComponentVector())
+    
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        d_soilwater_func,
-        step_func
+        parameters=parameters,
+        func=d_soilwater_func
     )
 end
 

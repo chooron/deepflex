@@ -11,7 +11,7 @@ function Soil_ExpHydro(; name::Symbol, parameters::ComponentVector{T}, init_stat
     ]
 
     d_funcs = [
-        D_Soilwater(Dict(:In => :Infiltration, :Out => [:Evap, :Flow]), [:SoilWater])
+        Differ(Dict(:In => [:Infiltration], :Out => [:Evap, :Flow]), [:SoilWater])
     ]
 
     ODEElement(
@@ -94,9 +94,9 @@ function Soil_GR4J(; name::Symbol,
         Saturation([:SoilWater, :Infiltration], parameters=parameters[[:x1]]),
         Evap([:SoilWater, :Pet], parameters=parameters[[:x1]]),
         Percolation([:SoilWater], parameters=parameters[[:x1]]),
-        HydroFlux([:Infiltration, :Percolation, :Saturation], [:TempFlow],
-            ComponentVector{T}(),
-            (i, p, sf) -> @.(i[:Infiltration] - i[:Saturation] + i[:Percolation])),
+        SimpleFlux([:Infiltration, :Percolation, :Saturation], :TempFlow,
+            parameters=ComponentVector{T}(),
+            func=(i, p, sf) -> @.(i[:Infiltration] - i[:Saturation] + i[:Percolation])),
         Splitter([:TempFlow], [:SlowFlow, :FastFlow], parameters=ComponentVector{T}(SlowFlow=0.9, FastFlow=0.1))
     ]
 
@@ -149,7 +149,7 @@ function Soil_XAJ(; name::Symbol,
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
-        Saturation([:TensionWater, :Infiltration], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
+        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
         Evap([:SoilWater, :Pet], parameters=parameters[[:c, :LM]]),
     ]
 
@@ -175,24 +175,16 @@ function Soil_HBV(; name::Symbol,
     init_states::ComponentVector{T}) where {T<:Number}
 
     funcs = [
-        HydroFlux([:SoilWater], [:Capillary], parameters=parameters[[:cflux, :fc]],
+        SimpleFlux([:SoilWater], :Capillary,
+            parameters=parameters[[:cflux, :fc]],
             func=(i, p, sf) -> @.(p[:cflux] * (1 - i[:SoilWater] / p[:fc]))),
         Evap([:SoilWater, :Pet], parameters=parameters[[:lp, :fc]]),
         Recharge([:SoilWater, :Infiltration], parameters=parameters[[:fc, :β]]),
-        HydroFlux([:UpperZone], [:InterFlow], parameters=parameters[[:k0, :α]],
-            func=(i, p, sf) -> @.(p[:k0] * i[:UpperZone]^(1 + p[:α]))),
-        HydroFlux([:LowerZone], [:BaseFlow], parameters=parameters[[:k1]],
-            func=(i, p, sf) -> @.(p[:k1] * i[:LowerZone])),
-        Summation([:InterFlow, :BaseFlow], [:Flow])
     ]
 
 
     d_funcs = [
         Differ(Dict(:In => [:Infiltration, :Capillary], :Out => [:Evap, :Recharge]), [:SoilWater]),
-        HydroFlux([:Recharge, :Capillary, :InterFlow], [:UpperZone], parameters=parameters[[:c]],
-            func=(i, p, sf) -> @.(i[:Recharge] - i[:Capillary] - i[:InterFlow] - p[:c])),
-        HydroFlux([:BaseFlow], [:LowerZone], parameters=parameters[[:c]],
-            func=(i, p, sf) -> @.(p[:c] - i[:BaseFlow]))
     ]
 
     ODEElement(

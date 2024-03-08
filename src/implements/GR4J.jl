@@ -1,4 +1,4 @@
-function GR4J(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function GR4J(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver) where {T<:Number}
     elements = [
         Surface_GR4J(name=:sf),
         Soil_GR4J(
@@ -16,5 +16,5 @@ function GR4J(; name::String, parameters::ComponentVector{T}, init_states::Compo
             init_states=init_states[[:RoutingStore]]
         ),
     ]
-    build_unit(name=name, elements=elements)
+    build_unit(name=name, elements=elements, solver=solver)
 end

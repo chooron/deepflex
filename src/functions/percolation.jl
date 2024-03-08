@@ -1,13 +1,12 @@
 function Percolation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Percolation];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Percolation;
+    parameters::ComponentVector=ComponentVector())
+    
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        percolation_func,
-        step_func
+        parameters=parameters,
+        func=percolation_func,
     )
 end
 

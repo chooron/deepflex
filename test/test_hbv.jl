@@ -29,6 +29,8 @@ tt, tti, cfr, cfmax, ttm, whc = 0, 4, 0.5, 10, 0, 0.5
 cflux, fc, lp, k0, k1, α, β, c = 2.0, 500, 0.5, 0.5, 0.5, 2, 5, 10
 maxbas = 5
 
+solver = DeepFlex.ODESolver(dt=1, saveat=1:1:length(P))
+
 parameters = ComponentVector(
     tt=tt, tti=tti, cfr=cfr, cfmax=cfmax, ttm=ttm, whc=whc,
     cflux=cflux, fc=fc, lp=lp, k0=k0, k1=k1, α=α, β=β, c=c, maxbas=maxbas
@@ -44,7 +46,8 @@ init_states = ComponentVector(
 model = DeepFlex.HBV(
     name="hbv",
     parameters=parameters,
-    init_states=init_states
+    init_states=init_states,
+    solver=solver
 )
 
 input = ComponentVector(Prcp=P, Pet=E, Temp=T)

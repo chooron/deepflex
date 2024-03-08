@@ -1,4 +1,4 @@
-function HBV(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function HBV(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver) where {T<:Number}
     elements = [
         Surface_HBV(
             name=:sf,
@@ -15,7 +15,7 @@ function HBV(; name::String, parameters::ComponentVector{T}, init_states::Compon
             parameters=parameters[[:maxbas]]
         )
     ]
-    build_unit(name=name, elements=elements)
+    build_unit(name=name, elements=elements, solver=solver)
 end
 
 function dPL_HBV()

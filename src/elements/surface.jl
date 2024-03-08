@@ -33,7 +33,8 @@ function Surface_GR4J(; name::Symbol)
 
     funcs = [
         Rainfall([:Prcp, :Pet]),
-        SimpleFlux([:Prcp, :Pet], [:Pet], parameters=ComponentVector(),
+        SimpleFlux([:Prcp, :Pet], :Pet,
+            parameters=ComponentVector(),
             func=(i, p, sf) -> @.(sf(i[:Pet] - i[:Prcp]) * (i[:Pet] - i[:Prcp]))),
         Infiltration([:Rainfall])
     ]
@@ -52,7 +53,8 @@ function Surface_HBV(; name::Symbol,
 
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
-        SimpleFlux([:Temp], [:Refreeze], parameters=parameters[[:cfr, :cfmax, :ttm]],
+        SimpleFlux([:Temp], :Refreeze,
+            parameters=parameters[[:cfr, :cfmax, :ttm]],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
         Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
         Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
@@ -79,7 +81,8 @@ function Surface_XAJ(; name::Symbol,
 
     funcs = [
         Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
-        SimpleFlux([:Temp], [:Refreeze], parameters=parameters[[:cfr, :cfmax, :ttm]],
+        SimpleFlux([:Temp], :Refreeze,
+            parameters=parameters[[:cfr, :cfmax, :ttm]],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
         Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
         Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
@@ -110,9 +113,9 @@ function Surface_M100(; name::Symbol,
     ]
 
     d_funcs = [
-        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], [:SnowWater], parameters=ComponentVector(),
-            func=(i, p, sf) -> @.(relu(sinh(i[:Snowfall]) * sf(i[:Temp])) -
-                                  relu(sf(i[:SnowWater]) * sinh(i[:Melt])))),
+        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], :SnowWater,
+            parameters=ComponentVector(),
+            func=(i, p, sf) -> @.(relu(sinh(i[:Snowfall]) * sf(i[:Temp])) - relu(sf(i[:SnowWater]) * sinh(i[:Melt])))),
     ]
 
     ODEElement(

@@ -1,13 +1,12 @@
 function Saturation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Saturation];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Saturation;
+    parameters::ComponentVector=ComponentVector())
+    
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        saturation_func,
-        step_func
+        parameters=parameters,
+        func=saturation_func
     )
 end
 

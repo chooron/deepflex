@@ -1,14 +1,13 @@
 function Infiltration(
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Infiltration];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Infiltration;
+    parameters::ComponentVector=ComponentVector())
+
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        infiltration_func,
-        step_func
+        parameters=parameters,
+        func=infiltration_func
     )
 end
 

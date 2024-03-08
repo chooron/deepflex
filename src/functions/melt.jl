@@ -1,13 +1,12 @@
 function Melt(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Melt];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Melt;
+    parameters::ComponentVector=ComponentVector())
+
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        melt_func,
-        step_func
+        parameters=parameters,
+        func=melt_func
     )
 end
 

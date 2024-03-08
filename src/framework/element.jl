@@ -32,20 +32,14 @@ function SimpleElement(
     funcs::Vector{F},
 ) where {F<:AbstractFlux,T<:Number}
 
-    input_names = Set{Symbol}()
-    output_names = Set{Symbol}()
-
-    for func in funcs
-        union!(input_names, func.input_names)
-        union!(output_names, func.output_names)
-    end
+    input_names, output_names = get_input_and_output_names(funcs)
 
     return SimpleElement{T}(
         name,
         parameters,
         funcs,
-        collect(input_names),
-        collect(output_names)
+        input_names,
+        output_names
     )
 end
 
@@ -93,6 +87,21 @@ function ODEElement(
     d_funcs::Vector{F},
 ) where {F<:AbstractFlux,T<:Number}
 
+    input_names, output_names = get_input_and_output_names(funcs)
+
+    return ODEElement{T}(
+        name=name,
+        parameters=parameters,
+        init_states=init_states,
+        state_names=collect(keys(init_states)),
+        funcs=funcs,
+        d_funcs=d_funcs,
+        input_names=input_names,
+        output_names=output_names
+    )
+end
+
+function get_input_and_output_names(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names = Set{Symbol}()
     output_names = Set{Symbol}()
 
@@ -102,19 +111,14 @@ function ODEElement(
         else
             union!(input_names, func.input_names)
         end
-        union!(output_names, func.output_names)
+        if func.output_names isa Vector
+            union!(output_names, func.output_names)
+        else
+            union!(output_names, [func.output_names])
+        end
     end
 
-    return ODEElement{T}(
-        name=name,
-        parameters=parameters,
-        init_states=init_states,
-        state_names=collect(keys(init_states)),
-        funcs=funcs,
-        d_funcs=d_funcs,
-        input_names=collect(input_names),
-        output_names=collect(output_names)
-    )
+    (collect(input_names), collect(output_names))
 end
 
 
@@ -161,10 +165,8 @@ function single_ele_ode_func!(du, u, p, t)
     tmp_ele = p[:element]
     tmp_input = ComponentVector(namedtuple(p[:input_names], [p[:itp][nm](t) for nm in p[:input_names]]))
     tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
-    tmp_du = tmp_ele.get_du(tmp_fluxes, tmp_ele.parameters)
-    # return du
-    for k in tmp_ele.state_names
-        du[k] = tmp_du[k]
+    for d_func in tmp_ele.d_funcs
+        du[d_func.output_names[1]] = d_func(tmp_fluxes)[d_func.output_names[1]]
     end
 end
 
@@ -199,7 +201,7 @@ end
 LAGElement
 """
 @kwdef mutable struct LAGElement{T} <: AbstractElement where {T<:Number}
-    name::String
+    name::Symbol
 
     # parameters
     parameters::ComponentVector{T}
@@ -212,12 +214,14 @@ LAGElement
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
+
 end
 
 function LAGElement(
-    ; name::String,
+    ; name::Symbol,
     lag_time::Union{T,ComponentVector{T}},
-    lag_func::Dict{Symbol,F}
+    lag_func::Dict{Symbol,F},
+    step_func::Function=DEFAULT_SMOOTHER
 ) where {T<:Number,F<:Function}
 
     input_names = collect(keys(lag_func))
@@ -229,17 +233,23 @@ function LAGElement(
     parameters = ComponentVector(namedtuple(["$(k)_lag_time" for k in keys(lag_time)], [lag_time[k] for k in keys(lag_time)]))
 
     # init lag states
-    lag_states = ComponentVector(; Dict(nm => begin
-        zeros(Int(ceil(lag_time[nm])))
-    end for nm in input_names)...)
+    lag_states = ComponentVector(namedtuple(input_names, [zeros(Int(ceil(lag_time[nm]))) for nm in input_names]))
+    # lag_states = ComponentVector(; Dict(nm => begin
+    #     zeros(Int(ceil(lag_time[nm])))
+    # end for nm in input_names)...)
 
     # build weight
-    lag_weights = ComponentVector(; Dict(k => begin
-        [
-            lag_func[k](i, lag_time[k]) - lag_func[k](i - 1, lag_time[k])
-            for i in 1:(ceil(lag_time[k])|>Int)
-        ]
-    end for k in keys(lag_time))...)
+    lag_weights = ComponentVector(namedtuple(input_names, [[lag_func[k](T(i), T(lag_time[k]), step_func) -
+                                                            lag_func[k](T(i - 1), T(lag_time[k]), step_func)
+                                                            for i in 1:(ceil(lag_time[k])|>Int)]
+                                                           for k in input_names]))
+
+    # lag_weights = ComponentVector(; Dict(k => begin
+    #     [
+    #         lag_func[k](i, lag_time[k], step_func) - lag_func[k](i - 1, lag_time[k], step_func)
+    #         for i in 1:(ceil(lag_time[k])|>Int)
+    #     ]
+    # end for k in keys(lag_time))...)
 
     LAGElement{T}(
         name=name,

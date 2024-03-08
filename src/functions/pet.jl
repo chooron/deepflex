@@ -1,13 +1,12 @@
 function Pet(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Vector{Symbol}=[:Pet];
-    parameters::ComponentVector=ComponentVector(),
-    step_func::Function=DEFAULT_SMOOTHER)
-    HydroFlux(
+    output_names::Symbol=:Pet;
+    parameters::ComponentVector=ComponentVector())
+    
+    SimpleFlux(
         input_names,
         output_names,
-        parameters,
-        pet_func,
-        step_func
+        parameters=parameters,
+        func=pet_func
     )
 end
 
