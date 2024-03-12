@@ -2,7 +2,8 @@
 - [x] 模型构建中需要调整fluxes的输入变量名称和输出变量名称
 - [x] fluxes的function返回值过于固定，不够灵活
 - [ ] LAG Element无法参与整体ode的计算
-- [ ] SimpleFlux和HydroFlux无明显差异性
+- [x] SimpleFlux和HydroFlux无明显差异性
+
 
 # 创新点
 - 耦合神经网络模型，提供一个PINN的水文模型构建框架
@@ -26,6 +27,9 @@
 - [x] 创建模型搭建基础类
 - [x] 针对之前的模型进行ComponentArrays改造
 - [x] 直接将element分为三个大类：ODE，Lag和Simple
+- [ ] 创建模型参数动态估计类，构建delay ode problem(一些参数是通过历史观测资料动态预测得到，而非通过优化算法根据实测预测结果无法计算得到)
+    - [ ] 0实参构建模型
+
 
 
 # 未来计划

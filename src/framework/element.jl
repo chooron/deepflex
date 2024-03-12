@@ -1,8 +1,4 @@
 # Element Methods
-function get_name(ele::AbstractElement)::String
-    return ele.name
-end
-
 function get_output(ele::AbstractElement, input::ComponentVector)
     return nothing
 end
@@ -12,43 +8,43 @@ SimpleElement
 
 SimpleElement是由多个AbstractFlux组成，无中间状态，对应RRMG的一些模型
 """
-struct SimpleElement{T} <: AbstractElement where {T<:Number}
+struct SimpleElement <: AbstractElement
     name::Symbol
-
-    # parameters
-    parameters::ComponentVector{T}
-
-    # functions
-    funcs::Vector{AbstractFlux}
 
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
+    parameters_names::Vector{Symbol}
+
+    # functions
+    funcs::Vector{AbstractFlux}
 end
 
 function SimpleElement(
     ; name::Symbol,
-    parameters::ComponentVector{T},
     funcs::Vector{F},
-) where {F<:AbstractFlux,T<:Number}
+) where {F<:AbstractFlux}
 
-    input_names, output_names = get_input_and_output_names(funcs)
+    input_names, output_names, parameter_names = get_func_infos(funcs)
 
-    return SimpleElement{T}(
+    parameters = ComponentVector{Number}(namedtuple(parameter_names, ones(Number, length(parameter_names))))
+
+    return SimpleElement(
         name,
-        parameters,
-        funcs,
         input_names,
-        output_names
+        output_names,
+        parameters_names,
+        funcs,
+        parameters
     )
 end
 
-function get_output(ele::SimpleElement; input::ComponentVector{T}) where {T<:Number}
+function get_output(ele::SimpleElement; input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
     fluxes = input
     for func in ele.funcs
-        fluxes = ComponentVector(fluxes; func(fluxes)...)
+        fluxes = ComponentVector(fluxes; func(fluxes, parameters)...)
     end
-    return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
+    return fluxes[ele.output_names]
 end
 
 """
@@ -56,99 +52,44 @@ ODEElement
 
 ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含continuous和discrete两种
 """
-@kwdef mutable struct ODEElement{T} <: AbstractElement where {T<:Number}
+struct ODEElement <: AbstractElement
     name::Symbol
 
-    # parameters
-    parameters::ComponentVector{T}
-
-    # states
-    states::ComponentVector = ComponentVector()
-    init_states::ComponentVector{T}
+    # attribute
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
+    parameter_names::Vector{Symbol}
     state_names::Vector{Symbol}
 
     # functions
     funcs::Vector{AbstractFlux}
     d_funcs::Vector{AbstractFlux}
-
-    # solver
-    solver::Union{ODESolver,Nothing} = nothing
-
-    # attribute
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
 end
 
 function ODEElement(
-    ; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T},
+    name::Symbol;
     funcs::Vector{F},
     d_funcs::Vector{F},
-) where {F<:AbstractFlux,T<:Number}
+) where {F<:AbstractFlux}
 
-    input_names, output_names = get_input_and_output_names(funcs)
+    input_names1, output_names, parameter_names1 = get_func_infos(funcs)
+    input_names2, states_names, parameter_names2 = get_d_func_infos(d_funcs)
 
-    return ODEElement{T}(
-        name=name,
-        parameters=parameters,
-        init_states=init_states,
-        state_names=collect(keys(init_states)),
-        funcs=funcs,
-        d_funcs=d_funcs,
-        input_names=input_names,
-        output_names=output_names
+    input_names = union(input_names1, input_names2)
+    parameter_names = union(parameter_names1, parameter_names2)
+
+    return ODEElement(
+        name,
+        input_names,
+        output_names,
+        parameter_names,
+        states_names,
+        funcs,
+        d_funcs
     )
 end
 
-function get_input_and_output_names(funcs::Vector{F}) where {F<:AbstractFlux}
-    input_names = Set{Symbol}()
-    output_names = Set{Symbol}()
-
-    for func in funcs
-        if func.input_names isa Dict
-            union!(input_names, Set(keys(func.input_names)))
-        else
-            union!(input_names, func.input_names)
-        end
-        if func.output_names isa Vector
-            union!(output_names, func.output_names)
-        else
-            union!(output_names, [func.output_names])
-        end
-    end
-
-    (collect(input_names), collect(output_names))
-end
-
-
-function get_parameters(ele::ODEElement; names::Vector{Symbol}=nothing)
-    if isnothing(names)
-        return ele.parameters
-    else
-        return Dict(name => ele.parameters[name] for name in names)
-    end
-end
-
-function set_parameters!(ele::ODEElement; paraminfos::Vector{P}) where {P<:AbstractParamInfo}
-    for p in paraminfos
-        ele.parameters[p.name] = p.value
-        for func in ele.funcs
-            set_parameters!(func, paraminfos=paraminfos)
-        end
-    end
-end
-
-function get_states(ele::ODEElement; state_names::Union{Set{Symbol},Nothing}=nothing)
-    if isnothing(state_names)
-        return ele.states
-    else
-        available_state_names = [nm for nm in state_names if nm in ele.state_names]
-        return ele.states[available_state_names]
-    end
-end
-
-function set_solver!(ele::ODEElement, solver::ODESolver)
+function set_solver!(ele::ODEElement, solver::AbstractSolver)
     setproperty!(ele, :solver, solver)
 end
 
@@ -160,106 +101,102 @@ function pretrain!(ele::ODEElement; input::ComponentVector{T}, train_config...) 
     end
 end
 
-function single_ele_ode_func!(du, u, p, t)
-    # interpolate value by fitted functions
-    tmp_ele = p[:element]
-    tmp_input = ComponentVector(namedtuple(p[:input_names], [p[:itp][nm](t) for nm in p[:input_names]]))
-    tmp_fluxes = get_fluxes(tmp_ele, state=u, input=tmp_input)
-    for d_func in tmp_ele.d_funcs
-        du[d_func.output_names[1]] = d_func(tmp_fluxes)[d_func.output_names[1]]
-    end
-end
-
-function solve_prob!(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
-    dt = 1
-    cur_input_names = collect(keys(input))
-    xs = 1:dt:length(input[cur_input_names[1]])
-
+function solve_prob(
+    ele::ODEElement;
+    input::ComponentVector{T},
+    parameters::ComponentVector{T},
+    init_states::ComponentVector{T},
+    solver::AbstractSolver,
+)::ComponentVector{T} where {T<:Number}
     # fit interpolation functions
-    itp_dict = Dict(nm => linear_interpolation(xs, input[nm]) for nm in cur_input_names)
-
+    itp_dict = Dict(nm => linear_interpolation(input[:time], input[nm]) for nm in element.input_names)
     # solve the problem
-    ode_parameters = (itp=itp_dict, element=ele, input_names=cur_input_names)
-    ele.states = ele.solver(single_ele_ode_func!, ode_parameters, ele.init_states)
+    function singel_ele_ode_func!(du, u, p)
+        tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in element.input_names]))
+        tmp_fluxes = get_output(ele, input=tmp_input, state=u, parameters=p)
+        for d_func in tmp_ele.d_funcs
+            du[d_func.output_names[1]] = d_func(tmp_fluxes)[d_func.output_names[1]]
+        end
+    end
+    # return solved result
+    solver(singel_ele_ode_func!, parameters, init_states, time_config)
 end
 
-function get_fluxes(ele::ODEElement; state::ComponentVector, input::ComponentVector{T}) where {T<:Number}
-    fluxes = ComponentVector(input; state...)
+function get_output(
+    ele::ODEElement;
+    input::ComponentVector{T},
+    states::ComponentVector{T},
+    parameters::ComponentVector{T}
+)::ComponentVector{T} where {T<:Number}
+    fluxes = ComponentVector(input; states...)
     for func in ele.funcs
-        fluxes = ComponentVector(fluxes; func(fluxes)...)
+        fluxes = ComponentVector(fluxes; func(fluxes, parameters)...)
     end
     return fluxes
 end
 
-function get_output(ele::ODEElement; input::ComponentVector{T}) where {T<:Number}
-    fluxes = get_fluxes(ele, state=ele.states, input=input)
-    return ComponentVector(; Dict(nm => fluxes[nm] for nm in ele.output_names)...)
-end
-
-
 """
 LAGElement
 """
-@kwdef mutable struct LAGElement{T} <: AbstractElement where {T<:Number}
+@kwdef mutable struct LAGElement <: AbstractElement
     name::Symbol
-
-    # parameters
-    parameters::ComponentVector{T}
-    lag_time::ComponentVector{T}
-
-    # states
-    lag_states::ComponentVector{T}
-    lag_weights::ComponentVector{T}
 
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
 
+    # func
+    lag_func::Dict{Symbol,F}
+    step_func::Function
+
+    # parameters
+    lag_time::ComponentVector
+
+    # lag states
+    lag_states::ComponentVector
+
+    # lag weights
+    lag_weights::ComponentVector
 end
 
 function LAGElement(
-    ; name::Symbol,
-    lag_time::Union{T,ComponentVector{T}},
+    name::Symbol;
     lag_func::Dict{Symbol,F},
     step_func::Function=DEFAULT_SMOOTHER
-) where {T<:Number,F<:Function}
+) where {F<:Function}
 
-    input_names = collect(keys(lag_func))
+    input_names = Set(keys(lag_func))
 
-    if typeof(lag_time) == T
-        lag_time = ComponentVector(namedtuple(input_names, repeat([lag_time], length(input_names))))
+    LAGElement(
+        name,
+        input_names,
+        input_names,
+        lag_func,
+        step_func,
+        ComponentVector(),
+        ComponentVector(),
+        ComponentVector()
+    )
+end
+
+function set_lag_time!(ele::LAGElement; lag_time::ComponentVector{T}) where {T<:Number}
+    if Set(keys(lag_time)) != ele.input_names
+        @error "$(Set(key(lag_time))) is not consistent with the states of element($(ele.name)): $(ele.input_names)"
     end
-
-    parameters = ComponentVector(namedtuple(["$(k)_lag_time" for k in keys(lag_time)], [lag_time[k] for k in keys(lag_time)]))
-
+    setfield!(ele, :lag_time, lag_time)
     # init lag states
-    lag_states = ComponentVector(namedtuple(input_names, [zeros(Int(ceil(lag_time[nm]))) for nm in input_names]))
-    # lag_states = ComponentVector(; Dict(nm => begin
-    #     zeros(Int(ceil(lag_time[nm])))
-    # end for nm in input_names)...)
+    lag_states = ComponentVector(namedtuple(input_names,
+        [zeros(Int(ceil(lag_time[nm]))) for nm in ele.input_names]))
 
     # build weight
-    lag_weights = ComponentVector(namedtuple(input_names, [[lag_func[k](T(i), T(lag_time[k]), step_func) -
-                                                            lag_func[k](T(i - 1), T(lag_time[k]), step_func)
-                                                            for i in 1:(ceil(lag_time[k])|>Int)]
-                                                           for k in input_names]))
+    lag_weights = ComponentVector(namedtuple(input_names,
+        [[lag_func[k](T(i), T(lag_time[k]), step_func) -
+          lag_func[k](T(i - 1), T(lag_time[k]), step_func)
+          for i in 1:(ceil(lag_time[k])|>Int)]
+         for k in ele.input_names]))
 
-    # lag_weights = ComponentVector(; Dict(k => begin
-    #     [
-    #         lag_func[k](i, lag_time[k], step_func) - lag_func[k](i - 1, lag_time[k], step_func)
-    #         for i in 1:(ceil(lag_time[k])|>Int)
-    #     ]
-    # end for k in keys(lag_time))...)
-
-    LAGElement{T}(
-        name=name,
-        parameters=parameters,
-        lag_time=lag_time,
-        lag_states=lag_states,
-        lag_weights=lag_weights,
-        input_names=input_names,
-        output_names=input_names
-    )
+    setfield!(ele, :lag_states, lag_states)
+    setfield!(ele, :lag_weights, lag_weights)
 end
 
 function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
@@ -290,8 +227,6 @@ function get_output(ele::LAGElement; input::ComponentVector{T}) where {T<:Number
     end
 
     # Get the new lag value to restart
-    ele.lag_states = ComponentVector(; Dict(k => solved_state[k][end, :] for k in ele.input_names)...)
-
-    output = ComponentVector(; Dict(k => solved_state[k][:, 1] for k in ele.input_names)...)
-    return output
+    setfield!(ele, :lag_states, ComponentVector(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names])))
+    ComponentVector(namedtuple(ele.input_names, [solved_state[k][:, 1] for k in ele.input_names]))
 end

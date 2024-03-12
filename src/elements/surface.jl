@@ -1,15 +1,13 @@
 """
 SnowWaterReservoir in Exp-Hydro
 """
-function Surface_ExpHydro(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Surface_ExpHydro(; name::Symbol)
 
     funcs = [
         Pet([:Temp, :Lday]),
-        Snowfall([:Prcp, :Temp], parameters=parameters[[:Tmin]]),
-        Melt([:SnowWater, :Temp], parameters=parameters[[:Tmax, :Df]]),
-        Rainfall([:Prcp, :Temp], parameters=parameters[[:Tmin]]),
+        Snowfall([:Prcp, :Temp], parameters_names=[:Tmin]),
+        Melt([:SnowWater, :Temp], parameters_names=[:Tmax, :Df]),
+        Rainfall([:Prcp, :Temp], parameters_names=[:Tmin]),
         Infiltration([:Rainfall, :Melt])
     ]
 
@@ -19,8 +17,6 @@ function Surface_ExpHydro(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -41,24 +37,21 @@ function Surface_GR4J(; name::Symbol)
 
     SimpleElement(
         name=name,
-        parameters=ComponentVector(),
         funcs=funcs
     )
 end
 
 
-function Surface_HBV(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Surface_HBV(; name::Symbol)
 
     funcs = [
-        Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
+        Snowfall([:Prcp, :Temp], parameters_names=[:tt, :tti]),
         SimpleFlux([:Temp], :Refreeze,
-            parameters=parameters[[:cfr, :cfmax, :ttm]],
+        parameters_names=[:cfr, :cfmax, :ttm],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
-        Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
-        Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], parameters=parameters[[:whc]]),
+        Melt([:Temp], parameters_names=[:cfmax, :ttm]),
+        Rainfall([:Prcp, :Temp], parameters_names=[:tt, :tti]),
+        Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], parameters_names=[:whc]),
     ]
 
     d_funcs = [
@@ -68,25 +61,21 @@ function Surface_HBV(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
 end
 
-function Surface_XAJ(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Surface_XAJ(; name::Symbol)
 
     funcs = [
-        Snowfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
+        Snowfall([:Prcp, :Temp], parameters_names=[:tt, :tti]),
         SimpleFlux([:Temp], :Refreeze,
-            parameters=parameters[[:cfr, :cfmax, :ttm]],
+        parameters_names=[:cfr, :cfmax, :ttm],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], parameters=parameters[[:cfmax, :ttm]]),
-        Rainfall([:Prcp, :Temp], parameters=parameters[[:tt, :tti]]),
-        Infiltration([:LiquidWater, :Rainfall, :Melt], parameters=parameters[[:whc, :sp]]),
+        Melt([:Temp], parameters_names=[:cfmax, :ttm]),
+        Rainfall([:Prcp, :Temp], parameters_names=[:tt, :tti]),
+        Infiltration([:LiquidWater, :Rainfall, :Melt], parameters_names=[:whc, :sp]),
     ]
 
     d_funcs = [
@@ -96,17 +85,13 @@ function Surface_XAJ(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
 end
 
 
-function Surface_M100(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Surface_M100(; name::Symbol)
 
     funcs = [
         Tranparent([:Melt, :Snowfall, :Temp, :SnowWater]),
@@ -120,8 +105,6 @@ function Surface_M100(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )

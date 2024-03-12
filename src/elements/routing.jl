@@ -18,15 +18,13 @@ end
 """
 RoutingStore in GR4J
 """
-function Routing_GR4J(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Routing_GR4J(; name::Symbol)
 
     funcs = [
         Tranparent([:SlowFlow]),
-        Recharge([:RoutingStore], parameters=parameters[[:x2, :x3, :ω]]),
+        Recharge([:RoutingStore], parameter_names=[:x2, :x3, :ω]),
         SimpleFlux([:RoutingStore], :RoutedFlow,
-            parameters=parameters[[:x3, :γ]],
+            parameter_names=[:x3, :γ],
             func=(i, p, sf) -> @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:RoutingStore]^p[:γ]))),
         Summation([:RoutedFlow, :Recharge, :FastFlow], :Flow)
     ]
@@ -37,34 +35,30 @@ function Routing_GR4J(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
 end
 
-function Routing_HBV(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Routing_HBV(; name::Symbol)
 
     funcs = [
         Tranparent([:Recharge, :Capillary]),
         SimpleFlux([:UpperZone], :InterFlow,
-            parameters=parameters[[:k0, :α]],
+            parameter_names=[:k0, :α],
             func=(i, p, sf) -> @.(p[:k0] * i[:UpperZone]^(1 + p[:α]))),
         SimpleFlux([:LowerZone], :BaseFlow,
-            parameters=parameters[[:k1]],
+            parameter_names=[:k1],
             func=(i, p, sf) -> @.(p[:k1] * i[:LowerZone])),
         Summation([:InterFlow, :BaseFlow], :Flow)
     ]
 
     d_funcs = [
         SimpleFlux([:Recharge, :Capillary, :InterFlow], :UpperZone,
-            parameters=parameters[[:c]],
+            parameter_names=[:c],
             func=(i, p, sf) -> @.(i[:Recharge] - i[:Capillary] - i[:InterFlow] - p[:c])),
         SimpleFlux([:BaseFlow], :LowerZone,
-            parameters=parameters[[:c]],
+            parameter_names=[:c],
             func=(i, p, sf) -> @.(p[:c] - i[:BaseFlow]))
     ]
 
@@ -77,24 +71,14 @@ function Routing_HBV(; name::Symbol,
     )
 end
 
-function Routing_HyMOD(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Routing_HyMOD(; name::Symbol)
 
     funcs = [
         Tranparent([:FastFlow, :SlowFlow]),
-        SimpleFlux([:FastRouting1], :Qf1,
-            parameters=parameters[[:kf]],
-            func=(i, p) -> p[:kf] .* i[:FastRouting1]),
-        SimpleFlux([:FastRouting2], :Qf2,
-            parameters=parameters[[:kf]],
-            func=(i, p) -> p[:kf] .* i[:FastRouting2]),
-        SimpleFlux([:FastRouting3], :Qf3,
-            parameters=parameters[[:kf]],
-            func=(i, p) -> p[:kf] .* i[:FastRouting3]),
-        SimpleFlux([:SlowRouting], :Qs,
-            parameters=parameters[[:ks]],
-            func=(i, p) -> p[:ks] .* i[:SlowRouting]),
+        SimpleFlux([:FastRouting1], :Qf1, parameter_names=[:kf], func=(i, p) -> p[:kf] .* i[:FastRouting1]),
+        SimpleFlux([:FastRouting2], :Qf2, parameter_names=[:kf], func=(i, p) -> p[:kf] .* i[:FastRouting2]),
+        SimpleFlux([:FastRouting3], :Qf3, parameter_names=[:kf], func=(i, p) -> p[:kf] .* i[:FastRouting3]),
+        SimpleFlux([:SlowRouting], :Qs, parameter_names=[:ks], func=(i, p) -> p[:ks] .* i[:SlowRouting]),
         Summation([:Qs, :Qf3], :Flow)
     ]
 
@@ -107,17 +91,13 @@ function Routing_HyMOD(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
 end
 
 
-function Routing_XAJ(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Routing_XAJ(; name::Symbol)
 
     tmp_func = (i, p, sf) -> begin
         free_water, flux_in = i[:FreeWater], i[:FluxIn]
@@ -127,21 +107,13 @@ function Routing_XAJ(; name::Symbol,
     end
 
     funcs = [
-        SimpleFlux(Dict(:FreeWater => :FreeWater, :Saturation => :FluxIn), :SurfaceRunoff,
-            parameters=parameters[[:Smax, :ex]], func=tmp_func),
-        SimpleFlux(Dict(:FreeWater => :FreeWater, :SurfaceFlow => :FluxIn), :InterRunoff,
-            parameters=parameters[[:Smax, :ex]], func=tmp_func),
-        SimpleFlux(Dict(:FreeWater => :FreeWater, :InterFlow => :FluxIn), :BaseRunoff,
-            parameters=parameters[[:Smax, :ex]], func=tmp_func),
-        SimpleFlux([:InterRouting], :InterFlow,
-            parameters=parameters[:ci],
-            func=(i, p, sf) -> p[:ci] .* i[:InterRouting]),
-        SimpleFlux([:BaseRouting], :BaseFlow,
-            parameters=parameters[:cg],
-            func=(i, p, sf) -> p[:cg] .* i[:BaseRouting]),
-        SimpleFlux([:Prcp, :SurfaceRunoff], :SurfaceFlow,
-            parameters=parameters[[:Aim]],
-            func=(i, p, sf) -> p[:Aim] .* i[:Prcp] .+ i[:SurfaceFlow]),
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :Saturation => :FluxIn), :SurfaceRunoff, parameter_names=[:Smax, :ex], func=tmp_func),
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :SurfaceFlow => :FluxIn), :InterRunoff, parameter_names=[:Smax, :ex], func=tmp_func),
+        SimpleFlux(Dict(:FreeWater => :FreeWater, :InterFlow => :FluxIn), :BaseRunoff, parameter_names=[:Smax, :ex], func=tmp_func),
+        
+        SimpleFlux([:InterRouting], :InterFlow, parameter_names=[:ci], func=(i, p, sf) -> p[:ci] .* i[:InterRouting]),
+        SimpleFlux([:BaseRouting], :BaseFlow, parameter_names=[:cg], func=(i, p, sf) -> p[:cg] .* i[:BaseRouting]),
+        SimpleFlux([:Prcp, :SurfaceRunoff], :SurfaceFlow, parameter_names=[:Aim], func=(i, p, sf) -> p[:Aim] .* i[:Prcp] .+ i[:SurfaceFlow]),
         Summation([:BaseFlow, :InterFlow, :SurfaceFlow], :Flow)
     ]
 
@@ -153,8 +125,6 @@ function Routing_XAJ(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )

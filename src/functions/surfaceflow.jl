@@ -1,11 +1,11 @@
 function Surfaceflow(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:Surfaceflow;
-    parameters::ComponentVector=ComponentVector())
+    parameters_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
+        parameters_names,
         func=surfaceflow_func
     )
 end

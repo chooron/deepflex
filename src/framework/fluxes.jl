@@ -1,13 +1,54 @@
 
+function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    parameter_names = Vector{Symbol}()
+
+    for func in funcs
+        if func.input_names isa Dict
+            union!(input_names, Vector(keys(func.input_names)))
+        else
+            union!(input_names, func.input_names)
+        end
+        if func.output_names isa Vector
+            union!(output_names, func.output_names)
+        else
+            union!(output_names, [func.output_names])
+        end
+        union!(parameters_names, func.parameters_names)
+    end
+
+    input_names, output_names, parameter_names
+end
+
+function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+    input_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
+    parameter_names = Vector{Symbol}()
+
+    for func in funcs
+        union!(state_names, func.output_names)
+        union!(parameters_names, func.parameters_names)
+
+        if func.input_names isa Dict
+            for k in keys(func.input_names)
+                union!(input_names, Vector(func.input_names[k]))
+            end
+        else
+            union!(input_names, func.input_names)
+        end
+    end
+    input_names, state_names, parameter_names
+end
+
 """
-简单计算公式，包括split，sum，transparent
+Simple flux
 """
-mutable struct SimpleFlux <: AbstractFlux
+struct SimpleFlux <: AbstractFlux
     # attribute
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}}
     output_names::Union{Symbol,Vector{Symbol}}
-    # parameters
-    parameters::ComponentVector
+    parameter_names::Vector{Symbol}
     # function 
     func::Function
     # step function
@@ -16,14 +57,14 @@ end
 
 function SimpleFlux(
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Union{Symbol,Vector{Symbol}};
-    parameters::ComponentVector,
-    func::Function)
-    
+    output_names::Union{Symbol,Vector{Symbol}},
+    parameter_names::Vector{Symbol};
+    func::Function
+)
     SimpleFlux(
         input_names,
         output_names,
-        parameters,
+        parameter_names,
         func,
         DEFAULT_SMOOTHER
     )
@@ -51,9 +92,9 @@ end
 
 ## ----------------------------------------------------------------------
 ## callable function
-function (flux::SimpleFlux)(input::ComponentVector{T}) where {T<:Number}
+function (flux::SimpleFlux)(input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
     tmp_input = extract_input(input, flux.input_names)
-    func_output = flux.func(tmp_input, NamedTuple(flux.parameters), flux.step_func)
+    func_output = flux.func(tmp_input, NamedTuple(parameters[flux.parameter_names]), flux.step_func)
     process_output(flux.output_names, func_output)
 end
 

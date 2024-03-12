@@ -1,24 +1,13 @@
-function test1(a::Vector{T}) where {T<:Number}
-       for i in a
-              if !(i isa AbstractFloat)
-                     i = Float32(i)
-              end
-       end
-end
+using OrdinaryDiffEq
+using ComponentArrays
 
-function convert(v::Int32)
-       Float32(v)
+function lorenz!(du, u, p, t)
+       @info typeof(p)
+       du[1] = 10.0(u[2] - u[1])
+       du[2] = u[1] * (28.0 - u[3]) - u[2]
+       du[3] = u[1] * u[2] - (8 / 3) * u[3]
 end
-
-function convert(v::Float32)
-       v
-end
-
-function test2(a::Vector{T}) where {T<:Number}
-       for i in a
-              i = convert(i)
-       end
-end
-
-@btime test1(ones(Int32, 100))
-@btime test2(ones(Int32, 100))
+u0 = [1.0; 0.0; 0.0]
+tspan = (0.0, 100.0)
+prob = ODEProblem(lorenz!, u0, tspan, ComponentVector(p1=1, p2=2))
+sol = solve(prob, Tsit5())

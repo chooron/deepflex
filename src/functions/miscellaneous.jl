@@ -1,10 +1,10 @@
 function Summation(input_names::Vector{Symbol},
-    output_names::Symbol;
-    parameters::ComponentVector=ComponentVector())
+    output_names::Symbol,
+    parameters_names::Vector{Symbol}=Symbol[])
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
+        parameters_names,
         func=(i::NamedTuple, p::NamedTuple, sf::Function) -> begin
             sum([i[k] for k in keys(i)])
         end
@@ -17,11 +17,11 @@ end
 """
 function Splitter(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}}},
     output_names::Vector{Symbol};
-    parameters::ComponentVector{T}) where {T<:Number}
+    parameters_names::Vector{Symbol}=Symbol[])
     SimpleFlux(
         input_names,
         output_names,
-        parameters=parameters,
+        parameters_names,
         func=(i::NamedTuple, p::NamedTuple, sf::Function) -> begin
             tmp_input = i[first(keys(i))]
             [p[k] .* tmp_input for k in keys(p)]
@@ -48,7 +48,7 @@ function Tranparent(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}
     SimpleFlux(
         input_names,
         output_names,
-        parameters=ComponentVector(),
+        [],
         func=(i::NamedTuple, p::NamedTuple, sf::Function) -> [i[k] for k in keys(i)]
     )
 end
@@ -61,7 +61,7 @@ function Differ(
     SimpleFlux(
         tmp_input_names,
         output_names,
-        parameters=ComponentVector(),
+        [],
         func=(i::NamedTuple, p::NamedTuple, sf::Function) -> [sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])]
     )
 end

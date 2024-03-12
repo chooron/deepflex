@@ -1,12 +1,12 @@
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Soil_ExpHydro(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function Soil_ExpHydro(; name::Symbol)
     funcs = [
         Tranparent([:Infiltration]),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]]),
-        Baseflow([:SoilWater], parameters=parameters[[:Smax, :Qmax, :f]]),
-        Surfaceflow([:SoilWater], parameters=parameters[[:Smax]]),
+        Evap([:SoilWater, :Pet], parameter_names=[:Smax]),
+        Baseflow([:SoilWater], parameter_names=[:Smax, :Qmax, :f]),
+        Surfaceflow([:SoilWater], parameter_names=[:Smax]),
         Flow([:Baseflow, :Surfaceflow])
     ]
 
@@ -27,9 +27,7 @@ end
 """
 SoilWaterReservoir in M50
 """
-function Soil_M50(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_M50(; name::Symbol)
 
     et_ann = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
     q_ann = Lux.Chain(Lux.Dense(2, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
@@ -43,13 +41,15 @@ function Soil_M50(; name::Symbol,
     ]
 
     d_funcs = [
-        D_Soilwater([:SoilWater, :Infiltration, :Lday, :Evap, :Flow])
+        SimpleFlux([:SoilWater, :Infiltration, :Lday, :Evap, :Flow], [:SoilWater],
+            parameter_names=Symbol[],
+            func=(i, p, sf) -> @.(input[:Infiltration] -
+                                  sf(input[:SoilWater]) * input[:Lday] * exp(input[:Evap]) -
+                                  sf(input[:SoilWater]) * exp(input[:Flow])))
     ]
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -58,15 +58,13 @@ end
 """
 SoilWaterReservoir in M100
 """
-function Soil_M100(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_M100(; name::Symbol)
 
     ann = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
 
     funcs = [
         Tranparent([:Melt, :Rainfall, :Temp, :SnowWater, :SoilWater, :Evap, :Lday]),
-        NNFlux([:SnowWater, :SoilWater, :Temp], [:Evap], model=et_ann, seed=42)
+        NNFlux([:SnowWater, :SoilWater, :Temp], [:Evap], model=ann, seed=42)
         #TODO 还没写完
     ]
 
@@ -74,10 +72,17 @@ function Soil_M100(; name::Symbol,
         D_Soilwater([:SnowWater, :SoilWater, :Rainfall, :Melt, :Lday, :Evap, :Flow])
     ]
 
+    d_funcs = [
+        SimpleFlux([:SnowWater, :SoilWater, :Rainfall, :Melt, :Lday, :Evap, :Flow], [:SoilWater],
+            parameter_names=Symbol[],
+            func=(i, p, sf) -> @.(relu(sinh(input[:Rainfall])) +
+                                  relu(step_func(input[:SnowWater]) * sinh(input[:Melt])) -
+                                  step_func(input[:SoilWater]) * input[:Lday] * exp(input[:Evap]) -
+                                  step_func(input[:SoilWater]) * exp(input[:Flow])))
+    ]
+
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -86,16 +91,14 @@ end
 """
 SoilWaterReservoir in GR4J
 """
-function Soil_GR4J(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_GR4J(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:x1]]),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:x1]]),
-        Percolation([:SoilWater], parameters=parameters[[:x1]]),
+        Saturation([:SoilWater, :Infiltration], parameter_names=[:x1]),
+        Evap([:SoilWater, :Pet], parameter_names=[:x1]),
+        Percolation([:SoilWater], parameter_names=[:x1]),
         SimpleFlux([:Infiltration, :Percolation, :Saturation], :TempFlow,
-            parameters=ComponentVector{T}(),
+            parameters=Symbol[],
             func=(i, p, sf) -> @.(i[:Infiltration] - i[:Saturation] + i[:Percolation])),
         Splitter([:TempFlow], [:SlowFlow, :FastFlow], parameters=ComponentVector{T}(SlowFlow=0.9, FastFlow=0.1))
     ]
@@ -106,8 +109,6 @@ function Soil_GR4J(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -116,15 +117,13 @@ end
 """
 SoilWaterReservoir in HYMOD
 """
-function Soil_HyMOD(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_HyMOD(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:Smax, :b]]),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:Smax]]),
-        Splitter([:Saturation], [:FastFlow, :SlowFlow],
-            parameters=ComponentVector(FastFlow=parameters[:a], SlowFlow=(T(1) .- parameters[:a])))
+        Saturation([:SoilWater, :Infiltration], parameter_names=[:Smax, :b]),
+        Evap([:SoilWater, :Pet], parameter_names=[:Smax]),
+        SimpleFlux([:Saturation], [:FastFlow, :SlowFlow], parameter_names=[:a],
+            func=(i, p, sf) -> @.[i[:Saturation] * (1 - p[:a]), i[:Saturation] * p[:a]])
     ]
 
     d_funcs = [
@@ -133,8 +132,6 @@ function Soil_HyMOD(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -144,13 +141,11 @@ end
 """
 SoilWaterReservoir in XAJ
 """
-function Soil_XAJ(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_XAJ(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameters=parameters[[:Aim, :Wmax, :a, :b]]),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:c, :LM]]),
+        Saturation([:SoilWater, :Infiltration], parameter_names=[:Aim, :Wmax, :a, :b]),
+        Evap([:SoilWater, :Pet], parameter_names=[:c, :LM]),
     ]
 
     d_funcs = [
@@ -159,8 +154,6 @@ function Soil_XAJ(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -170,16 +163,14 @@ end
 """
 HBV
 """
-function Soil_HBV(; name::Symbol,
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T}) where {T<:Number}
+function Soil_HBV(; name::Symbol)
 
     funcs = [
         SimpleFlux([:SoilWater], :Capillary,
-            parameters=parameters[[:cflux, :fc]],
+            parameter_names=[:cflux, :fc],
             func=(i, p, sf) -> @.(p[:cflux] * (1 - i[:SoilWater] / p[:fc]))),
-        Evap([:SoilWater, :Pet], parameters=parameters[[:lp, :fc]]),
-        Recharge([:SoilWater, :Infiltration], parameters=parameters[[:fc, :β]]),
+        Evap([:SoilWater, :Pet], parameter_names=[:lp, :fc]),
+        Recharge([:SoilWater, :Infiltration], parameter_names=[:fc, :β]),
     ]
 
 
@@ -189,8 +180,6 @@ function Soil_HBV(; name::Symbol,
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
