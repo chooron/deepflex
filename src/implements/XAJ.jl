@@ -1,4 +1,4 @@
-function XAJ(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function XAJ(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
         Surface_GR4J(name=:sf),
         Soil_XAJ(name=:sl,

@@ -16,7 +16,7 @@ using Graphs
 using MetaGraphs
 
 # data interpolataion
-using Interpolations
+using DataInterpolations
 
 # solve ODEProblem
 using OrdinaryDiffEq
@@ -74,7 +74,6 @@ include("functions/recharge.jl")
 include("functions/saturation.jl")
 include("functions/smoother.jl")
 include("functions/snowfall.jl")
-include("functions/soilwater.jl")
 include("functions/surfaceflow.jl")
 include("functions/unithydro.jl")
 # Implement Element

@@ -1,7 +1,7 @@
 """
 Exp-Hydro model
 """
-function ExpHydro(; name::String)
+function ExpHydro(; name::Symbol)
     elements = [
         Surface_ExpHydro(name=:sf),
         Soil_ExpHydro(name=:sl),

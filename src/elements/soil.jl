@@ -3,11 +3,10 @@ SoilWaterReservoir in Exp-Hydro
 """
 function Soil_ExpHydro(; name::Symbol)
     funcs = [
-        Tranparent([:Infiltration]),
         Evap([:SoilWater, :Pet], parameter_names=[:Smax]),
-        Baseflow([:SoilWater], parameter_names=[:Smax, :Qmax, :f]),
-        Surfaceflow([:SoilWater], parameter_names=[:Smax]),
-        Flow([:Baseflow, :Surfaceflow])
+        BaseFlow([:SoilWater], parameter_names=[:Smax, :Qmax, :f]),
+        SurfaceFlow([:SoilWater], parameter_names=[:Smax]),
+        Flow([:BaseFlow, :SurfaceFlow])
     ]
 
     d_funcs = [
@@ -16,8 +15,6 @@ function Soil_ExpHydro(; name::Symbol)
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )
@@ -63,13 +60,8 @@ function Soil_M100(; name::Symbol)
     ann = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
 
     funcs = [
-        Tranparent([:Melt, :Rainfall, :Temp, :SnowWater, :SoilWater, :Evap, :Lday]),
         NNFlux([:SnowWater, :SoilWater, :Temp], [:Evap], model=ann, seed=42)
         #TODO 还没写完
-    ]
-
-    d_funcs = [
-        D_Soilwater([:SnowWater, :SoilWater, :Rainfall, :Melt, :Lday, :Evap, :Flow])
     ]
 
     d_funcs = [

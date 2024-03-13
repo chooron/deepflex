@@ -15,7 +15,7 @@ function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
         else
             union!(output_names, [func.output_names])
         end
-        union!(parameters_names, func.parameters_names)
+        union!(parameter_names, func.parameter_names)
     end
 
     input_names, output_names, parameter_names
@@ -28,7 +28,7 @@ function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
 
     for func in funcs
         union!(state_names, func.output_names)
-        union!(parameters_names, func.parameters_names)
+        union!(parameter_names, func.parameter_names)
 
         if func.input_names isa Dict
             for k in keys(func.input_names)

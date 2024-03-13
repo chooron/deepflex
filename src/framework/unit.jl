@@ -1,11 +1,11 @@
 struct Unit{E,S} <: AbstractUnit where {E<:AbstractElement,S<:AbstractSolver}
-    name::String
+    name::Symbol
 
     # attribute
-    input_names::Set{Symbol}
-    output_names::Set{Symbol}
-    state_names::Set{Symbol}
-    parameter_names::Set{Symbol}
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
+    state_names::Vector{Symbol}
+    parameter_names::Vector{Symbol}
 
     # model structure
     elements::Vector{E}
@@ -13,24 +13,22 @@ struct Unit{E,S} <: AbstractUnit where {E<:AbstractElement,S<:AbstractSolver}
     solver::Dict{Symbol,S}
 end
 
-function build_unit(; name::String, elements::Vector{E}, solver::Union{S,Dict{Symbol,S}}) where {E<:AbstractElement,S<:AbstractSolver}
+function build_unit(; name::Symbol, elements::Vector{E}) where {E<:AbstractElement}
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
     parameter_names = Vector{Symbol}()
 
-    if !(solver isa Dict)
-        solver = Dict(ele.nm => solver for ele in elements if elements isa ODEElement)
-    end
-
     for ele in elements
         union!(input_names, ele.input_names)
         union!(output_names, ele.output_names)
         union!(parameter_names, ele.parameter_names)
-        if elements isa ODEElement
+        if ele isa ODEElement
             union!(state_names, ele.state_names)
         end
     end
+
+    solver = Dict(ele.name => DEFAULT_SOLVER for ele in elements if ele isa ODEElement)
 
     Unit(
         name,
@@ -41,6 +39,15 @@ function build_unit(; name::String, elements::Vector{E}, solver::Union{S,Dict{Sy
         elements,
         solver,
     )
+end
+
+function set_solver!(unit::Unit, solver::AbstractSolver)
+    solver = Dict(ele.nm => solver for ele in unit.elements if ele isa ODEElement)
+    setfield!(unit, :solver, solver)
+end
+
+function set_solver!(unit::Unit, solver::Dict{Symbol,S}) where {S<:AbstractSolver}
+    setfield!(unit, :solver, solver)
 end
 
 function pretrain!(unit::AbstractUnit; input::ComponentVector{T}, train_config...) where {T<:Number}
@@ -73,19 +80,18 @@ function get_output(
     parameters::ComponentVector{T},
     init_states::ComponentVector{T},
 ) where {T<:Number}
-    # 开始计算
     # * This function is calculated element by element
     # initialize unit fluxes
     fluxes = input
     # traversal of the directed graph
-    for tmp_ele in unit.elements
-        if tmp_ele isa ODEElement
-            solved_states = solve_prob(tmp_ele,
-                input=fluxes, parameters=parameters, init_states=init_states,
-                time_idx=input[:time], solver=unit.ele[tmp_ele.name])
-            tmp_fluxes = get_output(tmp_ele, input=fluxes, states=solved_states, parameters=parameters)
+    for ele in unit.elements
+        if ele isa ODEElement
+            solved_states = solve_prob(ele,
+                input=fluxes, parameters=parameters,
+                init_states=init_states[ele.state_names], solver=unit.solver[ele.name])
+            tmp_fluxes = get_output(ele, input=fluxes, states=solved_states, parameters=parameters)
         else
-            tmp_fluxes = get_output(tmp_ele, input=fluxes, parameters=parameters)
+            tmp_fluxes = get_output(ele, input=fluxes, parameters=parameters)
         end
         fluxes = ComponentVector(fluxes; tmp_fluxes...)
     end

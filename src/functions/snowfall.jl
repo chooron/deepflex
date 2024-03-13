@@ -1,11 +1,11 @@
 function Snowfall(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:Snowfall;
-    parameters_names::Vector{Symbol}=Symbol[])
+    parameter_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
         input_names,
         output_names,
-        parameters_names,
+        parameter_names,
         func=snowfall_func
     )
 end

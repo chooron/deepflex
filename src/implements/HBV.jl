@@ -1,4 +1,4 @@
-function HBV(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver) where {T<:Number}
+function HBV(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver) where {T<:Number}
     elements = [
         Surface_HBV(
             name=:sf,

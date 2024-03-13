@@ -14,7 +14,7 @@ struct SimpleElement <: AbstractElement
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    parameters_names::Vector{Symbol}
+    parameter_names::Vector{Symbol}
 
     # functions
     funcs::Vector{AbstractFlux}
@@ -27,15 +27,12 @@ function SimpleElement(
 
     input_names, output_names, parameter_names = get_func_infos(funcs)
 
-    parameters = ComponentVector{Number}(namedtuple(parameter_names, ones(Number, length(parameter_names))))
-
     return SimpleElement(
         name,
         input_names,
         output_names,
-        parameters_names,
-        funcs,
-        parameters
+        parameter_names,
+        funcs
     )
 end
 
@@ -67,15 +64,20 @@ struct ODEElement <: AbstractElement
 end
 
 function ODEElement(
-    name::Symbol;
+    ; name::Symbol,
     funcs::Vector{F},
     d_funcs::Vector{F},
 ) where {F<:AbstractFlux}
-
+    # combine the info of func and d_func
     input_names1, output_names, parameter_names1 = get_func_infos(funcs)
-    input_names2, states_names, parameter_names2 = get_d_func_infos(d_funcs)
+    input_names2, state_names, parameter_names2 = get_d_func_infos(d_funcs)
 
     input_names = union(input_names1, input_names2)
+
+    # delete the inner flux names
+    input_names = setdiff(input_names, state_names)
+    input_names = setdiff(input_names, output_names)
+
     parameter_names = union(parameter_names1, parameter_names2)
 
     return ODEElement(
@@ -83,7 +85,7 @@ function ODEElement(
         input_names,
         output_names,
         parameter_names,
-        states_names,
+        state_names,
         funcs,
         d_funcs
     )
@@ -109,17 +111,17 @@ function solve_prob(
     solver::AbstractSolver,
 )::ComponentVector{T} where {T<:Number}
     # fit interpolation functions
-    itp_dict = Dict(nm => linear_interpolation(input[:time], input[nm]) for nm in element.input_names)
+    itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in ele.input_names)
     # solve the problem
-    function singel_ele_ode_func!(du, u, p)
-        tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in element.input_names]))
-        tmp_fluxes = get_output(ele, input=tmp_input, state=u, parameters=p)
-        for d_func in tmp_ele.d_funcs
-            du[d_func.output_names[1]] = d_func(tmp_fluxes)[d_func.output_names[1]]
+    function singel_ele_ode_func!(du, u, p, t)
+        tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))
+        tmp_fluxes = get_output(ele, input=tmp_input, states=u, parameters=p)
+        for d_func in ele.d_funcs
+            du[d_func.output_names[1]] = d_func(tmp_fluxes, p)[d_func.output_names[1]]
         end
     end
     # return solved result
-    solver(singel_ele_ode_func!, parameters, init_states, time_config)
+    solver(singel_ele_ode_func!, parameters, init_states, (saveat=input[:time],))
 end
 
 function get_output(
@@ -144,23 +146,16 @@ LAGElement
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
+    params_names::Vector{Symbol}
 
     # func
-    lag_func::Dict{Symbol,F}
+    lag_func::Dict{Symbol,Function}
     step_func::Function
-
-    # parameters
-    lag_time::ComponentVector
-
-    # lag states
-    lag_states::ComponentVector
-
-    # lag weights
-    lag_weights::ComponentVector
 end
 
 function LAGElement(
-    name::Symbol;
+    ; name::Symbol,
+    params_names::Dict{Symbol,Vector{Symbol}},
     lag_func::Dict{Symbol,F},
     step_func::Function=DEFAULT_SMOOTHER
 ) where {F<:Function}
@@ -171,19 +166,16 @@ function LAGElement(
         name,
         input_names,
         input_names,
-        lag_func,
+        params_names,
         step_func,
-        ComponentVector(),
-        ComponentVector(),
-        ComponentVector()
     )
 end
 
-function set_lag_time!(ele::LAGElement; lag_time::ComponentVector{T}) where {T<:Number}
+function preprocess_parameters(ele::LAGElement; parameters::ComponentVector{T}) where {T<:Number}
     if Set(keys(lag_time)) != ele.input_names
         @error "$(Set(key(lag_time))) is not consistent with the states of element($(ele.name)): $(ele.input_names)"
     end
-    setfield!(ele, :lag_time, lag_time)
+
     # init lag states
     lag_states = ComponentVector(namedtuple(input_names,
         [zeros(Int(ceil(lag_time[nm]))) for nm in ele.input_names]))

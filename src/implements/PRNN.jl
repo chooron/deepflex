@@ -4,7 +4,7 @@ Regional PRNN model
 Jiang S., Zheng Y., & Solomatine D.. (2020) Improving AI system awareness of geoscience knowledge:
 Symbiotic integration of physical approaches and deep learning. *Geophysical Research Letters*, 47. DOI: 10.1029/2020GL088229
 """
-function RegionalPRNN(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver=nothing) where {T<:Number}
+function RegionalPRNN(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}, solver::AbstractSolver=nothing) where {T<:Number}
     # attribute names
     attr_names = []
 

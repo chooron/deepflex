@@ -4,12 +4,11 @@ RoutingStore in GR4J
 function Routing_ExpHydro(; name::Symbol)
 
     funcs = [
-        Flow([:Baseflow, :Surfaceflow])
+        Flow([:BaseFlow, :SurfaceFlow])
     ]
 
     SimpleElement(
         name=name,
-        parameters=ComponentVector(),
         funcs=funcs
     )
 end
@@ -64,8 +63,6 @@ function Routing_HBV(; name::Symbol)
 
     ODEElement(
         name=name,
-        parameters=parameters,
-        init_states=init_states,
         funcs=funcs,
         d_funcs=d_funcs
     )

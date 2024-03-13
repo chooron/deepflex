@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "160b7513c23b3ca80efd56257bfdc3b470ffeafc"
+project_hash = "2a7d07a41733223e9a8f24ad97a448a2b932f70d"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -460,6 +460,25 @@ deps = ["Compat", "DataAPI", "DataStructures", "Future", "InlineStrings", "Inver
 git-tree-sha1 = "04c738083f29f86e62c8afc341f0967d8717bdb8"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 version = "1.6.1"
+
+[[deps.DataInterpolations]]
+deps = ["LinearAlgebra", "PrettyTables", "RecipesBase", "Reexport"]
+git-tree-sha1 = "79e533ab41ad6784eea6eafbf3f1c615c9a1349e"
+uuid = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+version = "4.7.0"
+
+    [deps.DataInterpolations.extensions]
+    DataInterpolationsChainRulesCoreExt = "ChainRulesCore"
+    DataInterpolationsOptimExt = ["ForwardDiff", "Optim"]
+    DataInterpolationsRegularizationToolsExt = "RegularizationTools"
+    DataInterpolationsSymbolicsExt = "Symbolics"
+
+    [deps.DataInterpolations.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+    RegularizationTools = "29dad682-9a27-4bc3-9c72-016788665182"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]

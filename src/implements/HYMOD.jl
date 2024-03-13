@@ -1,4 +1,4 @@
-function HyMOD(; name::String, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function HyMOD(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
     elements = [
         Surface_GR4J(name="sf"),
         Soil_HyMOD(name="sl", parameters=parameters[[:Smax, :a, :b]], init_states=init_states[[:SoilWater]]),
