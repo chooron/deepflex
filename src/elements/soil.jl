@@ -3,9 +3,9 @@ SoilWaterReservoir in Exp-Hydro
 """
 function Soil_ExpHydro(; name::Symbol)
     funcs = [
-        Evap([:SoilWater, :Pet], parameter_names=[:Smax]),
-        BaseFlow([:SoilWater], parameter_names=[:Smax, :Qmax, :f]),
-        SurfaceFlow([:SoilWater], parameter_names=[:Smax]),
+        Evap([:SoilWater, :Pet], param_names=[:Smax]),
+        BaseFlow([:SoilWater], param_names=[:Smax, :Qmax, :f]),
+        SurfaceFlow([:SoilWater], param_names=[:Smax]),
         Flow([:BaseFlow, :SurfaceFlow])
     ]
 
@@ -39,7 +39,7 @@ function Soil_M50(; name::Symbol)
 
     d_funcs = [
         SimpleFlux([:SoilWater, :Infiltration, :Lday, :Evap, :Flow], [:SoilWater],
-            parameter_names=Symbol[],
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(input[:Infiltration] -
                                   sf(input[:SoilWater]) * input[:Lday] * exp(input[:Evap]) -
                                   sf(input[:SoilWater]) * exp(input[:Flow])))
@@ -66,7 +66,7 @@ function Soil_M100(; name::Symbol)
 
     d_funcs = [
         SimpleFlux([:SnowWater, :SoilWater, :Rainfall, :Melt, :Lday, :Evap, :Flow], [:SoilWater],
-            parameter_names=Symbol[],
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(relu(sinh(input[:Rainfall])) +
                                   relu(step_func(input[:SnowWater]) * sinh(input[:Melt])) -
                                   step_func(input[:SoilWater]) * input[:Lday] * exp(input[:Evap]) -
@@ -86,13 +86,15 @@ SoilWaterReservoir in GR4J
 function Soil_GR4J(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameter_names=[:x1]),
-        Evap([:SoilWater, :Pet], parameter_names=[:x1]),
-        Percolation([:SoilWater], parameter_names=[:x1]),
+        Saturation([:SoilWater, :Infiltration], param_names=[:x1]),
+        Evap([:SoilWater, :Pet], param_names=[:x1]),
+        Percolation([:SoilWater], param_names=[:x1]),
         SimpleFlux([:Infiltration, :Percolation, :Saturation], :TempFlow,
-            parameters=Symbol[],
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(i[:Infiltration] - i[:Saturation] + i[:Percolation])),
-        Splitter([:TempFlow], [:SlowFlow, :FastFlow], parameters=ComponentVector{T}(SlowFlow=0.9, FastFlow=0.1))
+        SimpleFlux([:TempFlow], [:SlowFlow, :FastFlow],
+            param_names=Symbol[],
+            func=(i, p, sf) -> @.[i[:TempFlow] * 0.9, i[:TempFlow] * 0.1])
     ]
 
     d_funcs = [
@@ -112,9 +114,9 @@ SoilWaterReservoir in HYMOD
 function Soil_HyMOD(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameter_names=[:Smax, :b]),
-        Evap([:SoilWater, :Pet], parameter_names=[:Smax]),
-        SimpleFlux([:Saturation], [:FastFlow, :SlowFlow], parameter_names=[:a],
+        Saturation([:SoilWater, :Infiltration], param_names=[:Smax, :b]),
+        Evap([:SoilWater, :Pet], param_names=[:Smax]),
+        SimpleFlux([:Saturation], [:FastFlow, :SlowFlow], param_names=[:a],
             func=(i, p, sf) -> @.[i[:Saturation] * (1 - p[:a]), i[:Saturation] * p[:a]])
     ]
 
@@ -136,8 +138,8 @@ SoilWaterReservoir in XAJ
 function Soil_XAJ(; name::Symbol)
 
     funcs = [
-        Saturation([:SoilWater, :Infiltration], parameter_names=[:Aim, :Wmax, :a, :b]),
-        Evap([:SoilWater, :Pet], parameter_names=[:c, :LM]),
+        Saturation([:SoilWater, :Infiltration], param_names=[:Aim, :Wmax, :a, :b]),
+        Evap([:SoilWater, :Pet], param_names=[:c, :LM]),
     ]
 
     d_funcs = [
@@ -159,10 +161,10 @@ function Soil_HBV(; name::Symbol)
 
     funcs = [
         SimpleFlux([:SoilWater], :Capillary,
-            parameter_names=[:cflux, :fc],
+            param_names=[:cflux, :fc],
             func=(i, p, sf) -> @.(p[:cflux] * (1 - i[:SoilWater] / p[:fc]))),
-        Evap([:SoilWater, :Pet], parameter_names=[:lp, :fc]),
-        Recharge([:SoilWater, :Infiltration], parameter_names=[:fc, :β]),
+        Evap([:SoilWater, :Pet], param_names=[:lp, :fc]),
+        Recharge([:SoilWater, :Infiltration], param_names=[:fc, :β]),
     ]
 
 

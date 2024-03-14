@@ -4,9 +4,9 @@ SnowWaterReservoir in Exp-Hydro
 function Surface_ExpHydro(; name::Symbol)
     funcs = [
         Pet([:Temp, :Lday]),
-        Snowfall([:Prcp, :Temp], parameter_names=[:Tmin]),
-        Melt([:SnowWater, :Temp], parameter_names=[:Tmax, :Df]),
-        Rainfall([:Prcp, :Temp], parameter_names=[:Tmin]),
+        Snowfall([:Prcp, :Temp], param_names=[:Tmin]),
+        Melt([:SnowWater, :Temp], param_names=[:Tmax, :Df]),
+        Rainfall([:Prcp, :Temp], param_names=[:Tmin]),
         Infiltration([:Rainfall, :Melt])
     ]
 
@@ -27,7 +27,8 @@ SnowWaterReservoir in Exp-Hydro
 function Surface_GR4J(; name::Symbol)
     funcs = [
         Rainfall([:Prcp, :Pet]),
-        SimpleFlux([:Prcp, :Pet], :Pet, parameters=Symbol[],
+        SimpleFlux([:Prcp, :Pet], :Pet,
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(sf(i[:Pet] - i[:Prcp]) * (i[:Pet] - i[:Prcp]))),
         Infiltration([:Rainfall])
     ]
@@ -41,12 +42,13 @@ end
 
 function Surface_HBV(; name::Symbol)
     funcs = [
-        Snowfall([:Prcp, :Temp], parameter_names=[:tt, :tti]),
-        SimpleFlux([:Temp], :Refreeze, parameter_names=[:cfr, :cfmax, :ttm],
+        Snowfall([:Prcp, :Temp], param_names=[:tt, :tti]),
+        SimpleFlux([:Temp], :Refreeze,
+            param_names=[:cfr, :cfmax, :ttm],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], parameter_names=[:cfmax, :ttm]),
-        Rainfall([:Prcp, :Temp], parameter_names=[:tt, :tti]),
-        Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], parameter_names=[:whc]),
+        Melt([:Temp], param_names=[:cfmax, :ttm]),
+        Rainfall([:Prcp, :Temp], param_names=[:tt, :tti]),
+        Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], param_names=[:whc]),
     ]
 
     d_funcs = [
@@ -63,12 +65,13 @@ end
 
 function Surface_XAJ(; name::Symbol)
     funcs = [
-        Snowfall([:Prcp, :Temp], parameter_names=[:tt, :tti]),
-        SimpleFlux([:Temp], :Refreeze, parameter_names=[:cfr, :cfmax, :ttm],
+        Snowfall([:Prcp, :Temp], param_names=[:tt, :tti]),
+        SimpleFlux([:Temp], :Refreeze,
+            param_names=[:cfr, :cfmax, :ttm],
             func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], parameter_names=[:cfmax, :ttm]),
-        Rainfall([:Prcp, :Temp], parameter_names=[:tt, :tti]),
-        Infiltration([:LiquidWater, :Rainfall, :Melt], parameter_names=[:whc, :sp]),
+        Melt([:Temp], param_names=[:cfmax, :ttm]),
+        Rainfall([:Prcp, :Temp], param_names=[:tt, :tti]),
+        Infiltration([:LiquidWater, :Rainfall, :Melt], param_names=[:whc, :sp]),
     ]
 
     d_funcs = [
@@ -88,7 +91,8 @@ function Surface_M100(; name::Symbol)
     funcs = SimpleFlux[]
 
     d_funcs = [
-        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], :SnowWater, parameters=Symbol[],
+        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], :SnowWater,
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(relu(sinh(i[:Snowfall]) * sf(i[:Temp])) - relu(sf(i[:SnowWater]) * sinh(i[:Melt])))),
     ]
 

@@ -14,7 +14,7 @@ struct SimpleElement <: AbstractElement
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    parameter_names::Vector{Symbol}
+    param_names::Vector{Symbol}
 
     # functions
     funcs::Vector{AbstractFlux}
@@ -25,13 +25,13 @@ function SimpleElement(
     funcs::Vector{F},
 ) where {F<:AbstractFlux}
 
-    input_names, output_names, parameter_names = get_func_infos(funcs)
+    input_names, output_names, param_names = get_func_infos(funcs)
 
     return SimpleElement(
         name,
         input_names,
         output_names,
-        parameter_names,
+        param_names,
         funcs
     )
 end
@@ -55,7 +55,7 @@ struct ODEElement <: AbstractElement
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    parameter_names::Vector{Symbol}
+    param_names::Vector{Symbol}
     state_names::Vector{Symbol}
 
     # functions
@@ -69,22 +69,25 @@ function ODEElement(
     d_funcs::Vector{F},
 ) where {F<:AbstractFlux}
     # combine the info of func and d_func
-    input_names1, output_names, parameter_names1 = get_func_infos(funcs)
-    input_names2, state_names, parameter_names2 = get_d_func_infos(d_funcs)
+    input_names1, output_names, param_names1 = get_func_infos(funcs)
+    input_names2, state_names, param_names2 = get_d_func_infos(d_funcs)
 
+    # 避免一些中间变量混淆为输入要素
+    setdiff!(input_names2, output_names)
+
+    # 合并两种func的输入要素
     input_names = union(input_names1, input_names2)
 
-    # delete the inner flux names
-    input_names = setdiff(input_names, state_names)
-    input_names = setdiff(input_names, output_names)
+    # 删除输入要素的状态要素
+    setdiff!(input_names, state_names)
 
-    parameter_names = union(parameter_names1, parameter_names2)
+    param_names = union(param_names1, param_names2)
 
     return ODEElement(
         name,
         input_names,
         output_names,
-        parameter_names,
+        param_names,
         state_names,
         funcs,
         d_funcs
@@ -140,13 +143,16 @@ end
 """
 LAGElement
 """
-@kwdef mutable struct LAGElement <: AbstractElement
+struct LAGElement <: AbstractElement
     name::Symbol
 
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    params_names::Vector{Symbol}
+
+    # parameters names
+    param_names::Vector{Symbol}
+    lagtime_dict::Dict{Symbol,Symbol}
 
     # func
     lag_func::Dict{Symbol,Function}
@@ -155,50 +161,52 @@ end
 
 function LAGElement(
     ; name::Symbol,
-    params_names::Dict{Symbol,Vector{Symbol}},
-    lag_func::Dict{Symbol,F},
-    step_func::Function=DEFAULT_SMOOTHER
+    lagtime_dict::Dict{Symbol,Symbol},
+    lag_func::Dict{Symbol,F}
 ) where {F<:Function}
 
-    input_names = Set(keys(lag_func))
+    step_func = DEFAULT_SMOOTHER
+
+    param_names = Vector{Symbol}()
+    for v in values(lagtime_dict)
+        union!(param_names, [v])
+    end
+
+    input_names = collect(keys(lag_func))
 
     LAGElement(
         name,
         input_names,
         input_names,
-        params_names,
+        param_names,
+        lagtime_dict,
+        lag_func,
         step_func,
     )
 end
 
 function preprocess_parameters(ele::LAGElement; parameters::ComponentVector{T}) where {T<:Number}
-    if Set(keys(lag_time)) != ele.input_names
-        @error "$(Set(key(lag_time))) is not consistent with the states of element($(ele.name)): $(ele.input_names)"
-    end
-
     # init lag states
-    lag_states = ComponentVector(namedtuple(input_names,
-        [zeros(Int(ceil(lag_time[nm]))) for nm in ele.input_names]))
+    lag_states = ComponentVector(namedtuple(ele.input_names,
+        [zeros(Int(ceil(parameters[ele.lagtime_dict[nm]]))) for nm in ele.input_names]))
 
     # build weight
-    lag_weights = ComponentVector(namedtuple(input_names,
-        [[lag_func[k](T(i), T(lag_time[k]), step_func) -
-          lag_func[k](T(i - 1), T(lag_time[k]), step_func)
-          for i in 1:(ceil(lag_time[k])|>Int)]
-         for k in ele.input_names]))
+    lag_weights = ComponentVector(namedtuple(ele.input_names,
+        [[ele.lag_func[nm](T(i), T(parameters[ele.lagtime_dict[nm]]), ele.step_func) -
+          ele.lag_func[nm](T(i - 1), T(parameters[ele.lagtime_dict[nm]]), ele.step_func)
+          for i in 1:(ceil(parameters[ele.lagtime_dict[nm]])|>Int)] for nm in ele.input_names]))
 
-    setfield!(ele, :lag_states, lag_states)
-    setfield!(ele, :lag_weights, lag_weights)
+    lag_states, lag_weights
 end
 
-function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
-    max_weight_len = maximum([length(ele.lag_weights[k]) for k in keys(ele.lag_weights)])
+function solve_lag(input::ComponentVector{T}, lag_states::ComponentVector{T}, lag_weights::ComponentVector{T}) where {T<:Number}
+    max_weight_len = maximum([length(lag_weights[k]) for k in keys(lag_weights)])
     max_input_len = maximum([length(input[k]) for k in keys(input)])
 
     output = Dict(k => zeros(T, max_input_len, max_weight_len) for k in keys(input))
 
     for k in keys(output)
-        w, ls, ip = ele.lag_weights[k], ele.lag_states[k], input[k]
+        w, ls, ip = lag_weights[k], lag_states[k], input[k]
         for t in 1:max_input_len
             updated_state = ls .+ ip[t] .* w
             output[k][t, 1:length(w)] .= updated_state
@@ -208,9 +216,11 @@ function solve_lag(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
     return output
 end
 
-function get_output(ele::LAGElement; input::ComponentVector{T}) where {T<:Number}
-    input = input[collect(ele.input_names)]
-    solved_state = solve_lag(ele, input=input)
+function get_output(ele::LAGElement; input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
+    lag_states, lag_weights = preprocess_parameters(ele, parameters=parameters)
+
+    input = input[ele.input_names]
+    solved_state = solve_lag(input, lag_states, lag_weights)
 
     for k in ele.input_names
         solved_state[k][end, 1:end-1] = solved_state[k][end, 2:end]
@@ -218,7 +228,7 @@ function get_output(ele::LAGElement; input::ComponentVector{T}) where {T<:Number
         solved_state[k][end, :]
     end
 
-    # Get the new lag value to restart
-    setfield!(ele, :lag_states, ComponentVector(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names])))
+    # lag element don't need save states
+    # updated_lag_states = ComponentVector(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names]))
     ComponentVector(namedtuple(ele.input_names, [solved_state[k][:, 1] for k in ele.input_names]))
 end

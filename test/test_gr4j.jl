@@ -27,7 +27,7 @@ init_states = ComponentVector(SoilWater=0.0, RoutingStore=10.0)
 model = DeepFlex.GR4J(name=:gr4j)
 
 input = ComponentVector(Prcp=P, Pet=E, time=1:1:length(P))
-result = DeepFlex.get_output(model, input=input, parameters=parameters, init_states=init_states);
+@time result = DeepFlex.get_output(model, input=input, parameters=parameters, init_states=init_states);
 
 model_states = result[model.state_names]
 result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
@@ -36,5 +36,5 @@ result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 x = range(1, 100, length=100)
-lines!(ax, x, output[:Flow], color=:blue)
+lines!(ax, x, result_df[!,:Flow], color=:blue)
 fig

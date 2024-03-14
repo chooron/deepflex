@@ -1,11 +1,11 @@
 function Percolation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:Percolation;
-    parameter_names::Vector{Symbol}=Symbol[])
+    param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
         input_names,
         output_names,
-        parameter_names,
+        param_names=param_names,
         func=percolation_func,
     )
 end

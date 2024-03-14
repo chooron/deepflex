@@ -5,7 +5,7 @@ struct Unit{E,S} <: AbstractUnit where {E<:AbstractElement,S<:AbstractSolver}
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
     state_names::Vector{Symbol}
-    parameter_names::Vector{Symbol}
+    param_names::Vector{Symbol}
 
     # model structure
     elements::Vector{E}
@@ -17,12 +17,12 @@ function build_unit(; name::Symbol, elements::Vector{E}) where {E<:AbstractEleme
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
-    parameter_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
 
     for ele in elements
-        union!(input_names, ele.input_names)
+        union!(input_names, setdiff(ele.input_names, output_names))
         union!(output_names, ele.output_names)
-        union!(parameter_names, ele.parameter_names)
+        union!(param_names, ele.param_names)
         if ele isa ODEElement
             union!(state_names, ele.state_names)
         end
@@ -35,7 +35,7 @@ function build_unit(; name::Symbol, elements::Vector{E}) where {E<:AbstractEleme
         input_names,
         output_names,
         state_names,
-        parameter_names,
+        param_names,
         elements,
         solver,
     )

@@ -2,33 +2,41 @@
 function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
-    parameter_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
 
     for func in funcs
+        # extract the input and output name in flux
         if func.input_names isa Dict
-            union!(input_names, Vector(keys(func.input_names)))
+            tmp_input_names = Vector(keys(func.input_names))
         else
-            union!(input_names, func.input_names)
+            tmp_input_names = func.input_names
         end
         if func.output_names isa Vector
-            union!(output_names, func.output_names)
+            tmp_output_names = func.output_names
         else
-            union!(output_names, [func.output_names])
+            tmp_output_names = [func.output_names]
         end
-        union!(parameter_names, func.parameter_names)
+        # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
+        tmp_output_names = setdiff(tmp_output_names, tmp_input_names)
+        # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
+        tmp_input_names = setdiff(tmp_input_names, output_names)
+        # 合并名称
+        union!(input_names, tmp_input_names)
+        union!(output_names, tmp_output_names)
+        union!(param_names, func.param_names)
     end
 
-    input_names, output_names, parameter_names
+    input_names, output_names, param_names
 end
 
 function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
-    parameter_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
 
     for func in funcs
         union!(state_names, func.output_names)
-        union!(parameter_names, func.parameter_names)
+        union!(param_names, func.param_names)
 
         if func.input_names isa Dict
             for k in keys(func.input_names)
@@ -38,7 +46,7 @@ function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
             union!(input_names, func.input_names)
         end
     end
-    input_names, state_names, parameter_names
+    input_names, state_names, param_names
 end
 
 """
@@ -48,7 +56,7 @@ struct SimpleFlux <: AbstractFlux
     # attribute
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}}
     output_names::Union{Symbol,Vector{Symbol}}
-    parameter_names::Vector{Symbol}
+    param_names::Vector{Symbol}
     # function 
     func::Function
     # step function
@@ -57,17 +65,29 @@ end
 
 function SimpleFlux(
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Union{Symbol,Vector{Symbol}},
-    parameter_names::Vector{Symbol};
+    output_names::Union{Symbol,Vector{Symbol}};
+    param_names::Vector{Symbol},
     func::Function
 )
     SimpleFlux(
         input_names,
         output_names,
-        parameter_names,
+        param_names,
         func,
         DEFAULT_SMOOTHER
     )
+end
+
+struct LagFlux <: AbstractFlux
+    # attribute
+    input_names::Vector{Symbol}
+    output_names::Vector{Symbol}
+    # lag time
+    lag_time_name::Dict{Symbol,Symbol}
+    # function 
+    lag_func::Dict{Symbol,Function}
+    # step function
+    step_func::Function
 end
 
 mutable struct LuxNNFlux <: AbstractFlux
@@ -94,7 +114,7 @@ end
 ## callable function
 function (flux::SimpleFlux)(input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
     tmp_input = extract_input(input, flux.input_names)
-    func_output = flux.func(tmp_input, NamedTuple(parameters[flux.parameter_names]), flux.step_func)
+    func_output = flux.func(tmp_input, NamedTuple(parameters[flux.param_names]), flux.step_func)
     process_output(flux.output_names, func_output)
 end
 
