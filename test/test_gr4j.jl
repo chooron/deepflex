@@ -6,6 +6,7 @@ using CairoMakie
 using ComponentArrays
 using CairoMakie: Axis
 using Interpolations
+using BenchmarkTools
 
 # test gr4j model
 include("../src/DeepFlex.jl")
@@ -28,6 +29,7 @@ model = DeepFlex.GR4J(name=:gr4j)
 
 input = ComponentVector(Prcp=P, Pet=E, time=1:1:length(P))
 @time result = DeepFlex.get_output(model, input=input, parameters=parameters, init_states=init_states);
+@btime DeepFlex.get_output(model, input=input, parameters=parameters, init_states=init_states);
 
 model_states = result[model.state_names]
 result_df = DataFrame(Dict(k => result[k] for k in keys(result)))

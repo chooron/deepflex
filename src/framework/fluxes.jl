@@ -82,12 +82,52 @@ struct LagFlux <: AbstractFlux
     # attribute
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    # lag time
-    lag_time_name::Dict{Symbol,Symbol}
-    # function 
-    lag_func::Dict{Symbol,Function}
+    param_names::Vector{Symbol}
+    # function
+    lag_times::Dict{Symbol,Symbol}
+    lag_funcs::Dict{Symbol,Function}
     # step function
     step_func::Function
+
+    # inner variable
+    lag_states::ComponentVector
+end
+
+function LagFlux(
+    lag_funcs::Dict{Symbol,Function};
+    lag_times::Dict{Symbol,Symbol},
+)
+    input_names = collect(keys(lag_funcs))
+    param_names = Vector{Symbol}()
+
+    for value in lag_times
+        union!(param_names, [value])
+    end
+
+    LagFlux(
+        input_names,
+        input_names,
+        param_names,
+        lag_times,
+        lag_funcs,
+        DEFAULT_SMOOTHER,
+        ComponentVector()
+    )
+end
+
+function init!(flux::LagFlux; parameters::ComponentVector{T}) where {T<:Number}
+    # todo 添加dt插入功能
+    lag_states = [init_lag_state(flux.lag_funcs[nm], parameters[flux.lag_times[nm]], 1.0) for nm in flux.input_names]
+    ComponentVector(flux.input_names, lag_states)
+end
+
+function (flux::LagFlux)(input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
+    tmp_output = T[]
+    for nm in flux.input_names
+        push!(tmp_output, lag_states[nm][1, 1] * input[nm] + lag_states[nm][2, 1])
+        update_lag_state!(lag_states[nm], input[nm])
+    end
+    ComponentVector(namedtuple(flux.input_names, tmp_output))
 end
 
 mutable struct LuxNNFlux <: AbstractFlux

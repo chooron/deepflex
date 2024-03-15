@@ -1,4 +1,21 @@
 # Element Methods
+function get_element_info(elements::Vector{E}) where {E<:AbstractElement}
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
+
+    for ele in elements
+        union!(input_names, setdiff(ele.input_names, output_names))
+        union!(output_names, ele.output_names)
+        union!(param_names, ele.param_names)
+        if ele isa ODEElement
+            union!(state_names, ele.state_names)
+        end
+    end
+    input_names, output_names, state_names, param_names
+end
+
 function get_output(ele::AbstractElement, input::ComponentVector)
     return nothing
 end
@@ -115,6 +132,9 @@ function solve_prob(
 )::ComponentVector{T} where {T<:Number}
     # fit interpolation functions
     itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in ele.input_names)
+    filter(isa(LagFlux), ele.funcs) do func
+        init!(func, parameters)
+    end
     # solve the problem
     function singel_ele_ode_func!(du, u, p, t)
         tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))

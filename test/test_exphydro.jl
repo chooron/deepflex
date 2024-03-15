@@ -37,4 +37,4 @@ lines!(ax, x, flow_vec, color=:red)
 lines!(ax, x, result_df[!, :Flow], color=:blue)
 fig
 
-@btime DeepFlex.get_output(model, input=inputs, parameters=parameters, init_states=init_states)
+@btime DeepFlex.get_output(model, input=inputs, parameters=parameters, init_states=init_states);

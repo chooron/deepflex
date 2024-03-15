@@ -14,20 +14,7 @@ struct Unit{E,S} <: AbstractUnit where {E<:AbstractElement,S<:AbstractSolver}
 end
 
 function build_unit(; name::Symbol, elements::Vector{E}) where {E<:AbstractElement}
-    input_names = Vector{Symbol}()
-    output_names = Vector{Symbol}()
-    state_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
-
-    for ele in elements
-        union!(input_names, setdiff(ele.input_names, output_names))
-        union!(output_names, ele.output_names)
-        union!(param_names, ele.param_names)
-        if ele isa ODEElement
-            union!(state_names, ele.state_names)
-        end
-    end
-
+    input_names, output_names, state_names, param_names = get_element_info(elements)
     solver = Dict(ele.name => DEFAULT_SOLVER for ele in elements if ele isa ODEElement)
 
     Unit(
@@ -89,6 +76,9 @@ function get_output(
             solved_states = solve_prob(ele,
                 input=fluxes, parameters=parameters,
                 init_states=init_states[ele.state_names], solver=unit.solver[ele.name])
+            filter(isa(LagFlux), ele.funcs) do func
+                init!(func, parameters)
+            end
             tmp_fluxes = get_output(ele, input=fluxes, states=solved_states, parameters=parameters)
         else
             tmp_fluxes = get_output(ele, input=fluxes, parameters=parameters)
