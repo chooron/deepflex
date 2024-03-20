@@ -1,51 +1,96 @@
-function hyper_params_optimize(
-    component::C,
+mutable struct BoundaryParamInfo{T} <: AbstractParamInfo where {T<:Number}
+    name::Symbol
+    default::T
+    lb::T
+    ub::T
+    value::T
+end
+
+function BoundaryParamInfo(name::Symbol, default::T;
+    lb::T=default, ub::T=default, value::T=default) where {T<:Number}
+    BoundaryParamInfo(
+        name,
+        default,
+        lb,
+        ub,
+        value
+    )
+end
+
+struct HyperOptimizer <: AbstractOptimizer
+    optf
+    optprob
+    alg
+end
+
+function HyperOptimizer(; func::Function, paraminfos::Vector{BPI}, kwargs...) where {BPI<:BoundaryParamInfo}
+    x0 = [p.default for p in paraminfos]
+    lb = [p.lb for p in paraminfos]
+    ub = [p.ub for p in paraminfos]
+    optf = Optimization.OptimizationFunction(func)
+    optprob = Optimization.OptimizationProblem(optf, x0, (), lb=lb, ub=ub)
+
+    HyperOptimizer(
+        optf,
+        optprob,
+        kwargs[:alg]
+    )
+end
+
+function opt_solve(optimizer::HyperOptimizer; kwargs...)
+    if haskey(kwargs, :callback)
+        callback = kwargs[:callback]
+    else
+        callback = function (p, l)
+            println("rmse: " * string(l))
+            return false
+        end
+    end
+    Optimization.solve(optimizer.optprob, optimizer.alg, callback=callback, maxiters=kwargs[:maxiters])
+end
+
+function hyperparams_optimize(
+    component::AbstractComponent;
     paraminfos::Vector{P},
-    input::Dict{Symbol,Vector{T}},
-    output::Dict{Symbol,Vector{T}},
-    weight::Dict{Symbol,T}=Dict{Symbol,T}(),
-    errfunc::Dict{Symbol,T}=Dict{Symbol,T}()
-) where {C<:AbstractComponent,P<:AbstractParamInfo,T<:Number}
+    input::ComponentVector{T},
+    target::ComponentVector{T},
+    kwargs...,
+) where {P<:AbstractParamInfo,T<:Number}
     """
     针对模型超参数进行优化
     """
     # 设置默认weight和errfunc
-    if length(weight) == 0
-        weight = Dict(k => 1.0 for k in keys(output))
+    if haskey(kwargs, :error_weight)
+        error_weight = kwargs[:error_weight]
+    else
+        error_weight = Dict(k => 1.0 for k in keys(target))
     end
-    if length(errfunc) == 0
-        errfunc = Dict(k => rmse for k in keys(output))
+
+    if haskey(kwargs, :error_func)
+        error_func = kwargs[:error_func]
+    else
+        error_func = Dict(k => rmse for k in keys(target))
     end
+
+    param_names = [p.name for p in paraminfos]
 
     # 内部构造一个function
     function objective(x, p)
-        # 为所有componet创建set_parameters函数
-        update_paraminfos!(paraminfos, x)
-        set_parameters!(component, paraminfos=paraminfos)
-        predict = get_output(component, input=input)
+        tmp_params = ComponentVector(namedtuple(param_names, x))
+        predict = get_output(component, input=input, parameters=tmp_params,
+            init_states=tmp_params[component.state_names])
         criteria = 0.0
-        for (k, v) in output
-            criteria += errfunc[k](v, predict[k]) * weight[k]
+        for k in keys(target)
+            criteria += error_func[k](target[k], predict[k]) * error_weight[k]
         end
         return criteria
     end
 
-    callback = function (p, l)
-        println("rmse: " * string(l))
-        return false
-    end
-
-    x0 = [p.default for p in paraminfos]
-    lb = [p.lb for p in paraminfos]
-    ub = [p.ub for p in paraminfos]
-    optf = Optimization.OptimizationFunction(objective)
-    optprob = Optimization.OptimizationProblem(optf, x0, (), lb=lb, ub=ub)
-    sol = Optimization.solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback=callback, maxiters=100)
-    update_paraminfos!(paraminfos, sol.u)
-    return paraminfos
+    hyper_optimizer = HyperOptimizer(func=objective, paraminfos=paraminfos, alg=BBO_adaptive_de_rand_1_bin_radiuslimited())
+    opt_solve(hyper_optimizer, maxiters=100)
 end
 
-function hybrid_params_optimize!()
+function hybridparams_optimize!()
     """
     混合参数(包括模型超参数和模型内部权重)优化
     """

@@ -1,5 +1,5 @@
-function Flow(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Flow;
+function FlowFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:flow;
     param_names::Vector{Symbol}=Symbol[])
     SimpleFlux(
         input_names,
@@ -10,25 +10,25 @@ function Flow(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function flow_func(
-    input::gen_namedtuple_type([:BaseFlow, :SurfaceFlow], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:baseflow, :surfaceflow], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    input[:BaseFlow] .+ input[:SurfaceFlow]
+    i[:baseflow] .+ i[:surfaceflow]
 end
 
 function flow_func(
-    input::gen_namedtuple_type([:RoutedFlow, :Recharge, :FastFlow], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:routedflow, :recharge, :fastflow], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(input[:RoutedFlow] + step_func(input[:FastFlow] + input[:Recharge]) * (input[:FastFlow] + input[:Recharge]))
+    @.(i[:routedflow] + sf(i[:fastflow] + i[:recharge]) * (i[:fastflow] + i[:recharge]))
 end
 
 function flow_func(
-    input::gen_namedtuple_type([:BaseFlow, :InterFlow, :SurfaceFlow], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:baseflow, :interflow, :surfaceflow], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(input[:SurfaceFlow] + input[:BaseFlow] + input[:InterFlow])
+    @.(i[:surfaceflow] + i[:baseflow] + i[:interflow])
 end

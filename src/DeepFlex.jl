@@ -11,6 +11,9 @@ using DataFrames
 # run time stats
 using BenchmarkTools
 
+# ModelingToolkit building
+using ModelingToolkit
+
 # graph compute
 using Graphs
 using MetaGraphs
@@ -41,24 +44,27 @@ abstract type AbstractComponent end
 abstract type AbstractParamInfo end
 abstract type AbstractSmoother end
 abstract type AbstractSolver end
+abstract type AbstractOptimizer end
 abstract type AbstractFlux end
+abstract type AbstractElement end
 
 abstract type AbstractUnit <: AbstractComponent end
-abstract type AbstractElement <: AbstractComponent end
+abstract type AbstractNode <: AbstractComponent end
 abstract type AbstractNetwork <: AbstractComponent end
 
 ## Sensealg type
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 const default_ode_sensealg = ForwardDiffSensitivity()
 
-# framework Methods
-include("framework/paraminfo.jl")
+# framework build
 include("framework/solver.jl")
 include("framework/fluxes.jl")
 include("framework/element.jl")
+include("framework/mtk.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
 include("framework/network.jl")
+# framework methods
 include("framework/optimize.jl")
 # Implement Flux
 include("functions/baseflow.jl")

@@ -76,9 +76,9 @@ function get_output(
             solved_states = solve_prob(ele,
                 input=fluxes, parameters=parameters,
                 init_states=init_states[ele.state_names], solver=unit.solver[ele.name])
-            filter(isa(LagFlux), ele.funcs) do func
-                init!(func, parameters)
-            end
+            # filter(isa(LagFlux), ele.funcs) do func
+            #     init!(func, parameters)
+            # end
             tmp_fluxes = get_output(ele, input=fluxes, states=solved_states, parameters=parameters)
         else
             tmp_fluxes = get_output(ele, input=fluxes, parameters=parameters)

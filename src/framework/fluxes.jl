@@ -1,3 +1,20 @@
+function get_input_names(func::AbstractFlux)
+    if func.input_names isa Dict
+        input_names = Vector(keys(func.input_names))
+    else
+        input_names = func.input_names
+    end
+    input_names
+end
+
+function get_output_names(func::AbstractFlux)
+    if func.output_names isa Vector
+        output_names = func.output_names
+    else
+        output_names = [func.output_names]
+    end
+    output_names
+end
 
 function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names = Vector{Symbol}()
@@ -6,16 +23,8 @@ function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
 
     for func in funcs
         # extract the input and output name in flux
-        if func.input_names isa Dict
-            tmp_input_names = Vector(keys(func.input_names))
-        else
-            tmp_input_names = func.input_names
-        end
-        if func.output_names isa Vector
-            tmp_output_names = func.output_names
-        else
-            tmp_output_names = [func.output_names]
-        end
+        tmp_input_names = get_input_names(func)
+        tmp_output_names = get_output_names(func)
         # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
         tmp_output_names = setdiff(tmp_output_names, tmp_input_names)
         # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
@@ -25,7 +34,6 @@ function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
         union!(output_names, tmp_output_names)
         union!(param_names, func.param_names)
     end
-
     input_names, output_names, param_names
 end
 
@@ -35,16 +43,9 @@ function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     param_names = Vector{Symbol}()
 
     for func in funcs
-        union!(state_names, func.output_names)
+        union!(input_names, get_input_names(func))
+        union!(state_names, get_output_names(func))
         union!(param_names, func.param_names)
-
-        if func.input_names isa Dict
-            for k in keys(func.input_names)
-                union!(input_names, Vector(func.input_names[k]))
-            end
-        else
-            union!(input_names, func.input_names)
-        end
     end
     input_names, state_names, param_names
 end
@@ -195,23 +196,6 @@ function gen_namedtuple_type(input_names::Vector{Symbol}, dtype::Union{Type,Type
 end
 ## ----------------------------------------------------------------------
 
-## *parameters getter setter
-## ----------------------------------------------------------------------
-function get_parameters(func::SimpleFlux; names::Vector{Symbol}=nothing)::Dict{Symbol,Any}
-    if isnothing(names)
-        return func.parameters
-    else
-        return Dict(name => func.parameters[name] for name in names)
-    end
-end
-
-function set_parameters!(func::SimpleFlux; paraminfos::Vector{ParamInfo{T}}) where {T<:Number}
-    for p in paraminfos
-        if p.name in keys(func.parameters)
-            func.parameters[p.name] = p.value
-        end
-    end
-end
 ## ----------------------------------------------------------------------
 
 ## *训练后，更新模型内部参数

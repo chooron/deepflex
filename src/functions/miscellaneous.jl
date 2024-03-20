@@ -53,15 +53,15 @@ function Tranparent(input_names::Union{Vector{Symbol},Vector{Dict{Symbol,Symbol}
     )
 end
 
-function Differ(
+function DifferFlux(
     input_names::Dict{Symbol,Vector{Symbol}},
-    output_names::Vector{Symbol};
+    output_names::Symbol;
 )
     tmp_input_names = collect(union(map(x -> x, [Set(nms) for nms in values(input_names)])...))
     SimpleFlux(
         tmp_input_names,
         output_names,
         param_names=Symbol[],
-        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> [sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])]
+        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])
     )
 end

@@ -1,9 +1,9 @@
-function BaseFlow(
-    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:BaseFlow;
+function BaseflowFlux(
+    i_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:baseflow;
     param_names::Vector{Symbol}=Symbol[])
     SimpleFlux(
-        input_names,
+        i_names,
         output_names,
         param_names=param_names,
         func=baseflow_func,
@@ -11,23 +11,19 @@ function BaseFlow(
 end
 
 function baseflow_func(
-    input::gen_namedtuple_type([:SoilWater], T),
-    parameters::gen_namedtuple_type([:Smax, :Qmax, :f], T),
-    step_func::Function,
+    i::gen_namedtuple_type([:soilwater], T),
+    p::gen_namedtuple_type([:Smax, :Qmax, :f], T),
+    sf::Function,
 )::Union{T,Vector{T}} where {T<:Number}
-    soil_water = input[:SoilWater]
-    Smax, Qmax, f = parameters[:Smax], parameters[:Qmax], parameters[:f]
-    @.(step_func(soil_water) * step_func(soil_water - Smax) * Qmax +
-       step_func(soil_water) * step_func(Smax - soil_water) * Qmax * exp(-f * (Smax - soil_water)))
+    @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * p[:Qmax] +
+    sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * p[:Qmax] * exp(-p[:f] * (p[:Smax] - i[:soilwater])))
 end
 
 function baseflow_func(
-    input::gen_namedtuple_type([:RoutingStore], T),
-    parameters::gen_namedtuple_type([:x3, :γ], T),
-    step_func::Function,
+    i::gen_namedtuple_type([:routingstore], T),
+    p::gen_namedtuple_type([:x3, :γ], T),
+    sf::Function,
 )::Union{T,Vector{T}} where {T<:Number}
-    routing_store = input[:RoutingStore]
-    x3, γ = parameters[:x3], parameters[:γ]
-    @.((x3^(1 - γ)) / (γ - 1) * (routing_store^γ))
+    @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))
 end
 

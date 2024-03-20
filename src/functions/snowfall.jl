@@ -1,5 +1,5 @@
-function Snowfall(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Snowfall;
+function SnowfallFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:snowfall;
     param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
@@ -11,20 +11,20 @@ function Snowfall(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function snowfall_func(
-    input::gen_namedtuple_type([:Prcp, :Temp], T),
-    parameters::gen_namedtuple_type([:Tmin], T),
-    step_func::Function
+    i::gen_namedtuple_type([:prcp, :temp], T),
+    p::gen_namedtuple_type([:Tmin], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(step_func(parameters[:Tmin] - input[:Temp]) * input[:Prcp])
+    @.(sf(p[:Tmin] - i[:temp]) * i[:prcp])
 end
 
 function snowfall_func(
-    input::gen_namedtuple_type([:Prcp, :Temp], T),
-    parameters::gen_namedtuple_type([:tt, :tti], T),
-    step_func::Function
+    i::gen_namedtuple_type([:prcp, :temp], T),
+    p::gen_namedtuple_type([:tt, :tti], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    tmp_t1 = parameters[:tt] - 0.5 * parameters[:tti]
-    tmp_t2 = parameters[:tt] + 0.5 * parameters[:tti]
-    @.(step_func(tmp_t1 - input[:Temp]) * input[:Prcp] +
-       step_func(tmp_t2 - input[:Temp]) * step_func(input[:Temp] - tmp_t1) * input[:Prcp] * (tmp_t2 - input[:Temp]) / parameters[:tti])
+    tmp_t1 = p[:tt] - 0.5 * p[:tti]
+    tmp_t2 = p[:tt] + 0.5 * p[:tti]
+    @.(sf(tmp_t1 - i[:temp]) * i[:prcp] +
+    sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (tmp_t2 - i[:temp]) / p[:tti])
 end

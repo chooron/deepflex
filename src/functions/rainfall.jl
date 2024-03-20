@@ -1,5 +1,5 @@
-function Rainfall(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Rainfall;
+function RainfallFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:rainfall;
     param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
@@ -11,36 +11,36 @@ function Rainfall(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function rainfall_func(
-    input::gen_namedtuple_type([:Prcp, :Temp], T),
-    parameters::gen_namedtuple_type([:Tmin], T),
-    step_func::Function
+    i::gen_namedtuple_type([:prcp, :temp], T),
+    p::gen_namedtuple_type([:Tmin], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(step_func(input[:Temp] - parameters[:Tmin]) * input[:Prcp])
+    @.(sf(i[:Temp] - p[:Tmin]) * i[:prcp])
 end
 
 function rainfall_func(
-    input::gen_namedtuple_type([:Prcp, :Pet], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:prcp, :Pet], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(step_func(input[:Prcp] - input[:Pet]) * (input[:Prcp] - input[:Pet]))
+    @.(sf(i[:prcp] - i[:Pet]) * (i[:prcp] - i[:Pet]))
 end
 
 function rainfall_func(
-    input::gen_namedtuple_type([:Prcp], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:prcp], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    input[:Prcp]
+    i[:prcp]
 end
 
 function rainfall_func(
-    input::gen_namedtuple_type([:Prcp, :Temp], T),
-    parameters::gen_namedtuple_type([:tt, :tti], T),
-    step_func::Function
+    i::gen_namedtuple_type([:prcp, :Temp], T),
+    p::gen_namedtuple_type([:tt, :tti], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    tmp_t1 = parameters[:tt] - 0.5 * parameters[:tti]
-    tmp_t2 = parameters[:tt] + 0.5 * parameters[:tti]
-    @.(step_func(input[:Temp] - tmp_t2) * input[:Prcp] +
-       step_func(tmp_t2 - input[:Temp]) * step_func(input[:Temp] - tmp_t1) * input[:Prcp] * (input[:Temp] - tmp_t1) / parameters[:tti])
+    tmp_t1 = p[:tt] - 0.5 * p[:tti]
+    tmp_t2 = p[:tt] + 0.5 * p[:tti]
+    @.(sf(i[:Temp] - tmp_t2) * i[:prcp] +
+       sf(tmp_t2 - i[:Temp]) * sf(i[:Temp] - tmp_t1) * i[:prcp] * (i[:Temp] - tmp_t1) / p[:tti])
 end

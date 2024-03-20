@@ -1,5 +1,5 @@
-function SurfaceFlow(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:SurfaceFlow;
+function SurfaceflowFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:surfaceflow;
     param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
@@ -11,21 +11,17 @@ function SurfaceFlow(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function surfaceflow_func(
-    input::gen_namedtuple_type([:SoilWater], T),
-    parameters::gen_namedtuple_type([:Smax], T),
-    step_func::Function
+    i::gen_namedtuple_type([:soilwater], T),
+    p::gen_namedtuple_type([:Smax], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    soil_water = input[:SoilWater]
-    Smax = parameters[:Smax]
-    @.(step_func(soil_water) * step_func(soil_water - Smax) * (soil_water - Smax))
+    @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * (i[:soilwater] - p[:Smax]))
 end
 
 function surfaceflow_func(
-    input::gen_namedtuple_type([:SurfaceRunoff, :Prcp], T),
-    parameters::gen_namedtuple_type([:Aim], T),
-    step_func::Function
+    i::gen_namedtuple_type([:surfacerunoff, :prcp], T),
+    p::gen_namedtuple_type([:Aim], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    sf, prcp = input[:SurfaceRunoff], input[:Prcp]
-    Aim = parameters[:Aim]
-    @.(sf + Aim * prcp)
+    @.(i[:surfacerunoff] + p[:Aim] * i[:prcp])
 end

@@ -1,6 +1,6 @@
-function Infiltration(
+function InfiltrationFlux(
     input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Infiltration;
+    output_names::Symbol=:infiltration;
     param_names::Vector{Symbol}=Symbol[])
 
     SimpleFlux(
@@ -12,26 +12,27 @@ function Infiltration(
 end
 
 function infiltration_func(
-    input::gen_namedtuple_type([:SnowWater, :LiquidWater, :Rainfall, :Melt], T),
-    parameters::gen_namedtuple_type([:whc], T),
-    step_func::Function
+    i::gen_namedtuple_type([:snowwater, :liquidwater, :rainfall, :melt], T),
+    p::gen_namedtuple_type([:whc], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(step_func(input[:LiquidWater] - parameters[:whc] * input[:SnowWater]) *
-       (input[:Rainfall] + input[:Melt] + input[:LiquidWater] - parameters[:whc] * input[:SnowWater]))
+    @.(sf(i[:liquidwater] - p[:whc] * i[:snowwater]) *
+       (i[:rainfall] + i[:melt] + i[:liquidwater] - p[:whc] * i[:snowwater]))
 end
 
 
 function infiltration_func(
-    input::gen_namedtuple_type([:Rainfall, :Melt], T),
-    parameters::NamedTuple,
-    step_func::Function
+    i::gen_namedtuple_type([:rainfall, :melt], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(input[:Rainfall] + input[:Melt])
+    @.(i[:rainfall] + i[:melt])
 end
 
-function infiltration_func(input::gen_namedtuple_type([:Rainfall], T),
-    parameters::NamedTuple,
-    step_func::Function
+function infiltration_func(
+    i::gen_namedtuple_type([:rainfall], T),
+    p::NamedTuple,
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    input[:Rainfall]
+    i[:rainfall]
 end

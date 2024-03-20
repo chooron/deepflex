@@ -1,5 +1,5 @@
-function Recharge(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Recharge;
+function RechargeFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:recharge;
     param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
@@ -11,21 +11,17 @@ function Recharge(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function recharge_func(
-    input::gen_namedtuple_type([:RoutingStore], T),
-    parameters::gen_namedtuple_type([:x2, :x3, :ω], T),
-    step_func::Function
+    i::gen_namedtuple_type([:routingstore], T),
+    p::gen_namedtuple_type([:x2, :x3, :ω], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    routing_store = input[:RoutingStore]
-    x2, x3, ω = parameters[:x2], parameters[:x3], parameters[:ω]
-    @.(x2 / (x3^ω) * routing_store^ω)
+    @.(p[:x2] / (p[:x3]^p[:ω]) * i[:routingstore]^p[:ω])
 end
 
 function recharge_func(
-    input::gen_namedtuple_type([:SoilWater, :Infiltration], T),
-    parameters::gen_namedtuple_type([:fc, :β], T),
-    step_func::Function
+    i::gen_namedtuple_type([:soilwater, :infiltration], T),
+    p::gen_namedtuple_type([:fc, :β], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    soil_water, infiltration = input[:SoilWater], input[:Infiltration]
-    fc, β = parameters[:fc], parameters[:β]
-    @.((infiltration) * (soil_water / fc)^β)
+    @.((i[:infiltration]) * (i[:soilwater] / p[:fc])^p[:β])
 end

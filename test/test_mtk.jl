@@ -30,7 +30,13 @@ ps = @parameters begin
     df
 end
 
+function data_input(itp::Dict; name::Symbol)
+    eqs = []
+end
+
 function snow_water_reservoir(; name::Symbol)
+    @variables prcp temp(t) snowfall(t) melt(t) snw(t)
+
     ## SnowWater Reservoir
     eqs = [
         snowfall ~ step_func(tmin - temp) * prcp,

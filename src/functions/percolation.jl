@@ -1,5 +1,5 @@
-function Percolation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:Percolation;
+function PercolationFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    output_names::Symbol=:percolation;
     param_names::Vector{Symbol}=Symbol[])
     
     SimpleFlux(
@@ -11,9 +11,9 @@ function Percolation(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function percolation_func(
-    input::gen_namedtuple_type([:SoilWater], T),
-    parameters::gen_namedtuple_type([:x1], T),
-    step_func::Function
+    i::gen_namedtuple_type([:soilwater], T),
+    p::gen_namedtuple_type([:x1], T),
+    sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.((parameters[:x1]^(-4)) / 4 * ((4 / 9)^(-4)) * (input[:SoilWater]^5))
+    @.((p[:x1]^(-4)) / 4 * ((4 / 9)^(-4)) * (i[:soilwater]^5))
 end

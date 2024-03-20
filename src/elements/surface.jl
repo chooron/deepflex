@@ -3,21 +3,21 @@ SnowWaterReservoir in Exp-Hydro
 """
 function Surface_ExpHydro(; name::Symbol)
     funcs = [
-        Pet([:Temp, :Lday]),
-        Snowfall([:Prcp, :Temp], param_names=[:Tmin]),
-        Melt([:SnowWater, :Temp], param_names=[:Tmax, :Df]),
-        Rainfall([:Prcp, :Temp], param_names=[:Tmin]),
-        Infiltration([:Rainfall, :Melt])
+        Pet([:temp, :lday]),
+        Snowfall([:prcp, :temp], param_names=[:Tmin]),
+        Melt([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        Rainfall([:prcp, :temp], param_names=[:Tmin]),
+        Infiltration([:rainfall, :melt])
     ]
 
-    d_funcs = [
-        Differ(Dict(:In => [:Snowfall], :Out => [:Melt]), [:SnowWater]),
+    dfuncs = [
+        DifferFlux(Dict(:In => [:snowfall], :Out => [:melt]), :snowwater),
     ]
 
     ODEElement(
         name=name,
         funcs=funcs,
-        d_funcs=d_funcs
+        dfuncs=dfuncs
     )
 end
 
@@ -26,11 +26,11 @@ SnowWaterReservoir in Exp-Hydro
 """
 function Surface_GR4J(; name::Symbol)
     funcs = [
-        Rainfall([:Prcp, :Pet]),
-        SimpleFlux([:Prcp, :Pet], :Pet,
+        Rainfall([:prcp, :pet]),
+        SimpleFlux([:prcp, :pet], :pet,
             param_names=Symbol[],
-            func=(i, p, sf) -> @.(sf(i[:Pet] - i[:Prcp]) * (i[:Pet] - i[:Prcp]))),
-        Infiltration([:Rainfall])
+            func=(i, p, sf) -> @.(sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
+        Infiltration([:rainfall])
     ]
 
     SimpleElement(
@@ -42,47 +42,47 @@ end
 
 function Surface_HBV(; name::Symbol)
     funcs = [
-        Snowfall([:Prcp, :Temp], param_names=[:tt, :tti]),
-        SimpleFlux([:Temp], :Refreeze,
+        SnowfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
+        SimpleFlux([:temp], :refreeze,
             param_names=[:cfr, :cfmax, :ttm],
-            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], param_names=[:cfmax, :ttm]),
-        Rainfall([:Prcp, :Temp], param_names=[:tt, :tti]),
-        Infiltration([:SnowWater, :LiquidWater, :Rainfall, :Melt], param_names=[:whc]),
+            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:temp]))),
+        MeltFlux([:temp], param_names=[:cfmax, :ttm]),
+        RainfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
+        InfiltrationFlux([:snowwater, :liquidwater, :rainfall, :melt], param_names=[:whc]),
     ]
 
-    d_funcs = [
-        Differ(Dict(:In => [:Snowfall, :Refreeze], :Out => [:Melt]), [:SnowWater]),
-        Differ(Dict(:In => [:Rainfall, :Melt], :Out => [:Refreeze, :Infiltration]), [:LiquidWater]),
+    dfuncs = [
+        DifferFlux(Dict(:In => [:snowfall, :refreeze], :Out => [:melt]), :snowwater),
+        DifferFlux(Dict(:In => [:rainfall, :melt], :Out => [:refreeze, :infiltration]), :liquidwater),
     ]
 
     ODEElement(
         name=name,
         funcs=funcs,
-        d_funcs=d_funcs
+        dfuncs=dfuncs
     )
 end
 
 function Surface_XAJ(; name::Symbol)
     funcs = [
-        Snowfall([:Prcp, :Temp], param_names=[:tt, :tti]),
-        SimpleFlux([:Temp], :Refreeze,
+        SnowfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
+        SimpleFlux([:temp], :refreeze,
             param_names=[:cfr, :cfmax, :ttm],
-            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:Temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:Temp]))),
-        Melt([:Temp], param_names=[:cfmax, :ttm]),
-        Rainfall([:Prcp, :Temp], param_names=[:tt, :tti]),
-        Infiltration([:LiquidWater, :Rainfall, :Melt], param_names=[:whc, :sp]),
+            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:temp]))),
+        MeltFlux([:temp], param_names=[:cfmax, :ttm]),
+        RainfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
+        InfiltrationFlux([:liquidwater, :rainfall, :melt], param_names=[:whc, :sp]),
     ]
 
-    d_funcs = [
-        Differ(Dict(:In => [:Snowfall, :Refreeze], :Out => [:Melt]), [:SnowWater]),
-        Differ(Dict(:In => [:Rainfall, :Melt], :Out => [:Refreeze, :Infiltration]), [:LiquidWater]),
+    dfuncs = [
+        DifferFlux(Dict(:In => [:snowfall, :refreeze], :Out => [:melt]), :snowwater),
+        DifferFlux(Dict(:In => [:rainfall, :melt], :Out => [:refreeze, :infiltration]), :liquidwater),
     ]
 
     ODEElement(
         name=name,
         funcs=funcs,
-        d_funcs=d_funcs
+        dfuncs=dfuncs
     )
 end
 
@@ -90,15 +90,15 @@ end
 function Surface_M100(; name::Symbol)
     funcs = SimpleFlux[]
 
-    d_funcs = [
-        SimpleFlux([:SnowWater, :Snowfall, :Temp, :Melt], :SnowWater,
+    dfuncs = [
+        SimpleFlux([:snowwater, :snowfall, :temp, :melt], :snowwater,
             param_names=Symbol[],
-            func=(i, p, sf) -> @.(relu(sinh(i[:Snowfall]) * sf(i[:Temp])) - relu(sf(i[:SnowWater]) * sinh(i[:Melt])))),
+            func=(i, p, sf) -> @.(relu(sinh(i[:snowfall]) * sf(i[:temp])) - relu(sf(i[:snowwater]) * sinh(i[:melt])))),
     ]
 
     ODEElement(
         name=name,
         funcs=funcs,
-        d_funcs=d_funcs
+        dfuncs=dfuncs
     )
 end

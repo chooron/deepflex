@@ -88,16 +88,13 @@ function ODEElement(
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
     input_names2, state_names, param_names2 = get_d_func_infos(d_funcs)
-
     # 避免一些中间变量混淆为输入要素
     setdiff!(input_names2, output_names)
-
     # 合并两种func的输入要素
     input_names = union(input_names1, input_names2)
-
     # 删除输入要素的状态要素
     setdiff!(input_names, state_names)
-
+    # 合并两种类型函数的参数
     param_names = union(param_names1, param_names2)
 
     return ODEElement(
@@ -132,9 +129,9 @@ function solve_prob(
 )::ComponentVector{T} where {T<:Number}
     # fit interpolation functions
     itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in ele.input_names)
-    filter(isa(LagFlux), ele.funcs) do func
-        init!(func, parameters)
-    end
+    # filter(isa(LagFlux), ele.funcs) do func
+    #     init!(func, parameters)
+    # end
     # solve the problem
     function singel_ele_ode_func!(du, u, p, t)
         tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))
