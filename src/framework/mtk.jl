@@ -30,7 +30,7 @@ function MTKElement(
 
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
-    input_names2, state_names, param_names2 = get_d_func_infos(dfuncs)
+    input_names2, state_names, param_names2 = get_dfunc_infos(dfuncs)
     # 避免一些中间变量混淆为输入要素
     setdiff!(input_names2, output_names)
     # 合并两种func的输入要素
@@ -102,10 +102,15 @@ function build_dfunc_system(dfuncs, var_dict, param_dict; name::Symbol)
     ODESystem(eqs, t; name=name)
 end
 
-function combine_systems(func_sys, dfunc_sys, itp_sys)
-    for nm in get_func_infos(ele.funcs)[1]
-        eval(Meta.parse("func_sys.$(nm) ~ itp_sys.$(nm)"))
+function combine_systems(ele::MTKElement, func_sys::ODESystem, dfunc_sys::ODESystem, itp_sys::ODESystem)
+    eqs = []
+    for nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
+        push!(eqs, eval(Expr(:call, :~, getproperty(func_sys, nm), getproperty(itp_sys, nm))))
     end
+    for nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
+        push!(eqs, eval(Expr(:call, :~, getproperty(dfunc_sys, nm), getproperty(itp_sys, nm))))
+    end
+    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, func_sys, dfunc_sys))
 end
 
 
@@ -118,20 +123,15 @@ function solve_prob(
 )::ComponentVector{T} where {T<:Number}
     itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
     func_sys, dfunc_sys = ele.func_sys, ele.dfunc_sys
-    @info "run"
-    for nm in get_func_infos(ele.funcs)[1]
-        # tmp_nm = ele.
-    end
-    func_eqs = [eval(Meta.parse("func_sys.$(nm) ~ itp_sys.$(nm)")) for nm in ele.input_names]
-    dfunc_eqs = [eval(Meta.parse("dfunc_sys.$(nm) ~ itp_sys.$(nm)")) for nm in ele.input_names]
+    # combine system
+    ele_sys = combine_systems(ele, func_sys, dfunc_sys, itp_sys)
+    # setup init states
+    x0 = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, dfunc_sys.name), nm), init_states[nm])) for nm in ele.state_names]
+    # setup
+    func_p = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, func_sys.name), nm), params[nm])) for nm in ModelingToolkit.parameters(func_sys)]
+    dfunc_p = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, dfunc_sys.name), nm), params[nm])) for nm in ModelingToolkit.parameters(dfunc_sys)]
 
-    ele_sys = compose(ODESystem(vcat(func_eqs, dfunc_eqs), t; name=ele.name), func_eqs, dfunc_eqs)
-
-    x0 = [eval(Meta.parse("$(dfunc_sys).$(nm) ~ init_states[$nm]")) for nm in ele.state_names]
-    func_p = [eval(Meta.parse("$(func_sys).$(nm) ~ params[$nm]")) for nm in ModelingToolkit.parameters(func_sys)]
-    dfunc_p = [eval(Meta.parse("$(dfunc_sys).$(nm) ~ params[$nm]")) for nm in ModelingToolkit.parameters(dfunc_sys)]
-
-    prob = ODEProblem(ele_sys, x0, tspan, vcat(func_p, dfunc_p))
+    prob = ODEProblem(ele_sys, x0, (1,len(input[:time])), vcat(func_p, dfunc_p))
     sol = solve(prob, Tsit5())
     sol
 end

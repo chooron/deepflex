@@ -37,7 +37,7 @@ function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names, output_names, param_names
 end
 
-function get_d_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+function get_dfunc_infos(funcs::Vector{F}) where {F<:AbstractFlux}
     input_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
     param_names = Vector{Symbol}()

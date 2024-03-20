@@ -87,7 +87,7 @@ function ODEElement(
 ) where {F<:AbstractFlux}
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
-    input_names2, state_names, param_names2 = get_d_func_infos(d_funcs)
+    input_names2, state_names, param_names2 = get_dfunc_infos(d_funcs)
     # 避免一些中间变量混淆为输入要素
     setdiff!(input_names2, output_names)
     # 合并两种func的输入要素
