@@ -11,7 +11,7 @@ function MeltFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function melt_func(
-    i::gen_namedtuple_type([:snowwater, :Temp], T),
+    i::gen_namedtuple_type([:snowwater, :temp], T),
     p::gen_namedtuple_type([:Tmax, :Df], T),
     sf::Function
 )::Union{T,Vector{T}} where {T<:Number}

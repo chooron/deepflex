@@ -34,7 +34,6 @@ using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
 
-
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 

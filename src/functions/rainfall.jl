@@ -15,7 +15,7 @@ function rainfall_func(
     p::gen_namedtuple_type([:Tmin], T),
     sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(sf(i[:Temp] - p[:Tmin]) * i[:prcp])
+    @.(sf(i[:temp] - p[:Tmin]) * i[:prcp])
 end
 
 function rainfall_func(
@@ -23,7 +23,7 @@ function rainfall_func(
     p::NamedTuple,
     sf::Function
 )::Union{T,Vector{T}} where {T<:Number}
-    @.(sf(i[:prcp] - i[:Pet]) * (i[:prcp] - i[:Pet]))
+    @.(sf(i[:prcp] - i[:pet]) * (i[:prcp] - i[:Pet]))
 end
 
 function rainfall_func(

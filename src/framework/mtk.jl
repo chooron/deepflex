@@ -75,9 +75,10 @@ function build_interpolation_system(
     eqs = []
     for nm in keys(input)
         func_nm = Symbol(nm, "_itp")
-        eval(Meta.parse("$(func_nm)(t) = data_itp(t, time, input[$nm])"))
-        eval(Meta.parse("@register_symbolic $func_nm(t)"))
-        push!(eqs, eval(Meta.parse("$nm ~ $func_nm(t)")))
+        tmp_itp = data_itp(t, time, input[nm])
+        eval(:($(func_nm)(t) = $tmp_itp))
+        # eval(:(@register_symbolic $(func_nm)(t)))
+        push!(eqs, eval(:($nm ~ $(func_nm)(t))))
     end
     ODESystem(eqs, t; name=name)
 end
@@ -102,15 +103,27 @@ function build_dfunc_system(dfuncs, var_dict, param_dict; name::Symbol)
     ODESystem(eqs, t; name=name)
 end
 
-function combine_systems(ele::MTKElement, func_sys::ODESystem, dfunc_sys::ODESystem, itp_sys::ODESystem)
+function combine_systems(ele::MTKElement, itp_sys::ODESystem)
     eqs = []
+    # 先将插值系统的数据与方程的输入变量绑定
+    # intersect(get_func_infos(ele.funcs)[1], ele.input_names)是指funcs的外界输入变量
     for nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
-        push!(eqs, eval(Expr(:call, :~, getproperty(func_sys, nm), getproperty(itp_sys, nm))))
+        push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(itp_sys, nm))))
     end
+    # intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)是指funcs的外界输入变量
     for nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
-        push!(eqs, eval(Expr(:call, :~, getproperty(dfunc_sys, nm), getproperty(itp_sys, nm))))
+        push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), getproperty(itp_sys, nm))))
     end
-    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, func_sys, dfunc_sys))
+    # 然后将func和dfunc的变量结合到一块
+    # setdiff(get_func_infos(ele.dfuncs)[1], ele.input_names)是指dfuncs需要从funcs里传过来的中间变量
+    for nm in setdiff(get_func_infos(ele.dfuncs)[1], ele.input_names)
+        push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), getproperty(ele.func_sys, nm))))
+    end
+    # intersect(get_func_infos(ele.funcs)[1], ele.state_names)是指funcs需要从states_names里的输入变量
+    for nm in intersect(get_func_infos(ele.funcs)[1], ele.state_names)
+        push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(ele.dfunc_sys, nm))))
+    end
+    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, ele.func_sys, ele.dfunc_sys))
 end
 
 
@@ -120,18 +133,17 @@ function solve_prob(
     params::ComponentVector{T},
     init_states::ComponentVector{T},
     # solver::AbstractSolver,
-)::ComponentVector{T} where {T<:Number}
+) where {T<:Number}
     itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
-    func_sys, dfunc_sys = ele.func_sys, ele.dfunc_sys
     # combine system
-    ele_sys = combine_systems(ele, func_sys, dfunc_sys, itp_sys)
+    ele_sys = combine_systems(ele, itp_sys)
     # setup init states
-    x0 = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, dfunc_sys.name), nm), init_states[nm])) for nm in ele.state_names]
+    x0 = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.dfunc_sys.name), nm), init_states[nm])) for nm in ele.state_names]
     # setup
-    func_p = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, func_sys.name), nm), params[nm])) for nm in ModelingToolkit.parameters(func_sys)]
-    dfunc_p = [eval(Expr(:call, :~, getproperty(getproperty(ele_sys, dfunc_sys.name), nm), params[nm])) for nm in ModelingToolkit.parameters(dfunc_sys)]
+    func_p = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.func_sys.name), Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.func_sys)]
+    dfunc_p = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.dfunc_sys.name), Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.dfunc_sys)]
 
-    prob = ODEProblem(ele_sys, x0, (1,len(input[:time])), vcat(func_p, dfunc_p))
-    sol = solve(prob, Tsit5())
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(ele_sys, x0, (1, length(input[:time])), vcat(func_p, dfunc_p))
+    sol = solve(prob,Tsit5())
     sol
 end

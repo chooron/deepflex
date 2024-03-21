@@ -8,7 +8,7 @@ function step_function(parameter::NamedTuple)
     inner_step_func
 end
 
-function _step_func(x::Num, p::(@NamedTuple{v::T})) where {T<:Number}
+function _step_func(x::Union{Num,T}, p::(@NamedTuple{v::T})) where {T<:Number}
     if x > p.v
         return 1
     else
@@ -16,7 +16,7 @@ function _step_func(x::Num, p::(@NamedTuple{v::T})) where {T<:Number}
     end
 end
 
-function _step_func(x::Num, p::(@NamedTuple{p1::T, p2::T, p3::T})) where {T<:Number}
+function _step_func(x::Union{Num,T}, p::(@NamedTuple{p1::T, p2::T, p3::T})) where {T<:Number}
     (tanh(p.p1 * x) + p.p2) * p.p3
 end
 

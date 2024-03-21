@@ -10,7 +10,7 @@ function Soil_ExpHydro(; name::Symbol)
     ]
 
     dfuncs = [
-        Differ(Dict(:In => [:infiltration], :Out => [:evap, :flow]), :soilwater)
+        DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :flow]), :soilwater)
     ]
 
     ODEElement(

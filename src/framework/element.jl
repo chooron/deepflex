@@ -77,17 +77,17 @@ struct ODEElement <: AbstractElement
 
     # functions
     funcs::Vector{AbstractFlux}
-    d_funcs::Vector{AbstractFlux}
+    dfuncs::Vector{AbstractFlux}
 end
 
 function ODEElement(
     ; name::Symbol,
     funcs::Vector{F},
-    d_funcs::Vector{F},
+    dfuncs::Vector{F},
 ) where {F<:AbstractFlux}
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
-    input_names2, state_names, param_names2 = get_dfunc_infos(d_funcs)
+    input_names2, state_names, param_names2 = get_dfunc_infos(dfuncs)
     # 避免一些中间变量混淆为输入要素
     setdiff!(input_names2, output_names)
     # 合并两种func的输入要素
@@ -104,7 +104,7 @@ function ODEElement(
         param_names,
         state_names,
         funcs,
-        d_funcs
+        dfuncs
     )
 end
 
@@ -136,12 +136,13 @@ function solve_prob(
     function singel_ele_ode_func!(du, u, p, t)
         tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))
         tmp_fluxes = get_output(ele, input=tmp_input, states=u, parameters=p)
-        for d_func in ele.d_funcs
-            du[d_func.output_names[1]] = d_func(tmp_fluxes, p)[d_func.output_names[1]]
+        for dfunc in ele.dfuncs
+            du[dfunc.output_names[1]] = d_func(tmp_fluxes, p)[dfunc.output_names[1]]
         end
     end
+    prob = ODEProblem(singel_ele_ode_func!, init_states, (input[:time][1], input[:time][end]), parameters)
     # return solved result
-    solver(singel_ele_ode_func!, parameters, init_states, (saveat=input[:time],))
+    solver(prob, init_states, (saveat=input[:time],))
 end
 
 function get_output(

@@ -3,11 +3,11 @@ SnowWaterReservoir in Exp-Hydro
 """
 function Surface_ExpHydro(; name::Symbol)
     funcs = [
-        Pet([:temp, :lday]),
-        Snowfall([:prcp, :temp], param_names=[:Tmin]),
-        Melt([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        Rainfall([:prcp, :temp], param_names=[:Tmin]),
-        Infiltration([:rainfall, :melt])
+        PetFlux([:temp, :lday]),
+        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        InfiltrationFlux([:rainfall, :melt])
     ]
 
     dfuncs = [
@@ -26,11 +26,11 @@ SnowWaterReservoir in Exp-Hydro
 """
 function Surface_GR4J(; name::Symbol)
     funcs = [
-        Rainfall([:prcp, :pet]),
+        RainfallFlux([:prcp, :pet]),
         SimpleFlux([:prcp, :pet], :pet,
             param_names=Symbol[],
             func=(i, p, sf) -> @.(sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
-        Infiltration([:rainfall])
+        InfiltrationFlux([:rainfall])
     ]
 
     SimpleElement(
