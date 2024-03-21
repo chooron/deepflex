@@ -137,7 +137,7 @@ function solve_prob(
         tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))
         tmp_fluxes = get_output(ele, input=tmp_input, states=u, parameters=p)
         for dfunc in ele.dfuncs
-            du[dfunc.output_names[1]] = d_func(tmp_fluxes, p)[dfunc.output_names[1]]
+            du[dfunc.output_names] = dfunc(tmp_fluxes, p)[dfunc.output_names]
         end
     end
     prob = ODEProblem(singel_ele_ode_func!, init_states, (input[:time][1], input[:time][end]), parameters)

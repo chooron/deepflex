@@ -9,7 +9,7 @@ using Interpolations
 using BenchmarkTools
 
 # test gr4j model
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 seed = 42
 Random.seed!(42)

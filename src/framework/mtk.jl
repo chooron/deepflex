@@ -77,7 +77,7 @@ function build_interpolation_system(
         func_nm = Symbol(nm, "_itp")
         tmp_itp = data_itp(t, time, input[nm])
         eval(:($(func_nm)(t) = $tmp_itp))
-        # eval(:(@register_symbolic $(func_nm)(t)))
+        eval(:(@register_symbolic $(func_nm)(t)))
         push!(eqs, eval(:($nm ~ $(func_nm)(t))))
     end
     ODESystem(eqs, t; name=name)
@@ -103,16 +103,27 @@ function build_dfunc_system(dfuncs, var_dict, param_dict; name::Symbol)
     ODESystem(eqs, t; name=name)
 end
 
-function combine_systems(ele::MTKElement, itp_sys::ODESystem)
+function combine_systems(ele::MTKElement, itp_dict)
     eqs = []
     # 先将插值系统的数据与方程的输入变量绑定
     # intersect(get_func_infos(ele.funcs)[1], ele.input_names)是指funcs的外界输入变量
-    for nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
-        push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(itp_sys, nm))))
-    end
-    # intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)是指funcs的外界输入变量
-    for nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
-        push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), getproperty(itp_sys, nm))))
+    # for nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
+    #     push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(itp_sys, nm))))
+    # end
+    # # intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)是指funcs的外界输入变量
+    # for nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
+    #     push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), getproperty(itp_sys, nm))))
+    # end
+    for nm in keys(itp_dict)
+        func_nm = Symbol(nm, "_itp")
+        eval(:($(func_nm)(t) = $(itp_dict[nm])))
+        # eval(:(@register_symbolic $(func_nm)(t)))
+        if nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
+            push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), :($(func_nm)(t)))))
+        end
+        if nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
+            push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), :($(func_nm)(t)))))
+        end
     end
     # 然后将func和dfunc的变量结合到一块
     # setdiff(get_func_infos(ele.dfuncs)[1], ele.input_names)是指dfuncs需要从funcs里传过来的中间变量
@@ -123,7 +134,8 @@ function combine_systems(ele::MTKElement, itp_sys::ODESystem)
     for nm in intersect(get_func_infos(ele.funcs)[1], ele.state_names)
         push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(ele.dfunc_sys, nm))))
     end
-    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, ele.func_sys, ele.dfunc_sys))
+    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), ele.func_sys, ele.dfunc_sys))
+    # structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, ele.func_sys, ele.dfunc_sys))
 end
 
 
@@ -134,9 +146,10 @@ function solve_prob(
     init_states::ComponentVector{T},
     # solver::AbstractSolver,
 ) where {T<:Number}
-    itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
+    # itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
+    itp_dict = Dict(nm=>data_itp(t, input[:time], input[nm]) for nm in ele.input_names)
     # combine system
-    ele_sys = combine_systems(ele, itp_sys)
+    ele_sys = combine_systems(ele, itp_dict)
     # setup init states
     x0 = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.dfunc_sys.name), nm), init_states[nm])) for nm in ele.state_names]
     # setup

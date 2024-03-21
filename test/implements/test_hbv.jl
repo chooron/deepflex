@@ -8,7 +8,7 @@ using CairoMakie: Axis
 using Interpolations
 
 # test gr4j model
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 seed = 42
 Random.seed!(42)

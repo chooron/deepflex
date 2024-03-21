@@ -6,7 +6,7 @@ using ComponentArrays
 using CairoMakie: Axis
 
 # test exphydro model
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 # load data
 file_path = "data/cache/01013500.csv"

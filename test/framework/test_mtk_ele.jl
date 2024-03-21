@@ -3,7 +3,7 @@ using ModelingToolkit
 using CSV
 using DataFrames
 using ComponentArrays
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 function Soil_ExpHydro(; name::Symbol)
     funcs = [

@@ -3,12 +3,11 @@ using CSV
 using Random
 using DataFrames
 using CairoMakie
-using ComponentArrays
 using CairoMakie: Axis
 using Interpolations
 
 # test gr4j model
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 seed = 42
 Random.seed!(42)
@@ -20,15 +19,19 @@ P[41:60] = rand(0.0:0.01:5.0, 20)
 P[81:83] = rand(30.0:0.01:50.0, 3)
 
 # build model
-s_max, b, a, kf, ks = 1000, 5, 0.5, 0.5, 0.5
-parameters = ComponentVector(Smax=s_max, b=b, a=a, kf=kf, ks=ks)
-init_states = ComponentVector(SoilWater=0.0,
-    FastRouting1=5.0, FastRouting2=5.0,
-    FastRouting3=5.0, SlowRouting=5.0
+aim, b, a, stot, fwm, flm, c, ex, ki, kg, ci, cg = 0.6, 0.1, 5, 500, 0.5, 0.5, 0.5, 5, 0.5, 0.5, 0.5, 0.5
+parameters = ComponentVector(Aim=aim, Wmax=fwm * stot, Smax=(1 - fwm) * stot,
+    b=b, a=a, c=c, LM=flm * fwm * stot,
+    stot=stot, fwm=fwm, flm=flm,
+    ex=ex, ki=ki, kg=kg, ci=ci, cg=cg)
+
+init_states = ComponentVector(
+    TensionWater=10.0, FreeWater=10.0,
+    InterRouting=5.0, BaseRouting=5.0
 )
 
-model = DeepFlex.HyMOD(
-    name="hymod",
+model = DeepFlex.XAJ(
+    name="xaj",
     parameters=parameters,
     init_states=init_states
 )

@@ -1,6 +1,6 @@
 using ComponentArrays
 
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 x4 = 3.5
 tmp_input = ComponentVector(Q9=Float64[1, 2, 3, 4, 5, 3, 2, 1, 4])
