@@ -3,7 +3,7 @@ using CSV
 using DataFrames
 using CairoMakie
 using ComponentArrays
-using Zygote, Lux, LuxCUDA
+using Zygote, Lux
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
@@ -18,11 +18,9 @@ prcp_vec = df[1:1000, "prcp(mm/day)"]
 temp_vec = df[1:1000, "tmean(C)"]
 flow_vec = df[1:1000, "flow(mm)"]
 
-inputs = ComponentVector(prcp=prcp_vec, temp=temp_vec, lday=lday_vec)
-outputs = ComponentVector(flow=flow_vec)
+inputs = (prcp=prcp_vec, temp=temp_vec, lday=lday_vec)
+outputs = (flow=flow_vec,)
 
-q_nn = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
-lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=q_nn)
-
-opt_params = DeepFlex.nn_params_optimize!(lux_func, input=inputs, output=outputs)
-# output = DeepFlex.get_output(ele, input=inputs)
+lux_model = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
+lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
+opt_params = DeepFlex.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)

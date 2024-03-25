@@ -7,7 +7,7 @@ using OrdinaryDiffEq
 using DiffEqFlux
 
 # test exphydro model
-include("../src/DeepFlex.jl")
+include("../../src/DeepFlex.jl")
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -29,15 +29,6 @@ nn_layer = Lux.Chain(
     Lux.Dense(20, 20, relu),
     Lux.Dense(20, 10, relu)
 )
-node_layer = NeuralODE(nn_layer,
-    (0.0f0, 1.0f0),
-    Tsit5();
-    save_everystep=false,
-    saveat=
-    reltol=1e-3, abstol=1e-3,
-    save_start=false)
-output_layer = Lux.Dense(10, 1)
-
 
 model_no_ode = Lux.Chain(; input_layer, nn_layer, output_layer)
 # ele = DeepFlex.LuxElement(model_no_ode, device=dev_gpu)

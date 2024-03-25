@@ -79,6 +79,32 @@ function SimpleFlux(
     )
 end
 
+
+## ----------------------------------------------------------------------
+## callable function
+function (flux::SimpleFlux)(input::NamedTuple, parameters::NamedTuple)
+    tmp_input = extract_input(input, flux.input_names)
+    func_output = flux.func(tmp_input, parameters[flux.param_names], flux.step_func)
+    process_output(flux.output_names, func_output)
+end
+
+function extract_input(input::NamedTuple, input_names::Vector{Symbol})
+    namedtuple(input_names, [input[k] for k in input_names])
+end
+
+function extract_input(input::NamedTuple, input_names::Dict{Symbol,Symbol})
+    namedtuple(collect(values(input_names)), [input[k] for k in keys(input_names)])
+end
+
+function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
+    namedtuple([output_names], [output])
+end
+
+function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}
+    namedtuple(output_names, output)
+end
+
+
 struct LagFlux <: AbstractFlux
     # attribute
     input_names::Vector{Symbol}
@@ -128,14 +154,14 @@ function (flux::LagFlux)(input::NamedTuple, parameters::NamedTuple)
         push!(tmp_output, lag_states[nm][1, 1] * input[nm] + lag_states[nm][2, 1])
         update_lag_state!(lag_states[nm], input[nm])
     end
-    NamedTuple(namedtuple(flux.input_names, tmp_output))
+    namedtuple(flux.input_names, tmp_output)
 end
 
 mutable struct LuxNNFlux <: AbstractFlux
     input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
+    output_names::Union{Vector{Symbol},Symbol}
+    init_params::NamedTuple
     func::Function
-    parameters::Any
 end
 
 function LuxNNFlux(
@@ -148,36 +174,12 @@ function LuxNNFlux(
     Random.seed!(rng, seed)
     ps, st = Lux.setup(rng, lux_model)
     func = (x, p) -> lux_model(x, p, st)[1]
-    LuxNNFlux(input_names, output_names, func, ComponentArray(ps=ps, st=st))
+    LuxNNFlux(input_names, output_names, ps, func)
 end
 
-## ----------------------------------------------------------------------
-## callable function
-function (flux::SimpleFlux)(input::NamedTuple, parameters::NamedTuple)
-    tmp_input = extract_input(input, flux.input_names)
-    func_output = flux.func(tmp_input, parameters[flux.param_names], flux.step_func)
-    process_output(flux.output_names, func_output)
-end
-
-function extract_input(input::NamedTuple, input_names::Vector{Symbol})
-    namedtuple(input_names, [input[k] for k in input_names])
-end
-
-function extract_input(input::NamedTuple, input_names::Dict{Symbol,Symbol})
-    namedtuple(collect(values(input_names)), [input[k] for k in keys(input_names)])
-end
-
-function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
-    namedtuple([output_names], [output])
-end
-
-function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}
-    namedtuple(output_names, output)
-end
-
-function (flux::LuxNNFlux)(input::NamedTuple)
+function (flux::LuxNNFlux)(input::NamedTuple, parameters::Union{ComponentVector,NamedTuple})
     x = hcat([input[nm] for nm in flux.input_names]...)'
-    y_pred = flux.func(x, flux.parameters[:ps])
+    y_pred = flux.func(x, parameters[flux.name])
     if size(y_pred, 2) > 1
         output = namedtuple(flux.output_names, [y_pred[i, :] for (i, k) in enumerate(flux.output_names)])
     else
@@ -185,11 +187,3 @@ function (flux::LuxNNFlux)(input::NamedTuple)
     end
     return output
 end
-
-## ----------------------------------------------------------------------
-
-## *训练后，更新模型内部参数
-function update!(flux::LuxNNFlux, tstate)
-    flux.parameters = tstate.parameters
-end
-## ----------------------------------------------------------------------

@@ -54,7 +54,6 @@ function SimpleElement(
 end
 
 function get_output(ele::SimpleElement; input::NamedTuple, parameters::NamedTuple)
-    # function get_output(ele::SimpleElement; input::NamedTuple, parameters::NamedTuple) where {T<:Number}
     fluxes = input
     for func in ele.funcs
         fluxes = merge(fluxes, func(fluxes, parameters))
