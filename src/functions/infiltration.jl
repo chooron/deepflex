@@ -12,27 +12,27 @@ function InfiltrationFlux(
 end
 
 function infiltration_func(
-    i::gen_namedtuple_type([:snowwater, :liquidwater, :rainfall, :melt], T),
-    p::gen_namedtuple_type([:whc], T),
+    i::namedtuple(:snowwater, :liquidwater, :rainfall, :melt),
+    p::namedtuple(:whc),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:liquidwater] - p[:whc] * i[:snowwater]) *
        (i[:rainfall] + i[:melt] + i[:liquidwater] - p[:whc] * i[:snowwater]))
 end
 
 
 function infiltration_func(
-    i::gen_namedtuple_type([:rainfall, :melt], T),
+    i::namedtuple(:rainfall, :melt),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(i[:rainfall] + i[:melt])
 end
 
 function infiltration_func(
-    i::gen_namedtuple_type([:rainfall], T),
+    i::namedtuple(:rainfall),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     i[:rainfall]
 end

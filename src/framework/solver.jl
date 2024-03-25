@@ -6,9 +6,9 @@ end
 
 function (solver::ODESolver)(
     ode_prob::ODEProblem,
-    init_states::ComponentVector{T},
+    init_states::NamedTuple,
     solve_config::NamedTuple
-) where {T<:Number}
+)
     # build problem
     # tspan = (solve_config.saveat[1], solve_config.saveat[end])
     # ode_prob = ODEProblem(ode_func, init_states, tspan, func_parameters)
@@ -20,7 +20,7 @@ function (solver::ODESolver)(
         sensealg=solver.sensealg)
     solved_u = hcat(sol.u...)
     state_names = collect(keys(init_states))
-    ComponentVector(namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)]))
+    namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
 end
 
 @kwdef struct DiscreteSolver <: AbstractSolver

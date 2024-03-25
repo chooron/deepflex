@@ -11,18 +11,18 @@ function SnowfallFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function snowfall_func(
-    i::gen_namedtuple_type([:prcp, :temp], T),
-    p::gen_namedtuple_type([:Tmin], T),
+    i::namedtuple(:prcp, :temp),
+    p::namedtuple(:Tmin),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(p[:Tmin] - i[:temp]) * i[:prcp])
 end
 
 function snowfall_func(
-    i::gen_namedtuple_type([:prcp, :temp], T),
-    p::gen_namedtuple_type([:tt, :tti], T),
+    i::namedtuple(:prcp, :temp),
+    p::namedtuple(:tt, :tti),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     tmp_t1 = p[:tt] - 0.5 * p[:tti]
     tmp_t2 = p[:tt] + 0.5 * p[:tti]
     @.(sf(tmp_t1 - i[:temp]) * i[:prcp] +

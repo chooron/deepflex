@@ -11,17 +11,17 @@ function RechargeFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function recharge_func(
-    i::gen_namedtuple_type([:routingstore], T),
-    p::gen_namedtuple_type([:x2, :x3, :ω], T),
+    i::namedtuple(:routingstore),
+    p::namedtuple(:x2, :x3, :ω),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(p[:x2] / (p[:x3]^p[:ω]) * i[:routingstore]^p[:ω])
 end
 
 function recharge_func(
-    i::gen_namedtuple_type([:soilwater, :infiltration], T),
-    p::gen_namedtuple_type([:fc, :β], T),
+    i::namedtuple(:soilwater, :infiltration),
+    p::namedtuple(:fc, :β),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.((i[:infiltration]) * (i[:soilwater] / p[:fc])^p[:β])
 end

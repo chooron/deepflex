@@ -11,17 +11,17 @@ function MeltFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function melt_func(
-    i::gen_namedtuple_type([:snowwater, :temp], T),
-    p::gen_namedtuple_type([:Tmax, :Df], T),
+    i::namedtuple(:snowwater, :temp),
+    p::namedtuple(:Tmax, :Df),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:temp] - p[:Tmax]) * sf(i[:snowwater]) * min(i[:snowwater], p[:Df] * (i[:temp] - p[:Tmax])))
 end
 
 function melt_func(
-    i::gen_namedtuple_type([:temp], T),
-    p::gen_namedtuple_type([:cfmax, :ttm], T),
+    i::namedtuple(:temp),
+    p::namedtuple(:cfmax, :ttm),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:temp] - p[:ttm]) * (i[:temp] - p[:ttm]) * p[:cfmax])
 end

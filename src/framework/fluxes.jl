@@ -91,7 +91,7 @@ struct LagFlux <: AbstractFlux
     step_func::Function
 
     # inner variable
-    lag_states::ComponentVector
+    lag_states::NamedTuple
 end
 
 function LagFlux(
@@ -112,23 +112,23 @@ function LagFlux(
         lag_times,
         lag_funcs,
         DEFAULT_SMOOTHER,
-        ComponentVector()
+        NamedTuple()
     )
 end
 
-function init!(flux::LagFlux; parameters::ComponentVector{T}) where {T<:Number}
+function init!(flux::LagFlux; parameters::NamedTuple)
     # todo 添加dt插入功能
     lag_states = [init_lag_state(flux.lag_funcs[nm], parameters[flux.lag_times[nm]], 1.0) for nm in flux.input_names]
-    ComponentVector(flux.input_names, lag_states)
+    namedTuple(flux.input_names, lag_states)
 end
 
-function (flux::LagFlux)(input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
-    tmp_output = T[]
+function (flux::LagFlux)(input::NamedTuple, parameters::NamedTuple)
+    tmp_output = []
     for nm in flux.input_names
         push!(tmp_output, lag_states[nm][1, 1] * input[nm] + lag_states[nm][2, 1])
         update_lag_state!(lag_states[nm], input[nm])
     end
-    ComponentVector(namedtuple(flux.input_names, tmp_output))
+    NamedTuple(namedtuple(flux.input_names, tmp_output))
 end
 
 mutable struct LuxNNFlux <: AbstractFlux
@@ -153,48 +153,38 @@ end
 
 ## ----------------------------------------------------------------------
 ## callable function
-function (flux::SimpleFlux)(input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
+function (flux::SimpleFlux)(input::NamedTuple, parameters::NamedTuple)
     tmp_input = extract_input(input, flux.input_names)
-    func_output = flux.func(tmp_input, NamedTuple(parameters[flux.param_names]), flux.step_func)
+    func_output = flux.func(tmp_input, parameters[flux.param_names], flux.step_func)
     process_output(flux.output_names, func_output)
 end
 
-function extract_input(input::ComponentVector{T}, input_names::Vector{Symbol}) where {T<:Number}
+function extract_input(input::NamedTuple, input_names::Vector{Symbol})
     namedtuple(input_names, [input[k] for k in input_names])
 end
 
-function extract_input(input::ComponentVector{T}, input_names::Dict{Symbol,Symbol}) where {T<:Number}
+function extract_input(input::NamedTuple, input_names::Dict{Symbol,Symbol})
     namedtuple(collect(values(input_names)), [input[k] for k in keys(input_names)])
 end
 
 function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
-    ComponentVector(namedtuple([output_names], [output]))
+    namedtuple([output_names], [output])
 end
 
 function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}
-    ComponentVector(namedtuple(output_names, output))
+    namedtuple(output_names, output)
 end
 
-function (flux::LuxNNFlux)(input::ComponentVector{T}) where {T<:Number}
+function (flux::LuxNNFlux)(input::NamedTuple)
     x = hcat([input[nm] for nm in flux.input_names]...)'
     y_pred = flux.func(x, flux.parameters[:ps])
     if size(y_pred, 2) > 1
-        output = ComponentVector(; Dict(k => y_pred[i, :] for (i, k) in enumerate(flux.output_names))...)
+        output = namedtuple(flux.output_names, [y_pred[i, :] for (i, k) in enumerate(flux.output_names)])
     else
-        output = ComponentVector(; Dict(k => first(y_pred[i, :]) for (i, k) in enumerate(flux.output_names))...)
+        output = namedtuple(flux.output_names, [first(y_pred[i, :]) for (i, k) in enumerate(flux.output_names)])
     end
     return output
 end
-
-## ----------------------------------------------------------------------
-
-## *namedtuple type generation function for SimpleFlux
-## ---------------------------------------------------------------------- 
-function gen_namedtuple_type(input_names::Vector{Symbol}, dtype::Union{Type,TypeVar})
-    Union{NamedTuple{tuple(input_names...),NTuple{length(input_names),dtype}},
-        NamedTuple{tuple(input_names...),NTuple{length(input_names),Vector{dtype}}}}
-end
-## ----------------------------------------------------------------------
 
 ## ----------------------------------------------------------------------
 

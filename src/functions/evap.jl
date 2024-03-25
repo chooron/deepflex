@@ -11,37 +11,37 @@ function EvapFlux(
 end
 
 function evap_func(
-    i::gen_namedtuple_type([:soilwater, :pet], T),
-    p::gen_namedtuple_type([:Smax], T),
+    i::namedtuple(:soilwater, :pet),
+    p::namedtuple(:Smax),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * i[:pet] +
     sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * i[:pet] * (i[:soilwater] / p[:Smax]))
 end
 
 function evap_func(
-    i::gen_namedtuple_type([:soilwater, :pet], T),
-    p::gen_namedtuple_type([:x1], T),
+    i::namedtuple(:soilwater, :pet),
+    p::namedtuple(:x1),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(i[:pet] * (2 * i[:soilwater] / p[:x1] - (i[:soilwater] / p[:x1])^2))
 end
 
 function evap_func(
-    i::gen_namedtuple_type([:soilwater, :pet], T),
-    p::gen_namedtuple_type([:c, :LM], T),
+    i::namedtuple(:soilwater, :pet),
+    p::namedtuple(:c, :LM),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:soilwater] - p[:LM]) * i[:pet] +
        sf(p[:LM] - i[:soilwater]) * sf(i[:soilwater] - p[:c] * p[:LM]) * i[:soilwater] / p[:LM] * i[:pet] +
        sf(p[:c] * p[:LM] - i[:soilwater]) * p[:c] * i[:pet])
 end
 
 function evap_func(
-    i::gen_namedtuple_type([:soilwater, :pet], T),
-    p::gen_namedtuple_type([:lp, :fc], T),
+    i::namedtuple(:soilwater, :pet),
+    p::namedtuple(:lp, :fc),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:soilwater] - p[:lp] * p[:fc]) * i[:pet] +
        sf(p[:lp] * p[:fc] - i[:soilwater]) * i[:pet] * i[:soilwater] / (p[:lp] * p[:fc]))
 end

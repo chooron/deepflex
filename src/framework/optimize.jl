@@ -1,3 +1,5 @@
+using ForwardDiff
+
 mutable struct BoundaryParamInfo{T} <: AbstractParamInfo where {T<:Number}
     name::Symbol
     default::T
@@ -17,77 +19,48 @@ function BoundaryParamInfo(name::Symbol, default::T;
     )
 end
 
-struct HyperOptimizer <: AbstractOptimizer
-    optf
-    optprob
-    alg
-end
-
-function HyperOptimizer(; func::Function, paraminfos::Vector{BPI}, kwargs...) where {BPI<:BoundaryParamInfo}
-    x0 = [p.default for p in paraminfos]
-    lb = [p.lb for p in paraminfos]
-    ub = [p.ub for p in paraminfos]
-    optf = Optimization.OptimizationFunction(func)
-    optprob = Optimization.OptimizationProblem(optf, x0, (), lb=lb, ub=ub)
-
-    HyperOptimizer(
-        optf,
-        optprob,
-        kwargs[:alg]
-    )
-end
-
-function opt_solve(optimizer::HyperOptimizer; kwargs...)
-    if haskey(kwargs, :callback)
-        callback = kwargs[:callback]
-    else
-        callback = function (p, l)
-            println("rmse: " * string(l))
-            return false
-        end
-    end
-    Optimization.solve(optimizer.optprob, optimizer.alg, callback=callback, maxiters=kwargs[:maxiters])
-end
-
-function hyperparams_optimize(
+function hyperparams_gradient_optimize(
     component::AbstractComponent;
-    paraminfos::Vector{P},
-    input::ComponentVector{T},
-    target::ComponentVector{T},
+    search_params::Vector{P},
+    const_params::NamedTuple,
+    input::NamedTuple,
+    target::NamedTuple,
     kwargs...,
-) where {P<:AbstractParamInfo,T<:Number}
+) where {P<:AbstractParamInfo}
     """
     针对模型超参数进行优化
     """
+    # 获取需要优化的参数名称
+    search_param_names = [p.name for p in search_params]
+
     # 设置默认weight和errfunc
-    if haskey(kwargs, :error_weight)
-        error_weight = kwargs[:error_weight]
-    else
-        error_weight = Dict(k => 1.0 for k in keys(target))
-    end
-
-    if haskey(kwargs, :error_func)
-        error_func = kwargs[:error_func]
-    else
-        error_func = Dict(k => rmse for k in keys(target))
-    end
-
-    param_names = [p.name for p in paraminfos]
+    error_weight = get(kwargs, :error_weight, Dict(k => 1.0 for k in keys(target)))
+    error_func = get(kwargs, :error_func, Dict(k => rmse for k in keys(target)))
+    solve_alg = get(kwargs, :solve_alg, Adam())
+    callback_func = get(kwargs, :callback_func, (p, l) -> begin
+        println("loss: " * string(l))
+        return false
+    end)
 
     # 内部构造一个function
-    function objective(x, p)
-        tmp_params = ComponentVector(namedtuple(param_names, x))
+    function objective(x::AbstractVector{T}, p)  where T
+        tmp_search_params = namedtuple(search_param_names, x)
+        search_params_type = eltype(tmp_search_params)
+        tmp_params = merge(tmp_search_params, namedtuple(keys(const_params), search_params_type.(collect(const_params))))
         predict = get_output(component, input=input, parameters=tmp_params,
             init_states=tmp_params[component.state_names])
-        criteria = 0.0
-        for k in keys(target)
-            criteria += error_func[k](target[k], predict[k]) * error_weight[k]
-        end
-        return criteria
+        sum((target[:flow] .- predict[:flow]) .^ 2) / length(target[:flow])
     end
 
-    hyper_optimizer = HyperOptimizer(func=objective, paraminfos=paraminfos, alg=BBO_adaptive_de_rand_1_bin_radiuslimited())
-    opt_solve(hyper_optimizer, maxiters=100)
+    # 处理数据搜索范围以及默认值
+    x0 = [p.default for p in search_params]
+    lb = [p.lb for p in search_params]
+    ub = [p.ub for p in search_params]
+    # 构建问题
+    optf = Optimization.OptimizationFunction(objective, get(kwargs, :adtype, Optimization.AutoForwardDiff())) # get(kwargs, :adtype, Optimization.AutoZygote())
+    optprob = Optimization.OptimizationProblem(optf, x0) # , lb=lb, ub=ub
+    sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=get(kwargs, :maxiters, 10))
+    namedtuple(search_param_names, sol.u)
 end
 
 function hybridparams_optimize!()
@@ -97,9 +70,9 @@ function hybridparams_optimize!()
 
 end
 
-function pretrain!(nn::LuxNNFlux; input::ComponentVector{T}, train_config...) where {T<:Number}
+function nn_params_optimize!(nn::LuxNNFlux; input::NamedTuple, output::NamedTuple, train_config...)
     x = hcat([input[nm] for nm in nn.input_names]...)
-    y = hcat([input[nm] for nm in nn.output_names]...)'
+    y = hcat([output[nm] for nm in nn.output_names]...)'
 
     function prep_pred_NN_pretrain(model_, input_)
         (params) -> model_(input_, params)
@@ -114,5 +87,5 @@ function pretrain!(nn::LuxNNFlux; input::ComponentVector{T}, train_config...) wh
     optf = Optimization.OptimizationFunction((θ, p) -> loss_NN_pretrain(θ, y), Optimization.AutoZygote())
     optprob = Optimization.OptimizationProblem(optf, nn.parameters[:ps])
     sol = Optimization.solve(optprob, Adam(0.01), maxiters=100)
-    nn.parameters = ComponentArray(nn.parameters; Dict(:ps => sol.u)...)
+    ComponentArray(nn.parameters; Dict(:ps => sol.u)...)
 end

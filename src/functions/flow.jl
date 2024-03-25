@@ -10,25 +10,25 @@ function FlowFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function flow_func(
-    i::gen_namedtuple_type([:baseflow, :surfaceflow], T),
+    i::namedtuple(:baseflow, :surfaceflow),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     i[:baseflow] .+ i[:surfaceflow]
 end
 
 function flow_func(
-    i::gen_namedtuple_type([:routedflow, :recharge, :fastflow], T),
+    i::namedtuple(:routedflow, :recharge, :fastflow),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(i[:routedflow] + sf(i[:fastflow] + i[:recharge]) * (i[:fastflow] + i[:recharge]))
 end
 
 function flow_func(
-    i::gen_namedtuple_type([:baseflow, :interflow, :surfaceflow], T),
+    i::namedtuple(:baseflow, :interflow, :surfaceflow),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(i[:surfaceflow] + i[:baseflow] + i[:interflow])
 end

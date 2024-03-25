@@ -11,34 +11,34 @@ function RainfallFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
 end
 
 function rainfall_func(
-    i::gen_namedtuple_type([:prcp, :temp], T),
-    p::gen_namedtuple_type([:Tmin], T),
+    i::namedtuple(:prcp, :temp),
+    p::namedtuple(:Tmin),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:temp] - p[:Tmin]) * i[:prcp])
 end
 
 function rainfall_func(
-    i::gen_namedtuple_type([:prcp, :Pet], T),
+    i::namedtuple(:prcp, :Pet),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:prcp] - i[:pet]) * (i[:prcp] - i[:Pet]))
 end
 
 function rainfall_func(
-    i::gen_namedtuple_type([:prcp], T),
+    i::namedtuple(:prcp),
     p::NamedTuple,
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     i[:prcp]
 end
 
 function rainfall_func(
-    i::gen_namedtuple_type([:prcp, :Temp], T),
-    p::gen_namedtuple_type([:tt, :tti], T),
+    i::namedtuple(:prcp, :Temp),
+    p::namedtuple(:tt, :tti),
     sf::Function
-)::Union{T,Vector{T}} where {T<:Number}
+)
     tmp_t1 = p[:tt] - 0.5 * p[:tti]
     tmp_t2 = p[:tt] + 0.5 * p[:tti]
     @.(sf(i[:Temp] - tmp_t2) * i[:prcp] +

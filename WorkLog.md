@@ -26,3 +26,4 @@
 - [x] 针对之前的模型进行ModelingToolkit改造, 准备做一个非mtl版本和mtl版本的包
 - [ ] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
+  - 需要学习`DiffEqParamEstim.jl`和`SciMLSensitivity.jl `

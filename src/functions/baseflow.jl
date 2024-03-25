@@ -11,19 +11,19 @@ function BaseflowFlux(
 end
 
 function baseflow_func(
-    i::gen_namedtuple_type([:soilwater], T),
-    p::gen_namedtuple_type([:Smax, :Qmax, :f], T),
+    i::namedtuple(:soilwater),
+    p::namedtuple(:Smax, :Qmax, :f),
     sf::Function,
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * p[:Qmax] +
     sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * p[:Qmax] * exp(-p[:f] * (p[:Smax] - i[:soilwater])))
 end
 
 function baseflow_func(
-    i::gen_namedtuple_type([:routingstore], T),
-    p::gen_namedtuple_type([:x3, :γ], T),
+    i::namedtuple(:routingstore),
+    p::namedtuple(:x3, :γ),
     sf::Function,
-)::Union{T,Vector{T}} where {T<:Number}
+)
     @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))
 end
 

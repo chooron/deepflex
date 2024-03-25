@@ -37,20 +37,10 @@ function set_solver!(unit::Unit, solver::Dict{Symbol,S}) where {S<:AbstractSolve
     setfield!(unit, :solver, solver)
 end
 
-function pretrain!(unit::AbstractUnit; input::ComponentVector{T}, train_config...) where {T<:Number}
+function pretrain!(unit::AbstractUnit; input::NamedTuple, train_config...)
     for ele in unit.elements
         pretrain!(ele; input=input, train_config...)
     end
-end
-
-function get_states(unit::AbstractUnit; state_names::Union{Set{Symbol},Nothing}=nothing)
-    states = ComponentVector()
-    for ele in unit.elements
-        if ele isa ODEElement
-            states = ComponentVector(states; get_states(ele, state_names=state_names)...)
-        end
-    end
-    return states
 end
 
 function set_solver!(unit::Unit, solver::AbstractSolver)
@@ -63,10 +53,10 @@ end
 
 function get_output(
     unit::Unit;
-    input::ComponentVector{T},
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T},
-) where {T<:Number}
+    input::NamedTuple,
+    parameters::NamedTuple,
+    init_states::NamedTuple,
+)
     # * This function is calculated element by element
     # initialize unit fluxes
     fluxes = input
@@ -76,14 +66,11 @@ function get_output(
             solved_states = solve_prob(ele,
                 input=fluxes, parameters=parameters,
                 init_states=init_states[ele.state_names], solver=unit.solver[ele.name])
-            # filter(isa(LagFlux), ele.funcs) do func
-            #     init!(func, parameters)
-            # end
             tmp_fluxes = get_output(ele, input=fluxes, states=solved_states, parameters=parameters)
         else
             tmp_fluxes = get_output(ele, input=fluxes, parameters=parameters)
         end
-        fluxes = ComponentVector(fluxes; tmp_fluxes...)
+        fluxes = merge(fluxes, tmp_fluxes)
     end
     fluxes
 end

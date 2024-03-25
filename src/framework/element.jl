@@ -16,7 +16,7 @@ function get_element_info(elements::Vector{E}) where {E<:AbstractElement}
     input_names, output_names, state_names, param_names
 end
 
-function get_output(ele::AbstractElement, input::ComponentVector)
+function get_output(ele::AbstractElement, input::NamedTuple)
     return nothing
 end
 
@@ -53,10 +53,11 @@ function SimpleElement(
     )
 end
 
-function get_output(ele::SimpleElement; input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
+function get_output(ele::SimpleElement; input::NamedTuple, parameters::NamedTuple)
+    # function get_output(ele::SimpleElement; input::NamedTuple, parameters::NamedTuple) where {T<:Number}
     fluxes = input
     for func in ele.funcs
-        fluxes = ComponentVector(fluxes; func(fluxes, parameters)...)
+        fluxes = merge(fluxes, func(fluxes, parameters))
     end
     return fluxes[ele.output_names]
 end
@@ -112,7 +113,7 @@ function set_solver!(ele::ODEElement, solver::AbstractSolver)
     setproperty!(ele, :solver, solver)
 end
 
-function pretrain!(ele::ODEElement; input::ComponentVector{T}, train_config...) where {T<:Number}
+function pretrain!(ele::ODEElement; input::NamedTuple, train_config...)
     for func in ele.funcs
         if isa(func, LuxNNFunc)
             pretrain!(func, input=input, train_config...)
@@ -122,38 +123,41 @@ end
 
 function solve_prob(
     ele::ODEElement;
-    input::ComponentVector{T},
-    parameters::ComponentVector{T},
-    init_states::ComponentVector{T},
+    input::NamedTuple,
+    parameters::NamedTuple,
+    init_states::NamedTuple,
     solver::AbstractSolver,
-)::ComponentVector{T} where {T<:Number}
+)
     # fit interpolation functions
-    itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in ele.input_names)
+    itp_dict = namedtuple(ele.input_names, [LinearInterpolation(input[nm], input[:time], extrapolate=true) for nm in ele.input_names])
+    # itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in [:temp,:lday,:prcp])
     # filter(isa(LagFlux), ele.funcs) do func
     #     init!(func, parameters)
     # end
     # solve the problem
     function singel_ele_ode_func!(du, u, p, t)
-        tmp_input = ComponentVector(namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names]))
-        tmp_fluxes = get_output(ele, input=tmp_input, states=u, parameters=p)
-        for dfunc in ele.dfuncs
-            du[dfunc.output_names] = dfunc(tmp_fluxes, p)[dfunc.output_names]
+        tmp_input = namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names])
+        tmp_states = namedtuple(ele.state_names, u)
+        tmp_fluxes = get_output(ele, input=tmp_input, states=tmp_states, parameters=parameters)
+        for (idx, dfunc) in enumerate(ele.dfuncs)
+            tmp_du = dfunc(tmp_fluxes, parameters)[dfunc.output_names]
+            du[idx] = tmp_du
         end
     end
-    prob = ODEProblem(singel_ele_ode_func!, init_states, (input[:time][1], input[:time][end]), parameters)
+    prob = ODEProblem(singel_ele_ode_func!, collect(init_states), (input[:time][1], input[:time][end]))
     # return solved result
     solver(prob, init_states, (saveat=input[:time],))
 end
 
 function get_output(
     ele::ODEElement;
-    input::ComponentVector{T},
-    states::ComponentVector{T},
-    parameters::ComponentVector{T}
-)::ComponentVector{T} where {T<:Number}
-    fluxes = ComponentVector(input; states...)
+    input::NamedTuple,
+    states::NamedTuple,
+    parameters::NamedTuple
+)::NamedTuple
+    fluxes = merge(input, states)
     for func in ele.funcs
-        fluxes = ComponentVector(fluxes; func(fluxes, parameters)...)
+        fluxes = merge(fluxes, func(fluxes, parameters))
     end
     return fluxes
 end
@@ -203,25 +207,24 @@ function LAGElement(
     )
 end
 
-function preprocess_parameters(ele::LAGElement; parameters::ComponentVector{T}) where {T<:Number}
+function preprocess_parameters(ele::LAGElement; parameters::NamedTuple)
     # init lag states
-    lag_states = ComponentVector(namedtuple(ele.input_names,
-        [zeros(Int(ceil(parameters[ele.lagtime_dict[nm]]))) for nm in ele.input_names]))
+    lag_states = namedtuple(ele.input_names, [zeros(Int(ceil(parameters[ele.lagtime_dict[nm]]))) for nm in ele.input_names])
 
     # build weight
-    lag_weights = ComponentVector(namedtuple(ele.input_names,
+    lag_weights = namedtuple(ele.input_names,
         [[ele.lag_func[nm](T(i), T(parameters[ele.lagtime_dict[nm]]), ele.step_func) -
           ele.lag_func[nm](T(i - 1), T(parameters[ele.lagtime_dict[nm]]), ele.step_func)
-          for i in 1:(ceil(parameters[ele.lagtime_dict[nm]])|>Int)] for nm in ele.input_names]))
+          for i in 1:(ceil(parameters[ele.lagtime_dict[nm]])|>Int)] for nm in ele.input_names])
 
     lag_states, lag_weights
 end
 
-function solve_lag(input::ComponentVector{T}, lag_states::ComponentVector{T}, lag_weights::ComponentVector{T}) where {T<:Number}
+function solve_lag(input::NamedTuple, lag_states::NamedTuple, lag_weights::NamedTuple)
     max_weight_len = maximum([length(lag_weights[k]) for k in keys(lag_weights)])
     max_input_len = maximum([length(input[k]) for k in keys(input)])
 
-    output = Dict(k => zeros(T, max_input_len, max_weight_len) for k in keys(input))
+    output = Dict(k => zeros(max_input_len, max_weight_len) for k in keys(input))
 
     for k in keys(output)
         w, ls, ip = lag_weights[k], lag_states[k], input[k]
@@ -234,7 +237,7 @@ function solve_lag(input::ComponentVector{T}, lag_states::ComponentVector{T}, la
     return output
 end
 
-function get_output(ele::LAGElement; input::ComponentVector{T}, parameters::ComponentVector{T}) where {T<:Number}
+function get_output(ele::LAGElement; input::NamedTuple, parameters::NamedTuple)
     lag_states, lag_weights = preprocess_parameters(ele, parameters=parameters)
 
     input = input[ele.input_names]
@@ -247,6 +250,6 @@ function get_output(ele::LAGElement; input::ComponentVector{T}, parameters::Comp
     end
 
     # lag element don't need save states
-    # updated_lag_states = ComponentVector(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names]))
-    ComponentVector(namedtuple(ele.input_names, [solved_state[k][:, 1] for k in ele.input_names]))
+    # updated_lag_states = NamedTuple(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names]))
+    namedtuple(ele.input_names, [solved_state[k][:, 1] for k in ele.input_names])
 end

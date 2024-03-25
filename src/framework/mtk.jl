@@ -68,7 +68,7 @@ function data_itp(t, time::AbstractVector, value::AbstractVector)
 end
 
 function build_interpolation_system(
-    input::ComponentVector{T},
+    input::NamedTuple,
     time::Vector{T};
     name::Symbol=:interpolator
 ) where {T<:Number}
@@ -141,13 +141,13 @@ end
 
 function solve_prob(
     ele::MTKElement;
-    input::ComponentVector{T},
-    params::ComponentVector{T},
-    init_states::ComponentVector{T},
+    input::NamedTuple,
+    params::NamedTuple,
+    init_states::NamedTuple,
     # solver::AbstractSolver,
-) where {T<:Number}
+)
     # itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
-    itp_dict = Dict(nm=>data_itp(t, input[:time], input[nm]) for nm in ele.input_names)
+    itp_dict = namedtuple(ele.input_names, [data_itp(t, input[:time], input[nm]) for nm in ele.input_names])
     # combine system
     ele_sys = combine_systems(ele, itp_dict)
     # setup init states
