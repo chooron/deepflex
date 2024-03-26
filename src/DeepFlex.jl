@@ -13,6 +13,7 @@ using BenchmarkTools
 
 # ModelingToolkit building
 using ModelingToolkit
+using Symbolics
 
 # graph compute
 using Graphs
@@ -20,7 +21,6 @@ using MetaGraphs
 
 # data interpolataion
 using DataInterpolations
-
 # solve ODEProblem
 using OrdinaryDiffEq
 using DiffEqFlux

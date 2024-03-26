@@ -1,3 +1,9 @@
+using DataInterpolations: AbstractInterpolation
+import DataInterpolations: derivative
+using Symbolics
+using Symbolics: Num, unwrap, SymbolicUtils
+
+
 @variables t
 const D = Differential(t)
 
@@ -62,6 +68,11 @@ function MTKElement(
     )
 end
 
+# # copy from https://github.com/SciML/DataInterpolations.jl/blob/master/ext/DataInterpolationsSymbolicsExt.jl
+(interp::AbstractInterpolation)(t::Num) = SymbolicUtils.term(interp, unwrap(t))
+SymbolicUtils.promote_symtype(t::AbstractInterpolation, _...) = Real
+Base.nameof(interp::AbstractInterpolation) = :Interpolation
+
 function data_itp(t, time::AbstractVector, value::AbstractVector)
     itp = LinearInterpolation(value, time, extrapolate=true)
     itp(t)
@@ -105,15 +116,6 @@ end
 
 function combine_systems(ele::MTKElement, itp_dict)
     eqs = []
-    # 先将插值系统的数据与方程的输入变量绑定
-    # intersect(get_func_infos(ele.funcs)[1], ele.input_names)是指funcs的外界输入变量
-    # for nm in intersect(get_func_infos(ele.funcs)[1], ele.input_names)
-    #     push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(itp_sys, nm))))
-    # end
-    # # intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)是指funcs的外界输入变量
-    # for nm in intersect(get_func_infos(ele.dfuncs)[1], ele.input_names)
-    #     push!(eqs, eval(Expr(:call, :~, getproperty(ele.dfunc_sys, nm), getproperty(itp_sys, nm))))
-    # end
     for nm in keys(itp_dict)
         func_nm = Symbol(nm, "_itp")
         eval(:($(func_nm)(t) = $(itp_dict[nm])))
@@ -134,8 +136,8 @@ function combine_systems(ele::MTKElement, itp_dict)
     for nm in intersect(get_func_infos(ele.funcs)[1], ele.state_names)
         push!(eqs, eval(Expr(:call, :~, getproperty(ele.func_sys, nm), getproperty(ele.dfunc_sys, nm))))
     end
-    structural_simplify(compose(ODESystem(eqs, t; name=ele.name), ele.func_sys, ele.dfunc_sys))
-    # structural_simplify(compose(ODESystem(eqs, t; name=ele.name), itp_sys, ele.func_sys, ele.dfunc_sys))
+    combine_sys = compose(ODESystem(eqs, t; name=ele.name), ele.func_sys, ele.dfunc_sys)
+    structural_simplify(combine_sys)
 end
 
 
@@ -146,17 +148,15 @@ function solve_prob(
     init_states::NamedTuple,
     # solver::AbstractSolver,
 )
-    # itp_sys = build_interpolation_system(input[ele.input_names], input[:time], name=Symbol(ele.name, :_itp))
     itp_dict = namedtuple(ele.input_names, [data_itp(t, input[:time], input[nm]) for nm in ele.input_names])
     # combine system
     ele_sys = combine_systems(ele, itp_dict)
     # setup init states
-    x0 = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.dfunc_sys.name), nm), init_states[nm])) for nm in ele.state_names]
-    # setup
-    func_p = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.func_sys.name), Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.func_sys)]
-    dfunc_p = [eval(Expr(:call, :(=>), getproperty(getproperty(ele_sys, ele.dfunc_sys.name), Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.dfunc_sys)]
-
-    prob = ODEProblem{true,SciMLBase.FullSpecialize}(ele_sys, x0, (1, length(input[:time])), vcat(func_p, dfunc_p))
-    sol = solve(prob,Tsit5())
+    x0 = [eval(Expr(:call, :(=>), getproperty(ele.dfunc_sys, nm), init_states[nm])) for nm in ele.state_names]
+    # setup parameters
+    func_p = Pair{Num, Float64}[eval(Expr(:call, :(=>), getproperty(ele.func_sys, Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.func_sys)]
+    dfunc_p = Pair{Num, Float64}[eval(Expr(:call, :(=>), getproperty(ele.dfunc_sys, Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(ele.dfunc_sys)]
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(ele_sys, x0, (1.0, length(input[:time])), vcat(func_p, dfunc_p))
+    sol = solve(prob, Tsit5())
     sol
 end
