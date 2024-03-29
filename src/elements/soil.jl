@@ -13,7 +13,7 @@ function Soil_ExpHydro(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :flow]), :soilwater)
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -44,7 +44,7 @@ function Soil_M50(; name::Symbol)
                                   sf(input[:soilwater]) * exp(input[:flow])))
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -72,7 +72,7 @@ function Soil_M100(; name::Symbol)
                                   step_func(input[:soilwater]) * exp(input[:flow])))
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -100,7 +100,7 @@ function Soil_GR4J(; name::Symbol)
         Differ(Dict(:In => [:infiltration], :Out => [:evap, :percolation]), :soilwater)
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -123,7 +123,7 @@ function Soil_HyMOD(; name::Symbol)
         DifferFlux(Dict(:infiltration => :In, :evap => :evap, :saturation => :Out), :soilwater)
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -145,7 +145,7 @@ function Soil_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :saturation]), :soilwater),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -171,7 +171,7 @@ function Soil_HBV(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration, :capillary], :Out => [:evap, :recharge]), :soilwater),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

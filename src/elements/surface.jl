@@ -14,7 +14,7 @@ function Surface_ExpHydro(; name::Symbol)
         DifferFlux(Dict(:In => [:snowfall], :Out => [:melt]), :snowwater),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -33,7 +33,7 @@ function Surface_GR4J(; name::Symbol)
         InfiltrationFlux([:rainfall])
     ]
 
-    SimpleElement(
+    HydroElement(
         name=name,
         funcs=funcs
     )
@@ -56,7 +56,7 @@ function Surface_HBV(; name::Symbol)
         DifferFlux(Dict(:In => [:rainfall, :melt], :Out => [:refreeze, :infiltration]), :liquidwater),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -79,7 +79,7 @@ function Surface_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:rainfall, :melt], :Out => [:refreeze, :infiltration]), :liquidwater),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -96,7 +96,7 @@ function Surface_M100(; name::Symbol)
             func=(i, p, sf) -> @.(relu(sinh(i[:snowfall]) * sf(i[:temp])) - relu(sf(i[:snowwater]) * sinh(i[:melt])))),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

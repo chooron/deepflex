@@ -4,6 +4,7 @@ using DataFrames
 using CairoMakie
 using ComponentArrays
 using Zygote, Lux
+using BenchmarkTools
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
@@ -23,4 +24,4 @@ outputs = (flow=flow_vec,)
 
 lux_model = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
 lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
-opt_params = DeepFlex.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)
+@btime DeepFlex.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)

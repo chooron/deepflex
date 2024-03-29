@@ -1,89 +1,33 @@
-# Element Methods
-function get_element_info(elements::Vector{E}) where {E<:AbstractElement}
-    input_names = Vector{Symbol}()
-    output_names = Vector{Symbol}()
-    state_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
 
-    for ele in elements
-        union!(input_names, setdiff(ele.input_names, output_names))
-        union!(output_names, ele.output_names)
-        union!(param_names, ele.param_names)
-        if ele isa ODEElement
-            union!(state_names, ele.state_names)
-        end
-    end
-    input_names, output_names, state_names, param_names
-end
-
-function get_output(ele::AbstractElement, input::NamedTuple)
-    return nothing
-end
-
-"""
-SimpleElement
-
-SimpleElement是由多个AbstractFlux组成，无中间状态，对应RRMG的一些模型
-"""
-struct SimpleElement <: AbstractElement
+struct NameInfo
+    #* component名称
     name::Symbol
-
-    # attribute
+    #* 输入输出名称
     input_names::Vector{Symbol}
     output_names::Vector{Symbol}
-    param_names::Vector{Symbol}
-
-    # functions
-    funcs::Vector{AbstractFlux}
-end
-
-function SimpleElement(
-    ; name::Symbol,
-    funcs::Vector{F},
-) where {F<:AbstractFlux}
-
-    input_names, output_names, param_names = get_func_infos(funcs)
-
-    return SimpleElement(
-        name,
-        input_names,
-        output_names,
-        param_names,
-        funcs
-    )
-end
-
-function get_output(ele::SimpleElement; input::NamedTuple, parameters::NamedTuple)
-    fluxes = input
-    for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, parameters))
-    end
-    return fluxes[ele.output_names]
-end
-
-"""
-ODEElement
-
-ODEElement是由多个AbstractFlux组成，有中间状态，求解方式包含continuous和discrete两种
-"""
-struct ODEElement <: AbstractElement
-    name::Symbol
-
-    # attribute
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
-    param_names::Vector{Symbol}
+    #* 中间状态名称
     state_names::Vector{Symbol}
+    #* 参数名称
+    param_names::Vector{Symbol}
+end
 
-    # functions
+"""
+HydroElement
+"""
+struct HydroElement <: AbstractElement
+    #* 名称信息
+    nameinfo::NameInfo
+    #* fluxes and dfluxes
     funcs::Vector{AbstractFlux}
     dfuncs::Vector{AbstractFlux}
+    lfuncs::Vector{AbstractFlux}
 end
 
-function ODEElement(
+function HydroElement(
     ; name::Symbol,
     funcs::Vector{F},
-    dfuncs::Vector{F},
+    dfuncs::Vector{F}=SimpleFlux[],
+    lfuncs::Vector{LagFlux}=LagFlux[],
 ) where {F<:AbstractFlux}
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
@@ -96,159 +40,152 @@ function ODEElement(
     setdiff!(input_names, state_names)
     # 合并两种类型函数的参数
     param_names = union(param_names1, param_names2)
+    # 检查lag fluxes的输入只能是input name，因为lag flux通常是需要在最开始进行计算
+    name_info = NameInfo(name, input_names, output_names, state_names, param_names)
 
-    return ODEElement(
-        name,
-        input_names,
-        output_names,
-        param_names,
-        state_names,
+    return HydroElement(
+        name_info,
         funcs,
-        dfuncs
+        dfuncs,
+        lfuncs
     )
 end
 
-function set_solver!(ele::ODEElement, solver::AbstractSolver)
-    setproperty!(ele, :solver, solver)
-end
+# Element Methods
+function get_element_infos(elements::Vector{E}) where {E<:AbstractElement}
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
 
-function pretrain!(ele::ODEElement; input::NamedTuple, train_config...)
-    for func in ele.funcs
-        if isa(func, LuxNNFunc)
-            pretrain!(func, input=input, train_config...)
-        end
+    for ele in elements
+        union!(input_names, setdiff(ele.name_info.input_names, output_names))
+        union!(output_names, ele.output_names)
+        union!(param_names, ele.param_names)
+        union!(state_names, ele.state_names)
     end
+    input_names, output_names, param_names, state_names
 end
 
 function solve_prob(
-    ele::ODEElement;
+    ele::HydroElement;
     input::NamedTuple,
-    parameters::NamedTuple,
-    init_states::NamedTuple,
-    solver::AbstractSolver,
+    params::Union{NamedTuple,ComponentVector},
+    init_states::Union{NamedTuple,ComponentVector}
 )
     # fit interpolation functions
-    itp_dict = namedtuple(ele.input_names, [LinearInterpolation(input[nm], input[:time], extrapolate=true) for nm in ele.input_names])
-    # itp_dict = Dict(nm => LinearInterpolation(input[nm], input[:time]) for nm in [:temp,:lday,:prcp])
-    # filter(isa(LagFlux), ele.funcs) do func
-    #     init!(func, parameters)
-    # end
-    # solve the problem
+    ele_input_names = ele.nameinfo.input_names
+    ele_state_names = ele.nameinfo.state_names
+    itp_dict = namedtuple(ele_input_names, [LinearInterpolation(input[nm], input[:time], extrapolate=true) for nm in ele_input_names])
     function singel_ele_ode_func!(du, u, p, t)
-        tmp_input = namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names])
-        tmp_states = namedtuple(ele.state_names, u)
-        tmp_fluxes = get_output(ele, input=tmp_input, states=tmp_states, parameters=parameters)
-        for (idx, dfunc) in enumerate(ele.dfuncs)
-            tmp_du = dfunc(tmp_fluxes, parameters)[dfunc.output_names]
-            du[idx] = tmp_du
-        end
+        tmp_input = namedtuple(ele_input_names, [itp_dict[nm](t) for nm in ele_input_names])
+        tmp_states = namedtuple(ele_state_names, u)
+        tmp_fluxes = merge(tmp_input, tmp_states)
+        for func in ele.funcs
+            tmp_fluxes = merge(tmp_fluxes, func(tmp_fluxes, params))
+        end 
+        du[:] = [dfunc(tmp_fluxes, params)[dfunc.output_names] for dfunc in ele.dfuncs]
     end
-    prob = ODEProblem(singel_ele_ode_func!, collect(init_states), (input[:time][1], input[:time][end]))
-    # return solved result
-    solver(prob, init_states, (saveat=input[:time],))
+    prob = ODEProblem(singel_ele_ode_func!, collect(init_states[ele_state_names]), (input[:time][1], input[:time][end]))
+    sol = solve(prob, Tsit5(), saveat=input[:time])
+    solved_u = hcat(sol.u...)
+    sol
+    # state_names = collect(keys(init_states))
+    # namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
 end
 
-function get_output(
-    ele::ODEElement;
+function (ele::HydroElement)(
     input::NamedTuple,
-    states::NamedTuple,
-    parameters::NamedTuple
-)::NamedTuple
-    fluxes = merge(input, states)
+    params::Union{NamedTuple,ComponentVector},
+    init_states::Union{NamedTuple,ComponentVector}
+)
+    fluxes = copy(input)
+    #* 当存在lagflux时需要提前进行计算
+    if length(ele.lfluxes) > 0
+        for lf in ele.lfluxes
+            fluxes = merge(fluxes, lf(input[lf.input_names]))
+        end
+    end
+    #* 当存在dflux时需要构建ode问题进行计算
+    if length(ele.dfuncs) > 0
+        solved_states = solve_prob(ele, input=fluxes, params=params,
+            init_states=init_states[ele.state_names])
+        fluxes = merge(fluxes, solved_states)
+    end
+    #* 最后就是直接通过flux进行计算
     for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, parameters))
+        fluxes = merge(fluxes, func(fluxes, params))
     end
     return fluxes
 end
 
-"""
-LAGElement
-"""
-struct LAGElement <: AbstractElement
-    name::Symbol
-
-    # attribute
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
-
-    # parameters names
-    param_names::Vector{Symbol}
-    lagtime_dict::Dict{Symbol,Symbol}
-
-    # func
-    lag_func::Dict{Symbol,Function}
-    step_func::Function
+function data_itp(t, time::AbstractVector, value::AbstractVector)
+    itp = LinearInterpolation(value, time, extrapolate=true)
+    itp(t)
 end
 
-function LAGElement(
-    ; name::Symbol,
-    lagtime_dict::Dict{Symbol,Symbol},
-    lag_func::Dict{Symbol,F}
-) where {F<:Function}
-
-    step_func = DEFAULT_SMOOTHER
-
-    param_names = Vector{Symbol}()
-    for v in values(lagtime_dict)
-        union!(param_names, [v])
+function build_ele_system(funcs, dfuncs, var_info, param_info; name::Symbol)
+    eqs = []
+    for func in funcs
+        tmp_input = namedtuple(get_input_names(func), [var_info[nm] for nm in get_input_names(func)])
+        tmp_param = namedtuple(func.param_names, [param_info[nm] for nm in func.param_names])
+        push!(eqs, var_info[first(get_output_names(func))] ~ func.func(tmp_input, tmp_param, func.step_func))
     end
-
-    input_names = collect(keys(lag_func))
-
-    LAGElement(
-        name,
-        input_names,
-        input_names,
-        param_names,
-        lagtime_dict,
-        lag_func,
-        step_func,
-    )
+    for dfunc in dfuncs
+        tmp_input = namedtuple(get_input_names(dfunc), [var_info[nm] for nm in get_input_names(dfunc)])
+        tmp_param = namedtuple(dfunc.param_names, [param_info[nm] for nm in dfunc.param_names])
+        push!(eqs, D(var_info[first(get_output_names(dfunc))]) ~ dfunc.func(tmp_input, tmp_param, dfunc.step_func))
+    end
+    ODESystem(eqs, t; name=name)
 end
 
-function preprocess_parameters(ele::LAGElement; parameters::NamedTuple)
-    # init lag states
-    lag_states = namedtuple(ele.input_names, [zeros(Int(ceil(parameters[ele.lagtime_dict[nm]]))) for nm in ele.input_names])
-
-    # build weight
-    lag_weights = namedtuple(ele.input_names,
-        [[ele.lag_func[nm](T(i), T(parameters[ele.lagtime_dict[nm]]), ele.step_func) -
-          ele.lag_func[nm](T(i - 1), T(parameters[ele.lagtime_dict[nm]]), ele.step_func)
-          for i in 1:(ceil(parameters[ele.lagtime_dict[nm]])|>Int)] for nm in ele.input_names])
-
-    lag_states, lag_weights
-end
-
-function solve_lag(input::NamedTuple, lag_states::NamedTuple, lag_weights::NamedTuple)
-    max_weight_len = maximum([length(lag_weights[k]) for k in keys(lag_weights)])
-    max_input_len = maximum([length(input[k]) for k in keys(input)])
-
-    output = Dict(k => zeros(max_input_len, max_weight_len) for k in keys(input))
-
-    for k in keys(output)
-        w, ls, ip = lag_weights[k], lag_states[k], input[k]
-        for t in 1:max_input_len
-            updated_state = ls .+ ip[t] .* w
-            output[k][t, 1:length(w)] .= updated_state
-            ls = vcat(updated_state[2:end], 0)
+function build_itp_system(input::NamedTuple, var_info::NamedTuple)
+    eqs = []
+    for nm in keys(input)
+        if nm != :time
+            tmp_itp = data_itp(t, input[:time], input[nm])
+            func_nm = Symbol(nm, "_itp")
+            eval(:($(func_nm)(t) = $(tmp_itp)))
+            push!(eqs, eval(Expr(:call, :~, :($(var_info[nm])), :($(func_nm)(t)))))
         end
+        #* eval(:(@register_symbolic $(func_nm)(t)))
     end
-    return output
+    ODESystem(eqs, t; name=:itp_sys)
 end
 
-function get_output(ele::LAGElement; input::NamedTuple, parameters::NamedTuple)
-    lag_states, lag_weights = preprocess_parameters(ele, parameters=parameters)
+function combine_system(ele::HydroElement, system::ODESystem, ipt_system::ODESystem)
+    ele_input_names = ele.nameinfo.input_names
+    eqs = [eval(Expr(:call, :~, getproperty(system, nm), getproperty(ipt_system, nm))) for nm in ele_input_names]
+    compose_sys = compose(ODESystem(eqs, t; name=Symbol(ele.nameinfo.name, :_conn_sys)), system, ipt_system)
+    structural_simplify(compose_sys)
+end
 
-    input = input[ele.input_names]
-    solved_state = solve_lag(input, lag_states, lag_weights)
+function init_var_param(nameinfo::NameInfo)
+    var_names = vcat(nameinfo.input_names, nameinfo.output_names, nameinfo.state_names)
+    var_info = namedtuple(var_names, [first(eval(:(@variables $nm(t)))) for nm in var_names])
+    param_info = namedtuple(nameinfo.param_names, [first(eval(:(@parameters $nm))) for nm in nameinfo.param_names])
+    var_info, param_info
+end
 
-    for k in ele.input_names
-        solved_state[k][end, 1:end-1] = solved_state[k][end, 2:end]
-        solved_state[k][end, end] = 0
-        solved_state[k][end, :]
-    end
-
-    # lag element don't need save states
-    # updated_lag_states = NamedTuple(namedtuple(ele.input_names, [solved_state[k][end, :] for k in ele.input_names]))
-    namedtuple(ele.input_names, [solved_state[k][:, 1] for k in ele.input_names])
+"""
+这里只是对funcs和dfuncs两个类型进行求解
+"""
+function solve_probv2(
+    ele::HydroElement;
+    input::NamedTuple,
+    params::NamedTuple,
+    init_states::NamedTuple,
+)
+    var_info, param_info = init_var_param(ele.nameinfo)
+    #* setup data
+    itp_sys = build_itp_system(input, var_info)
+    base_sys = build_ele_system(ele.funcs, ele.dfuncs, var_info, param_info, name=Symbol(ele.nameinfo.name, :_base_sys))
+    sys = combine_system(ele, base_sys, itp_sys)
+    #* setup init states
+    x0 = Pair{Num,eltype(init_states)}[eval(Expr(:call, :(=>), getproperty(base_sys, nm), init_states[nm])) for nm in ele.nameinfo.state_names]
+    #* setup parameters
+    p = Pair{Num,eltype(params)}[eval(Expr(:call, :(=>), getproperty(base_sys, Symbol(nm)), params[Symbol(nm)])) for nm in ModelingToolkit.parameters(base_sys)]
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (1.0, length(input[:time])), p)
+    sol = solve(prob, Tsit5(), saveat=input[:time])
+    sol
 end

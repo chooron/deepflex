@@ -7,7 +7,14 @@
 - [x] LAG Element无法参与整体ode的计算(可以参与计算但是兼容性很差,lagflux需要中间状态的缓冲计算)
 - [x] SimpleFlux和HydroFlux无明显差异性
 - [x] 构建多个function时，系统无法实现根据不同参数实现function的参数分配
-
+- [ ] 计算成本相对于普通计算成本显著加大
+  - [x] 原element计算产生的时间成本为2s, 直接构建一个简单的方程为38ms左右, 采用mtk.jl为40ms左右,另加mtk系统构建时间8ms
+- [x] 各种ODE如何各自进行计算的话会加大插值产生的计算成本多余
+  - [x] 采用mtk.jl对element公式进行整合
+- [ ] lagflux如何改造成mtk.jl
+  - [ ] lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变
+- [ ] mtk.jl貌似只能支持一对一输入输出
+- [ ] 
 
 # 工作计划
 

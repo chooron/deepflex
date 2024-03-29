@@ -55,11 +55,14 @@ abstract type AbstractNetwork <: AbstractComponent end
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 const default_ode_sensealg = ForwardDiffSensitivity()
 
+## for ModelingToolkit
+@variables t
+const D = Differential(t)
+
 # framework build
 include("framework/solver.jl")
 include("framework/fluxes.jl")
 include("framework/element.jl")
-include("framework/mtk.jl")
 include("framework/unit.jl")
 include("framework/node.jl")
 include("framework/network.jl")
@@ -82,8 +85,7 @@ include("functions/snowfall.jl")
 include("functions/surfaceflow.jl")
 include("functions/unithydro.jl")
 # Implement Element
-include("elements/lag.jl")
-include("elements/routing.jl")
+include("elements/slope.jl")
 include("elements/soil.jl")
 include("elements/surface.jl")
 # Implements Models

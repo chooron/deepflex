@@ -1,13 +1,15 @@
-function init_lag_state(lag_func::Function, lag_time::T, delta_t::T) where {T<:Number}
+function init_lag_state(lag_func::Function, step_func::Function, lag_time::T, delta_t::T) where {T<:Number}
     delay = lag_time / delta_t
-    lag_state = zeros(T, (2, length(tt)))
-    lag_state[1, :] = vcat(T[0], [lag_func(t + 1, lag_time) - lag_func(t, lag_time) for t in 1:(ceil(delay)|>Int)])
+    ts = 1:(ceil(delay)|>Int)
+    lag_state = zeros(Num, (2, length(ts)))
+    tmp_state = [lag_func(t, lag_time, step_func) for t in ts]
+    lag_state[1, :] = vcat([tmp_state[1]], (circshift(tmp_state, -1).-tmp_state)[1:end-1])
     lag_state
 end
 
-function update_lag_state!(lag_state::Vector{T}, input::T) where {T<:Number}
+function update_lag_state!(lag_state::Array{T}, input::Number) where {T<:Number}
     lag_state[2, :] = lag_state[1, :] .* input + lag_state[2, :]
-    circshift!(lag_state[2, :], -1)
+    lag_state[2, :] = circshift(lag_state[2, :], -1)
     lag_state[2, end] = 0
 end
 

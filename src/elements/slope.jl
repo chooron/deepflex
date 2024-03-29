@@ -7,7 +7,7 @@ function Routing_ExpHydro(; name::Symbol)
         FlowFlux([:baseflow, :surfaceflow])
     ]
 
-    SimpleElement(
+    HydroElement(
         name=name,
         funcs=funcs
     )
@@ -24,14 +24,16 @@ function Routing_GR4J(; name::Symbol)
         SimpleFlux([:routingstore], :routedflow,
             param_names=[:x3, :γ],
             func=(i, p, sf) -> @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))),
-        Summation([:routedflow, :recharge, :fastflow], :flow)
+        SimpleFlux([:routedflow, :recharge, :fastflow], :flow,
+            param_names=[:k1],
+            func=(i, p, sf) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
     ]
 
     dfuncs = [
         DifferFlux(Dict(:In => [:slowflow, :recharge], :Out => [:routedflow]), :routingstore),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -47,7 +49,9 @@ function Routing_HBV(; name::Symbol)
         SimpleFlux([:lowerzone], :baseflow,
             param_names=[:k1],
             func=(i, p, sf) -> @.(p[:k1] * i[:lowerzone])),
-        Summation([:interflow, :baseflow], :flow)
+        SimpleFlux([:interflow, :baseflow], :flow,
+            param_names=[:k1],
+            func=(i, p, sf) -> @.(i[:interflow] + i[:baseflow])),
     ]
 
     dfuncs = [
@@ -59,7 +63,7 @@ function Routing_HBV(; name::Symbol)
             func=(i, p, sf) -> @.(p[:c] - i[:baseflow]))
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -83,7 +87,7 @@ function Routing_HyMOD(; name::Symbol)
         DifferFlux(Dict(:In => [:slowflow], :Out => [:Qs]), :slowrouting),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -103,9 +107,7 @@ function Routing_XAJ(; name::Symbol)
     funcs = [
         SimpleFlux(Dict(:freewater => :freewater, :saturation => :fluxin), :surfacerunoff, param_names=[:Smax, :ex], func=tmp_func),
         SimpleFlux(Dict(:freewater => :freewater, :surfaceflow => :fluxin), :interrunoff, param_names=[:Smax, :ex], func=tmp_func),
-        SimpleFlux(Dict(:freewater => :freewater, :interflow => :fluxin), :baserunoff, param_names=[:Smax, :ex], func=tmp_func),
-        
-        SimpleFlux([:interrouting], :interflow, param_names=[:ci], func=(i, p, sf) -> p[:ci] .* i[:interrouting]),
+        SimpleFlux(Dict(:freewater => :freewater, :interflow => :fluxin), :baserunoff, param_names=[:Smax, :ex], func=tmp_func), SimpleFlux([:interrouting], :interflow, param_names=[:ci], func=(i, p, sf) -> p[:ci] .* i[:interrouting]),
         SimpleFlux([:baserouting], :baseflow, param_names=[:cg], func=(i, p, sf) -> p[:cg] .* i[:baserouting]),
         SimpleFlux([:prcp, :surfacerunoff], :surfaceflow, param_names=[:Aim], func=(i, p, sf) -> p[:Aim] .* i[:prcp] .+ i[:surfaceflow]),
         Summation([:baseflow, :interflow, :surfaceflow], :flow)
@@ -117,7 +119,7 @@ function Routing_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:baserunoff], :Out => [:baseflow]), [:baserouting]),
     ]
 
-    ODEElement(
+    HydroElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

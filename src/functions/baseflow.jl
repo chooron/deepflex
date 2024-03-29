@@ -1,9 +1,9 @@
 function BaseflowFlux(
-    i_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
+    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:baseflow;
     param_names::Vector{Symbol}=Symbol[])
     SimpleFlux(
-        i_names,
+        input_names,
         output_names,
         param_names=param_names,
         func=baseflow_func,

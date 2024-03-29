@@ -20,8 +20,8 @@ function param_box_optim(
 
     # TODO 联合callback库有一个统一的标准
     callback_func = get(kwargs, :callback_func, (p, l) -> begin
-        println("loss: " * string(l))
-        return false
+        @info l
+        false
     end)
 
     # 内部构造一个function
@@ -60,12 +60,13 @@ function param_grad_optim(
     error_weight = get(kwargs, :error_weight, Dict(k => 1.0 for k in keys(target)))
     error_func = get(kwargs, :error_func, Dict(k => rmse for k in keys(target)))
     solve_alg = get(kwargs, :solve_alg, Adam())
+    maxiters = get(kwargs, :maxiters, 10)
 
     # TODO 联合callback库有一个统一的标准
-    callback_func = get(kwargs, :callback_func, (p, l) -> begin
-        println("loss: " * string(l))
-        return false
-    end)
+    function callback_func(p, l)
+        @info l
+        false
+    end
 
     # 内部构造一个function
     function objective(u, p)
@@ -79,9 +80,9 @@ function param_grad_optim(
     end
 
     # 构建问题
-    optf = Optimization.OptimizationFunction(objective, get(kwargs, :adtype, Optimization.AutoForwardDiff()))
+    optf = Optimization.OptimizationFunction(objective, get(kwargs, :adtype, Optimization.AutoZygote()))
     optprob = Optimization.OptimizationProblem(optf, default_values)
-    sol = Optimization.solve(optprob, solve_alg, maxiters=get(kwargs, :maxiters, 10))
+    sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     namedtuple(search_param_names, sol.u)
 end
 
@@ -108,6 +109,6 @@ function nn_param_optim(
 
     optf = Optimization.OptimizationFunction(objective, Optimization.AutoZygote())
     optprob = Optimization.OptimizationProblem(optf, ComponentVector(init_params))
-    sol = Optimization.solve(optprob, Adam(0.01), maxiters=100)
+    sol = Optimization.solve(optprob, Adam(0.01), maxiters=10)
     sol
 end

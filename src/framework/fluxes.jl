@@ -1,55 +1,3 @@
-function get_input_names(func::AbstractFlux)
-    if func.input_names isa Dict
-        input_names = Vector(keys(func.input_names))
-    else
-        input_names = func.input_names
-    end
-    input_names
-end
-
-function get_output_names(func::AbstractFlux)
-    if func.output_names isa Vector
-        output_names = func.output_names
-    else
-        output_names = [func.output_names]
-    end
-    output_names
-end
-
-function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
-    input_names = Vector{Symbol}()
-    output_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
-
-    for func in funcs
-        # extract the input and output name in flux
-        tmp_input_names = get_input_names(func)
-        tmp_output_names = get_output_names(func)
-        # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
-        tmp_output_names = setdiff(tmp_output_names, tmp_input_names)
-        # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
-        tmp_input_names = setdiff(tmp_input_names, output_names)
-        # 合并名称
-        union!(input_names, tmp_input_names)
-        union!(output_names, tmp_output_names)
-        union!(param_names, func.param_names)
-    end
-    input_names, output_names, param_names
-end
-
-function get_dfunc_infos(funcs::Vector{F}) where {F<:AbstractFlux}
-    input_names = Vector{Symbol}()
-    state_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
-
-    for func in funcs
-        union!(input_names, get_input_names(func))
-        union!(state_names, get_output_names(func))
-        union!(param_names, func.param_names)
-    end
-    input_names, state_names, param_names
-end
-
 """
 Simple flux
 """
@@ -79,6 +27,69 @@ function SimpleFlux(
     )
 end
 
+function DifferFlux(
+    input_names::Dict{Symbol,Vector{Symbol}},
+    output_names::Symbol;
+)
+    tmp_input_names = collect(union(map(x -> x, [Set(nms) for nms in values(input_names)])...))
+    SimpleFlux(
+        tmp_input_names,
+        output_names,
+        param_names=Symbol[],
+        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])
+    )
+end
+
+function get_input_names(func::AbstractFlux)
+    if func.input_names isa Dict
+        input_names = Vector(keys(func.input_names))
+    else
+        input_names = func.input_names
+    end
+    input_names
+end
+
+function get_output_names(func::AbstractFlux)
+    if func.output_names isa Vector
+        output_names = func.output_names
+    else
+        output_names = [func.output_names]
+    end
+    output_names
+end
+
+function get_func_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
+    for func in funcs
+        # extract the input and output name in flux
+        tmp_input_names = get_input_names(func)
+        tmp_output_names = get_output_names(func)
+        # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
+        tmp_output_names = setdiff(tmp_output_names, tmp_input_names)
+        # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
+        tmp_input_names = setdiff(tmp_input_names, output_names)
+        # 合并名称
+        union!(input_names, tmp_input_names)
+        union!(output_names, tmp_output_names)
+        union!(param_names, func.param_names)
+    end
+    input_names, output_names, param_names
+end
+
+function get_dfunc_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+    input_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
+
+    for func in funcs
+        union!(input_names, get_input_names(func))
+        union!(state_names, get_output_names(func))
+        union!(param_names, func.param_names)
+    end
+    input_names, state_names, param_names
+end
 
 ## ----------------------------------------------------------------------
 ## callable function
@@ -106,58 +117,55 @@ end
 
 
 struct LagFlux <: AbstractFlux
+    # * 这里设计成只针对一个变量的Flux
     # attribute
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
-    param_names::Vector{Symbol}
+    input_names::Symbol
+    output_names::Symbol
+    param_names::Symbol
     # function
-    lag_times::Dict{Symbol,Symbol}
-    lag_funcs::Dict{Symbol,Function}
+    lag_func::Function
     # step function
     step_func::Function
-
-    # inner variable
-    lag_states::NamedTuple
 end
 
 function LagFlux(
-    lag_funcs::Dict{Symbol,Function};
-    lag_times::Dict{Symbol,Symbol},
+    input_names::Symbol,
+    output_names::Symbol;
+    lag_func::Function,
+    param_names::Symbol,
+    step_func::Function=DEFAULT_SMOOTHER
 )
-    input_names = collect(keys(lag_funcs))
-    param_names = Vector{Symbol}()
-
-    for value in lag_times
-        union!(param_names, [value])
-    end
-
     LagFlux(
         input_names,
-        input_names,
+        output_names,
         param_names,
-        lag_times,
-        lag_funcs,
-        DEFAULT_SMOOTHER,
-        NamedTuple()
+        lag_func,
+        step_func,
     )
 end
 
-function init!(flux::LagFlux; parameters::NamedTuple)
-    # todo 添加dt插入功能
-    lag_states = [init_lag_state(flux.lag_funcs[nm], parameters[flux.lag_times[nm]], 1.0) for nm in flux.input_names]
-    namedTuple(flux.input_names, lag_states)
-end
-
-function (flux::LagFlux)(input::NamedTuple, parameters::NamedTuple)
-    tmp_output = []
-    for nm in flux.input_names
-        push!(tmp_output, lag_states[nm][1, 1] * input[nm] + lag_states[nm][2, 1])
-        update_lag_state!(lag_states[nm], input[nm])
+function (flux::LagFlux)(input::NamedTuple, params::NamedTuple)
+    l_input = input[input_names]
+    #* 首先将lagflux转换为discrete problem
+    function discrete_prob!(du, u, p, t)
+        tmp_u = l_input[Int(t)] .* p + u
+        tmp_u = circshift(tmp_u, -1)
+        tmp_u[end] = 0
+        du[1:end] = tmp_u
     end
-    namedtuple(flux.input_names, tmp_output)
+    lag_time = params[flux.param_names]
+    ts = ceil(lag_time / delta_t) |> Int
+    #* 将weight作为param输入到prob中
+    lag_weights = [flux.lag_func(t, lag_time, flux.step_func) for t in ts]
+    lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
+    prob = DiscreteProblem(discrete_prob!, zeros(eltype(input), length(ts)), lag_weights)
+    #* 求解这个问题
+    sol = solve(prob)
+    sol_u = hcat((sol.u)...)
+    namedtuple([input_names], sol_u[1, :] .* l_input)
 end
 
-mutable struct LuxNNFlux <: AbstractFlux
+struct LuxNNFlux <: AbstractFlux
     input_names::Vector{Symbol}
     output_names::Union{Vector{Symbol},Symbol}
     init_params::NamedTuple

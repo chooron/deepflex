@@ -4,6 +4,7 @@ using DataFrames
 using CairoMakie
 using ComponentArrays
 using OptimizationOptimisers
+using BenchmarkTools
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
