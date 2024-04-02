@@ -20,25 +20,20 @@ P[41:60] = rand(0.0:0.01:5.0, 20)
 P[81:83] = rand(30.0:0.01:50.0, 3)
 
 # build model
-s_max, b, a, kf, ks = 1000, 5, 0.5, 0.5, 0.5
-parameters = ComponentVector(Smax=s_max, b=b, a=a, kf=kf, ks=ks)
-init_states = ComponentVector(SoilWater=0.0,
-    FastRouting1=5.0, FastRouting2=5.0,
-    FastRouting3=5.0, SlowRouting=5.0
+s_max, b, a, kf, ks = 10, 5, 0.5, 0.5, 0.5
+params = (Smax=s_max, b=b, a=a, kf=kf, ks=ks)
+init_states = (soilwater=0.0, fastrouting1=1.0, fastrouting2=1.0,
+    fastrouting3=1.0, slowrouting=1.0
 )
 
-model = DeepFlex.HyMOD(
-    name="hymod",
-    parameters=parameters,
-    init_states=init_states
-)
+model = DeepFlex.HyMOD(name=:hymod)
 
-input = ComponentVector(Prcp=P, Pet=E)
-output = DeepFlex.get_output(model, input=input, step=true)
+input = (prcp=P, pet=E,time=1:length(E))
+output = model(input, params, init_states)
 
 # plot result
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 x = range(1, 100, length=100)
-lines!(ax, x, output[:Flow], color=:blue)
+lines!(ax, x, output[:flow], color=:blue)
 fig

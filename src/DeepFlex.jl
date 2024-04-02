@@ -23,7 +23,7 @@ using MetaGraphs
 using DataInterpolations
 # solve ODEProblem
 using OrdinaryDiffEq
-using DiffEqFlux
+# using DiffEqFlux
 
 # deep learning
 using Lux
@@ -35,7 +35,7 @@ using OptimizationBBO
 using OptimizationOptimisers
 
 ## package version
-const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
+# const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
 ## Abstract Component Types
 abstract type AbstractComponent end
@@ -45,6 +45,7 @@ abstract type AbstractSmoother end
 abstract type AbstractSolver end
 abstract type AbstractOptimizer end
 abstract type AbstractFlux end
+abstract type AbstractNNFlux <: AbstractFlux end
 abstract type AbstractElement end
 
 abstract type AbstractUnit <: AbstractComponent end
@@ -52,8 +53,8 @@ abstract type AbstractNode <: AbstractComponent end
 abstract type AbstractNetwork <: AbstractComponent end
 
 ## Sensealg type
-const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
-const default_ode_sensealg = ForwardDiffSensitivity()
+# const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
+# const default_ode_sensealg = ForwardDiffSensitivity()
 
 ## for ModelingToolkit
 @variables t
@@ -87,14 +88,10 @@ include("functions/unithydro.jl")
 # Implement Element
 include("elements/slope.jl")
 include("elements/soil.jl")
-include("elements/surface.jl")
+include("elements/surf.jl")
 # Implements Models
-include("implements/ExpHydro.jl")
-include("implements/GR4J.jl")
-include("implements/HyMOD.jl")
-include("implements/HBV.jl")
-include("implements/XAJ.jl")
-include("implements/HydroNODE.jl")
+include("implements/hydromodel.jl")
+include("implements/neuralode.jl")
 # utils
 include("utils/loss_func.jl")
 include("utils/graph_utils.jl")

@@ -25,9 +25,8 @@ init_states = (snowwater=0.0, soilwater=1303.004248)
 model = DeepFlex.ExpHydro(name=:exphydro)
 
 inputs = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec))
-result = DeepFlex.get_output(model, input=inputs, parameters=params, init_states=init_states);
-model_states = result[model.state_names]
-result_df = DataFrame(Dict(k => result[k] for k in keys(result)))
+result = model(input, params, init_states);
+result_df = DataFrame(result)
 
 # plot result
 fig = Figure(size=(400, 300))
@@ -35,5 +34,3 @@ ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="
 lines!(ax, time, flow_vec, color=:red)
 lines!(ax, time, result_df[!, :flow], color=:blue)
 fig
-
-@btime DeepFlex.get_output(model, input=inputs, parameters=params, init_states=init_states)

@@ -1,7 +1,7 @@
 function SaturationFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:saturation;
     param_names::Vector{Symbol}=Symbol[])
-    
+
     SimpleFlux(
         input_names,
         output_names,
@@ -17,8 +17,8 @@ function saturation_func(
     i::namedtuple(:soilwater, :infiltration),
     p::namedtuple(:x1),
     sf::Function
-)
-    @.(i[:infiltration] * (1 - (i[:soilwater] / p[:x1])^2))
+)   
+    @.(max(0, i[:infiltration] * (1 - (i[:soilwater] / p[:x1])^2)))
 end
 
 """

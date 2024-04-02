@@ -1,3 +1,18 @@
+function SoilElement(; name::Symbol,
+    funcs::Vector,
+    dfuncs::Vector=SimpleFlux[],
+    lfuncs::Vector=LagFlux[]
+)
+    # todo 针对soil element可能有着不同的判断策略
+
+    HydroElement(
+        name=Symbol(name, :_soil_),
+        funcs=funcs,
+        dfuncs=dfuncs,
+        lfuncs=lfuncs
+    )
+end
+
 """
 SoilWaterReservoir in Exp-Hydro
 """
@@ -13,7 +28,7 @@ function Soil_ExpHydro(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :flow]), :soilwater)
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -26,25 +41,31 @@ SoilWaterReservoir in M50
 """
 function Soil_M50(; name::Symbol)
 
+    # 神经网络的定义是在模型之内，需要提取到模型的参数
     et_ann = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
     q_ann = Lux.Chain(Lux.Dense(2, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu))
 
     funcs = [
+        # normalize
+        StdNormFlux(:snowwater, :norm_snowwater),
+        StdNormFlux(:soilwater, :norm_soilwater),
+        StdNormFlux(:temp, :norm_temp),
+        StdNormFlux(:prcp, :norm_prcp),
         # ET ANN
-        NNFlux([:SnowWater, :soilwater, :Temp], [:evap], model=et_ann, seed=42),
+        LuxNNFlux([:norm_snowwater, :norm_soilwater, :norm_temp], :evap, param_names=:etnn, model=et_ann, seed=42),
         # Q ANN
-        NNFlux([:soilwater, :Prcp], [:flow], model=q_ann, seed=42),
+        LuxNNFlux([:norm_soilwater, :norm_prcp], :flow,  param_names=:qnn, model=q_ann, seed=42),
     ]
 
     dfuncs = [
-        SimpleFlux([:soilwater, :infiltration, :lday, :evap, :flow], :soilwater,
-            param_names=Symbol[],
+        SimpleFlux([:soilwater, :infiltration, :lday, :evap, :flow], :soilwater, param_names=Symbol[],
             func=(i, p, sf) -> @.(input[:infiltration] -
                                   sf(input[:soilwater]) * input[:lday] * exp(input[:evap]) -
-                                  sf(input[:soilwater]) * exp(input[:flow])))
+                                  sf(input[:soilwater]) * exp(input[:flow]))
+        )
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -72,7 +93,7 @@ function Soil_M100(; name::Symbol)
                                   step_func(input[:soilwater]) * exp(input[:flow])))
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -91,16 +112,15 @@ function Soil_GR4J(; name::Symbol)
         SimpleFlux([:infiltration, :percolation, :saturation], :tempflow,
             param_names=Symbol[],
             func=(i, p, sf) -> @.(i[:infiltration] - i[:saturation] + i[:percolation])),
-        SimpleFlux([:tempflow], [:slowflow, :fastflow],
-            param_names=Symbol[],
-            func=(i, p, sf) -> @.[i[:tempflow] * 0.9, i[:tempflow] * 0.1])
+        SimpleFlux([:tempflow], :slowflow, param_names=Symbol[], func=(i, p, sf) -> i[:tempflow] .* 0.9),
+        SimpleFlux([:tempflow], :fastflow, param_names=Symbol[], func=(i, p, sf) -> i[:tempflow] .* 0.1)
     ]
 
     dfuncs = [
-        Differ(Dict(:In => [:infiltration], :Out => [:evap, :percolation]), :soilwater)
+        DifferFlux(Dict(:In => [:saturation], :Out => [:evap, :percolation]), :soilwater)
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -115,15 +135,17 @@ function Soil_HyMOD(; name::Symbol)
     funcs = [
         SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
         EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        SimpleFlux([:saturation], [:fastflow, :slowflow], param_names=[:a],
-            func=(i, p, sf) -> @.[i[:saturation] * (1 - p[:a]), i[:saturation] * p[:a]])
+        SimpleFlux([:saturation], :fastflow, param_names=[:a],
+            func=(i, p, sf) -> @.(i[:saturation] * (1 - p[:a]))),
+        SimpleFlux([:saturation], :slowflow, param_names=[:a],
+            func=(i, p, sf) -> @.(i[:saturation] * p[:a]))
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:infiltration => :In, :evap => :evap, :saturation => :Out), :soilwater)
+        DifferFlux(Dict(:In => [:saturation], :Out => [:evap, :saturation]), :soilwater)
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -145,7 +167,7 @@ function Soil_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :saturation]), :soilwater),
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -159,8 +181,7 @@ HBV
 function Soil_HBV(; name::Symbol)
 
     funcs = [
-        SimpleFlux([:soilwater], :capillary,
-            param_names=[:cflux, :fc],
+        SimpleFlux([:soilwater], :capillary, param_names=[:cflux, :fc],
             func=(i, p, sf) -> @.(p[:cflux] * (1 - i[:soilwater] / p[:fc]))),
         EvapFlux([:soilwater, :pet], param_names=[:lp, :fc]),
         RechargeFlux([:soilwater, :infiltration], param_names=[:fc, :β]),
@@ -171,7 +192,7 @@ function Soil_HBV(; name::Symbol)
         DifferFlux(Dict(:In => [:infiltration, :capillary], :Out => [:evap, :recharge]), :soilwater),
     ]
 
-    HydroElement(
+    SoilElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

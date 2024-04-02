@@ -1,6 +1,6 @@
 @kwdef struct ODESolver <: AbstractSolver
     alg::OrdinaryDiffEqAlgorithm = BS3()
-    sensealg = ForwardDiffSensitivity()
+    # sensealg = ForwardDiffSensitivity()
     config::Dict = Dict(:reltol => 1e-3, :abstol => 1e-3)
 end
 

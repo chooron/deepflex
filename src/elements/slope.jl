@@ -1,13 +1,28 @@
+function SlopeElement(; name::Symbol,
+    funcs::Vector,
+    dfuncs::Vector=SimpleFlux[],
+    lfuncs::Vector=LagFlux[]
+)
+    # todo 针对soil element可能有着不同的判断策略
+
+    HydroElement(
+        name=Symbol(name, :_slope_),
+        funcs=funcs,
+        dfuncs=dfuncs,
+        lfuncs=lfuncs
+    )
+end
+
 """
-RoutingStore in GR4J
+Slope Runoff in GR4J
 """
-function Routing_ExpHydro(; name::Symbol)
+function Slope_ExpHydro(; name::Symbol)
 
     funcs = [
         FlowFlux([:baseflow, :surfaceflow])
     ]
 
-    HydroElement(
+    SlopeElement(
         name=name,
         funcs=funcs
     )
@@ -15,17 +30,17 @@ end
 
 
 """
-RoutingStore in GR4J
+Slope Runoff in GR4J
 """
-function Routing_GR4J(; name::Symbol)
+function Slope_GR4J(; name::Symbol)
 
     funcs = [
         RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
         SimpleFlux([:routingstore], :routedflow,
             param_names=[:x3, :γ],
-            func=(i, p, sf) -> @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))),
+            func=(i, p, sf) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),
         SimpleFlux([:routedflow, :recharge, :fastflow], :flow,
-            param_names=[:k1],
+            param_names=Symbol[],
             func=(i, p, sf) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
     ]
 
@@ -33,14 +48,20 @@ function Routing_GR4J(; name::Symbol)
         DifferFlux(Dict(:In => [:slowflow, :recharge], :Out => [:routedflow]), :routingstore),
     ]
 
-    HydroElement(
+    lfuncs = [
+        LagFlux(:slowflow, :slowflow, lag_func=uh_1_half, param_names=:x4),
+        LagFlux(:fastflow, :fastflow, lag_func=uh_2_full, param_names=:x4),
+    ]
+
+    SlopeElement(
         name=name,
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        lfuncs=lfuncs
     )
 end
 
-function Routing_HBV(; name::Symbol)
+function Slope_HBV(; name::Symbol)
 
     funcs = [
         SimpleFlux([:upperzone], :interflow,
@@ -63,31 +84,31 @@ function Routing_HBV(; name::Symbol)
             func=(i, p, sf) -> @.(p[:c] - i[:baseflow]))
     ]
 
-    HydroElement(
+    SlopeElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
     )
 end
 
-function Routing_HyMOD(; name::Symbol)
+function Slope_HyMOD(; name::Symbol)
 
     funcs = [
-        SimpleFlux([:fastrouting1], :qf1, param_names=[:kf], func=(i, p) -> p[:kf] .* i[:fastrouting1]),
-        SimpleFlux([:fastrouting2], :qf2, param_names=[:kf], func=(i, p) -> p[:kf] .* i[:fastrouting2]),
-        SimpleFlux([:fastrouting3], :qf3, param_names=[:kf], func=(i, p) -> p[:kf] .* i[:fastrouting3]),
-        SimpleFlux([:slowrouting], :Qs, param_names=[:ks], func=(i, p) -> p[:ks] .* i[:slowrouting]),
-        Summation([:Qs, :qf3], :flow)
+        SimpleFlux([:fastrouting1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fastrouting1]),
+        SimpleFlux([:fastrouting2], :qf2, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fastrouting2]),
+        SimpleFlux([:fastrouting3], :qf3, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fastrouting3]),
+        SimpleFlux([:slowrouting], :qs, param_names=[:ks], func=(i, p, sf) -> p[:ks] .* i[:slowrouting]),
+        SimpleFlux([:qs, :qf3], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:qs] .+ i[:qf3]),
     ]
 
     dfuncs = [
         DifferFlux(Dict(:In => [:fastflow], :Out => [:qf1]), :fastrouting1),
         DifferFlux(Dict(:In => [:qf1], :Out => [:qf2]), :fastrouting2),
         DifferFlux(Dict(:In => [:qf2], :Out => [:qf3]), :fastrouting3),
-        DifferFlux(Dict(:In => [:slowflow], :Out => [:Qs]), :slowrouting),
+        DifferFlux(Dict(:In => [:slowflow], :Out => [:qs]), :slowrouting),
     ]
 
-    HydroElement(
+    SlopeElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -95,7 +116,7 @@ function Routing_HyMOD(; name::Symbol)
 end
 
 
-function Routing_XAJ(; name::Symbol)
+function Slope_XAJ(; name::Symbol)
 
     tmp_func = (i, p, sf) -> begin
         free_water, flux_in = i[:freewater], i[:fluxin]
@@ -107,7 +128,8 @@ function Routing_XAJ(; name::Symbol)
     funcs = [
         SimpleFlux(Dict(:freewater => :freewater, :saturation => :fluxin), :surfacerunoff, param_names=[:Smax, :ex], func=tmp_func),
         SimpleFlux(Dict(:freewater => :freewater, :surfaceflow => :fluxin), :interrunoff, param_names=[:Smax, :ex], func=tmp_func),
-        SimpleFlux(Dict(:freewater => :freewater, :interflow => :fluxin), :baserunoff, param_names=[:Smax, :ex], func=tmp_func), SimpleFlux([:interrouting], :interflow, param_names=[:ci], func=(i, p, sf) -> p[:ci] .* i[:interrouting]),
+        SimpleFlux(Dict(:freewater => :freewater, :interflow => :fluxin), :baserunoff, param_names=[:Smax, :ex], func=tmp_func),
+        SimpleFlux([:interrouting], :interflow, param_names=[:ci], func=(i, p, sf) -> p[:ci] .* i[:interrouting]),
         SimpleFlux([:baserouting], :baseflow, param_names=[:cg], func=(i, p, sf) -> p[:cg] .* i[:baserouting]),
         SimpleFlux([:prcp, :surfacerunoff], :surfaceflow, param_names=[:Aim], func=(i, p, sf) -> p[:Aim] .* i[:prcp] .+ i[:surfaceflow]),
         Summation([:baseflow, :interflow, :surfaceflow], :flow)
@@ -119,7 +141,7 @@ function Routing_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:baserunoff], :Out => [:baseflow]), [:baserouting]),
     ]
 
-    HydroElement(
+    SlopeElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

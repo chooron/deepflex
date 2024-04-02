@@ -1,4 +1,4 @@
-mutable struct Node{U,T} <: AbstractComponent where {U<:Unit,T<:Number}
+mutable struct Node{U,T} <: AbstractComponent where {U<:HydroUnit,T<:Number}
     id::String
     units::Dict{Symbol,U}
     weights::Dict{Symbol,T}
@@ -9,7 +9,7 @@ end
 
 function Node(; id::String, units::Dict{Symbol,U}, weights::Dict{Symbol,T}, area::T,
     # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}},
-    target_names::Vector{Symbol}) where {U<:Unit,T<:Number}
+    target_names::Vector{Symbol}) where {U<:HydroUnit,T<:Number}
     Node{U,T}(id, units, weights, area,  target_names)
 end
 

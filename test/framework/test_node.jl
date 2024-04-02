@@ -33,7 +33,6 @@ model = DeepFlex.M50(id="M50", parameters=parameters, init_states=init_states)
 train_inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec,
     SnowWater=snowwater_vec, SoilWater=soilwater_vec, Evap=evap_vec, Flow=pred_flow_vec)
 DeepFlex.pretrain!(model, input=train_inputs)
-@info "pretrain complete!"
 
 ode_inputs = ComponentVector(Prcp=prcp_vec, Lday=lday_vec, Temp=temp_vec)
 result = DeepFlex.get_output(model, input=ode_inputs, step=false, sensealg=DeepFlex.default_node_sensealg, reltol=1e-3, abstol=1e-3)

@@ -1,7 +1,7 @@
 function RechargeFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
     output_names::Symbol=:recharge;
     param_names::Vector{Symbol}=Symbol[])
-    
+
     SimpleFlux(
         input_names,
         output_names,
@@ -15,7 +15,7 @@ function recharge_func(
     p::namedtuple(:x2, :x3, :ω),
     sf::Function
 )
-    @.(p[:x2] / (p[:x3]^p[:ω]) * i[:routingstore]^p[:ω])
+    @.(p[:x2] / (abs(p[:x3])^p[:ω]) * abs(i[:routingstore])^p[:ω])
 end
 
 function recharge_func(

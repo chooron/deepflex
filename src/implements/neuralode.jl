@@ -1,20 +1,12 @@
 """
 Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
 """
-function M50(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
+function M50(; name::Symbol)
     elements = [
-        SnowWater_ExpHydro(
-            name=:sr,
-            parameters=parameters,
-            init_states=init_states[[:SnowWater]]
-        ),
-        SoilWater_M50(
-            name=:wr,
-            parameters=parameters,
-            init_states=init_states[[:SoilWater]]
-        )
+        Surface_ExpHydro(name=name),
+        Soil_M50(name=name)
     ]
-    build_unit(name=name, elements=elements)
+    HydroUnit(name, elements=elements)
 end
 
 function M100(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
