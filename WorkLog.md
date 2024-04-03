@@ -34,3 +34,4 @@
 - [ ] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
   - 需要学习`DiffEqParamEstim.jl`和`SciMLSensitivity.jl `
+- 将lag function嵌入至Node模块中，删除

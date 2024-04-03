@@ -1,11 +1,13 @@
-mutable struct Node{U,T} <: AbstractComponent where {U<:HydroUnit,T<:Number}
-    id::String
-    units::Dict{Symbol,U}
+struct HydroNode{U,T} <: AbstractComponent where {U<:HydroUnit,T<:Number}
+    name::Symbol
+    units::Vector{HydroUnit}
     weights::Dict{Symbol,T}
     area::T
     # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}}
     target_names::Vector{Symbol}
 end
+
+# TODO 将lag function嵌入至Node模块中
 
 function Node(; id::String, units::Dict{Symbol,U}, weights::Dict{Symbol,T}, area::T,
     # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}},

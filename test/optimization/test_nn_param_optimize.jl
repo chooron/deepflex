@@ -33,7 +33,7 @@ ps = Lux.initialparameters(rng,lux_model)
 ps
 # todo 后续需要将lux的参数嵌入至mtk中
 # initial_params(lux_model)
-# lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
+lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
 # @btime DeepFlex.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)
 using DiffEqFlux
 
