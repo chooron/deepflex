@@ -1,32 +1,24 @@
-struct HydroNode{U,T} <: AbstractComponent where {U<:HydroUnit,T<:Number}
+# info HydroNode一些属性在单独计算时是用不上的，比如面积
+struct HydroNode <: AbstractComponent
     name::Symbol
     units::Vector{HydroUnit}
-    weights::Dict{Symbol,T}
-    area::T
-    # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}}
-    target_names::Vector{Symbol}
+    weight::NamedTuple
+    route::NamedTuple
 end
 
-# TODO 将lag function嵌入至Node模块中
+# function Node(name::Symbol; units::Vector{HydroUnit}, weight::NamedTuple, route::NamedTuple)
+#     Node(name, units, weight, route)
+# end
 
-function Node(; id::String, units::Dict{Symbol,U}, weights::Dict{Symbol,T}, area::T,
-    # routefunc::Function{Tuple{Dict{Symbol,Vector{T}},Vector{Symbol}},Dict{Symbol,Vector{T}}},
-    target_names::Vector{Symbol}) where {U<:HydroUnit,T<:Number}
-    Node{U,T}(id, units, weights, area,  target_names)
-end
-
-function get_output(node::Node, input::Dict{Symbol,Vector{T}}) where {T<:Number}
-    total_output::Dict{Symbol,Vector{T}} = Dict()
-    # Sum the results of each unit with their respective weights
-    for k in keys(node.units)
-        tmp_ouput = get_output(node.units[k], input=input)
-        for name in node.target_names
-            if !haskey(total_output, name)
-                total_output[name] = tmp_ouput[name] .* node.weights[k]
-            else
-                total_output[name] += tmp_ouput[name] .* node.weights[k]
-            end
+function (node::Node)(input::NamedTuple, params::NamedTuple, init_states::NamedTuple)
+    unit_names = [u.name for u in node.units]
+    unit_ouputs = namedtuple(unit_names, [
+        begin
+            tmp_ouput = u(input, params, init_states)
+            route_output = node.route[u.name](tmp_ouput, params, init_states) .* node.weight[u.name]
+            route_output
         end
-    end
-    total_output
+        for u in node.units
+    ])
+    unit_ouputs
 end
