@@ -124,7 +124,10 @@ function _whole_forward(
         sys=sys, input=fluxes, params=params,
         init_states=init_states[ele.state_names]
     )
-    solved_states
+    fluxes = merge(input, solved_states)
+    for ele in unit.elements
+        fluxes = merge(fluxes, ele(fluxes, params))
+    end
 end
 
 function get_all_luxnnflux(unit::HydroUnit)

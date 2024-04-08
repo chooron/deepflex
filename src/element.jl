@@ -67,6 +67,19 @@ function get_all_luxnnflux(ele::HydroElement)
     luxnn_tuple
 end
 
+# 带入中间状态后计算
+function (ele::HydroElement)(
+    input::NamedTuple,
+    params::Union{NamedTuple,ComponentVector},
+)
+    fluxes = input
+    for func in vcat(ele.lfuncs, ele.funcs)
+        fluxes = merge(fluxes, func(fluxes, params))
+    end
+    fluxes
+end
+
+# 求解并计算
 function (ele::HydroElement)(
     input::NamedTuple,
     params::Union{NamedTuple,ComponentVector},
@@ -145,7 +158,7 @@ function build_prob(
             push!(p, getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)])
         end
     end
-    #* prepare problem args
+    #* build problem
     ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
 end
 

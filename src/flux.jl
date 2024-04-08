@@ -204,7 +204,6 @@ function (flux::LagFlux)(input::NamedTuple, params::NamedTuple)
     #* 将weight作为param输入到prob中
     lag_weights = [flux.lag_func(t, lag_time, flux.step_func) for t in ts]
     lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
-    # prob = DiscreteProblem(discrete_prob!, zeros(eltype(input), length(ts)), lag_weights)
     prob = DiscreteProblem(discrete_prob!, zeros(eltype(l_input), length(ts)), (1.0, length(l_input)), lag_weights)
     #* 求解这个问题
     sol = solve(prob)

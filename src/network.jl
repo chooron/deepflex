@@ -1,20 +1,25 @@
 struct Network{T<:Number} <: AbstractComponent
-    id::String
+    name::Symbol
     nodes::AbstractVector{HydroNode}
     areas::NamedTuple
-    route::NamedTuple
+    routes::NamedTuple
     topology::AbstractGraph
-
 end
 
-function Network(; id::String, nodes::AbstractVector{HydroNode}, topology::AbstractGraph)
+function Network(;
+    name::Symbol,
+    nodes::AbstractVector{HydroNode},
+    areas::NamedTuple,
+    routes::NamedTuple,
+    topology::AbstractGraph
+)
     topology = MetaDiGraph(topology)
     for node in nodes
         node_name = node.nameinfo.name
         set_props!(topology, node_name, Dict(:node => node, :area => areas[node_name]))
     end
     # todo 添加连接线的属性
-    Network(id, nodes, topology)
+    Network(name, nodes, topology)
 end
 
 function (network::N)(

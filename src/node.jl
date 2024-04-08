@@ -9,6 +9,7 @@ struct HydroNode <: AbstractComponent
     param_names::NamedTuple
     #* 单元
     units::AbstractVector{HydroUnit}
+    #* 演进模块
     routes::NamedTuple
 end
 
@@ -48,16 +49,12 @@ function get_unit_infos(units::AbstractVector{HydroUnit})
     state_names = namedtuple()
     param_names = namedtuple()
     for unit in units
-        merge!(input_names, namedtuple([Symbol(unit.name)], route.input_names))
-        merge!(output_names, namedtuple([Symbol(unit.name)], route.output_names))
-        merge!(state_names, namedtuple([Symbol(unit.name)], route.state_names))
-        merge!(param_names, namedtuple([Symbol(unit.name, :_unit)], route.param_names))
+        merge!(input_names, namedtuple([Symbol(unit.name)], unit.input_names))
+        merge!(output_names, namedtuple([Symbol(unit.name)], unit.output_names))
+        merge!(state_names, namedtuple([Symbol(unit.name, :_unit)], unit.state_names))
+        merge!(param_names, namedtuple([Symbol(unit.name, :_unit)], unit.param_names))
     end
     input_names, output_names, param_names, state_names
-end
-
-function inner_routing(flux::AbstractVector, routefunc::AbstractElement, params::NamedTuple, init_states::NamedTuple)
-    routefunc(flux, params, init_states)
 end
 
 # todo parallel computing
@@ -65,11 +62,11 @@ function (node::Node)(input::NamedTuple, params::NamedTuple, init_states::NamedT
     unit_names = [u.name for u in node.units]
     unit_ouputs = namedtuple(unit_names, [
         begin
-            tmp_ouput = u(input, params, init_states)
-            route_output = node.routes[u.name](tmp_ouput, params, init_states) .* node.weights[u.name]
-            route_output
+            tmp_ouput = unit(input, params, init_states)
+            route_output = node.routes[unit.name](tmp_ouput, params[Symbol(unit.name, :_route)], init_states)
+            route_output .* params[:weights][Symbol(unit.name, :_weight)]
         end
-        for u in node.units
+        for unit in node.units
     ])
     unit_ouputs
 end
