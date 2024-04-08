@@ -8,8 +8,7 @@ function SoilElement(; name::Symbol,
     HydroElement(
         name=Symbol(name, :_soil_),
         funcs=funcs,
-        dfuncs=dfuncs,
-        lfuncs=lfuncs
+        dfuncs=dfuncs
     )
 end
 

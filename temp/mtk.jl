@@ -3,14 +3,6 @@ import DataInterpolations: derivative
 using Symbolics
 using Symbolics: Num, unwrap, SymbolicUtils
 
-#* copy from https://github.com/SciML/DataInterpolations.jl/blob/master/ext/DataInterpolationsSymbolicsExt.jl
-(interp::AbstractInterpolation)(t::Num) = SymbolicUtils.term(interp, unwrap(t))
-SymbolicUtils.promote_symtype(t::AbstractInterpolation, _...) = Real
-Base.nameof(interp::AbstractInterpolation) = :Interpolation
-
-@variables t
-const D = Differential(t)
-
 struct MTKElement <: AbstractElement
     name::Symbol
 

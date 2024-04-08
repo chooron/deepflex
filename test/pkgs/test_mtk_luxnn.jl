@@ -27,7 +27,7 @@ p_tuple = (layer_1=(weight=layer1_w, bias=layer1_b), layer_2=(weight=layer2_w, b
 loss_func = (sum((y .- vec(model(x, p_tuple, st)[1])) .^ 2))
 
 
-sys = OptimizationSystem(loss_func, [layer1_w...; layer1_b...; layer2_w...; layer2_b...; layer3_w...; layer3_b...], [], name=:sys)
+sys = OptimizationSystem(loss_func, [layer1_w; layer1_b; layer2_w; layer2_b; layer3_w; layer3_b], [], name=:sys)
 sys = complete(sys)
 u0 = [
     layer1_w => ps[:layer_1][:weight],
@@ -40,4 +40,3 @@ u0 = [
 prob = OptimizationProblem(sys, u0)
 solve(prob, GradientDescent())
 
-using DiffEqFlux

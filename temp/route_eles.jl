@@ -1,4 +1,4 @@
-function SlopeElement(; name::Symbol,
+function RouteElement(; name::Symbol,
     funcs::Vector,
     dfuncs::Vector=SimpleFlux[],
     lfuncs::Vector=LagFlux[]
@@ -14,25 +14,9 @@ function SlopeElement(; name::Symbol,
 end
 
 """
-Slope Runoff in GR4J
+Route Runoff in GR4J
 """
-function Slope_ExpHydro(; name::Symbol)
-
-    funcs = [
-        FlowFlux([:baseflow, :surfaceflow])
-    ]
-
-    SlopeElement(
-        name=name,
-        funcs=funcs
-    )
-end
-
-
-"""
-Slope Runoff in GR4J
-"""
-function Slope_GR4J(; name::Symbol)
+function Route_GR4J(; name::Symbol)
 
     funcs = [
         RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
@@ -53,7 +37,7 @@ function Slope_GR4J(; name::Symbol)
         LagFlux(:fastflow, :fastflow, lag_func=uh_2_full, param_names=:x4),
     ]
 
-    SlopeElement(
+    RouteElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs,
@@ -61,7 +45,7 @@ function Slope_GR4J(; name::Symbol)
     )
 end
 
-function Slope_HBV(; name::Symbol)
+function Route_HBV(; name::Symbol)
 
     funcs = [
         SimpleFlux([:upperzone], :interflow,
@@ -84,14 +68,14 @@ function Slope_HBV(; name::Symbol)
             func=(i, p, sf) -> @.(p[:c] - i[:baseflow]))
     ]
 
-    SlopeElement(
+    RouteElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
     )
 end
 
-function Slope_HyMOD(; name::Symbol)
+function Route_HyMOD(; name::Symbol)
 
     funcs = [
         SimpleFlux([:fastrouting1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fastrouting1]),
@@ -108,7 +92,7 @@ function Slope_HyMOD(; name::Symbol)
         DifferFlux(Dict(:In => [:slowflow], :Out => [:qs]), :slowrouting),
     ]
 
-    SlopeElement(
+    RouteElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs
@@ -116,7 +100,7 @@ function Slope_HyMOD(; name::Symbol)
 end
 
 
-function Slope_XAJ(; name::Symbol)
+function Route_XAJ(; name::Symbol)
 
     tmp_func = (i, p, sf) -> begin
         free_water, flux_in = i[:freewater], i[:fluxin]
@@ -141,7 +125,7 @@ function Slope_XAJ(; name::Symbol)
         DifferFlux(Dict(:In => [:baserunoff], :Out => [:baseflow]), [:baserouting]),
     ]
 
-    SlopeElement(
+    RouteElement(
         name=name,
         funcs=funcs,
         dfuncs=dfuncs

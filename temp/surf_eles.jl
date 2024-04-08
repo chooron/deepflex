@@ -1,15 +1,13 @@
 function SurfElement(; name::Symbol,
     funcs::Vector,
-    dfuncs::Vector=SimpleFlux[],
-    lfuncs::Vector=LagFlux[]
+    dfuncs::Vector=SimpleFlux[]
 )
     # todo 针对surf element可能有着不同的判断策略
 
     HydroElement(
         name=Symbol(name, :_surf_),
         funcs=funcs,
-        dfuncs=dfuncs,
-        lfuncs=lfuncs
+        dfuncs=dfuncs
     )
 end
 

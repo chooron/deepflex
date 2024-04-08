@@ -1,12 +1,12 @@
-using DifferentialEquations, RecursiveArrayTools, DiffEqParamEstim
-using Optimization, ForwardDiff, OptimizationOptimisers, Optimisers
+using DifferentialEquations # RecursiveArrayTools, DiffEqParamEstim ForwardDiff, 
+using Optimization, OptimizationOptimisers
 using DataInterpolations
 using DataFrames
 using CSV
 using DataInterpolations
 using SciMLSensitivity
-using Zygote
-using ComponentArrays
+# using Zygote
+# using ComponentArrays , Optimisers
 using BenchmarkTools
 using ModelingToolkit
 # smoothing step function
@@ -58,31 +58,31 @@ tspan = (time[1], time[end])
 params = [f => 0.05, Smax => 1000.0, Qmax => 20.0, Df => 3.0, Tmax => 1.0, Tmin => -1.0]
 # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
 idxs = ModelingToolkit.varmap_to_vars(params, parameters(model))
-prob = ODEProblem(model, u0, tspan, params)
+prob = samefile(model, u0, tspan, params)
 sol = solve(prob, FBDF(), saveat=1.0)
 
-function loss_func(u, p)
-    u0 = [snow => 0.0, soil => 1303.004248]
-    model = structural_simplify(ODESystem(eqs, t, name=:temp))
-    tspan = (time[1], time[end])
-    # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
-    params = [f => 0.05, Smax => 1000.0, Qmax => 20.0, Df => 3.0, Tmax => 1.0, Tmin => -1.0]
-    # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
-    idxs = ModelingToolkit.varmap_to_vars(params, parameters(model))
-    prob = ODEProblem(model, u0, tspan, params)
-    sol = solve(prob, FBDF(), saveat=1.0, p=u, abstol=1e-3, reltol=1e-3)
-    Q_out = @.(Qb(sol[2, :], u[1], u[2], u[3]) + Qs(sol[2, :], u[2]))
-    loss = sum(abs.(Q_out .- flow_vec))
-    println(loss)
-    loss
-end
+# function loss_func(u, p)
+#     u0 = [snow => 0.0, soil => 1303.004248]
+#     model = structural_simplify(ODESystem(eqs, t, name=:temp))
+#     tspan = (time[1], time[end])
+#     # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
+#     params = [f => 0.05, Smax => 1000.0, Qmax => 20.0, Df => 3.0, Tmax => 1.0, Tmin => -1.0]
+#     # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
+#     idxs = ModelingToolkit.varmap_to_vars(params, parameters(model))
+#     prob = ODEProblem(model, u0, tspan, params)
+#     sol = solve(prob, FBDF(), saveat=1.0, p=u, abstol=1e-3, reltol=1e-3)
+#     Q_out = @.(Qb(sol[2, :], u[1], u[2], u[3]) + Qs(sol[2, :], u[2]))
+#     loss = sum(abs.(Q_out .- flow_vec))
+#     println(loss)
+#     loss
+# end
 
-cost_function = Optimization.OptimizationFunction(loss_func, Optimization.AutoModelingToolkit())
-optprob = Optimization.OptimizationProblem(
-    cost_function,
-    [3.0, 1.0, -1.0, 1000.0, 0.05, 20.0],
-)
-sol = solve(optprob, Optimisers.Adam(1e-2), maxiters=10)
+# cost_function = Optimization.OptimizationFunction(loss_func, Optimization.AutoModelingToolkit())
+# optprob = Optimization.OptimizationProblem(
+#     cost_function,
+#     [3.0, 1.0, -1.0, 1000.0, 0.05, 20.0],
+# )
+# sol = solve(optprob, Optimisers.Adam(1e-2), maxiters=10)
 
 # qout = @.(Qb(sol[2, :], params[1], params[2], params[3]) + Qs(sol[2, :], params[2]))
 # sum(abs.(qout .- flow_vec))
