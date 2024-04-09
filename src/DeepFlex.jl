@@ -24,7 +24,7 @@ using MetaGraphs
 using DataInterpolations
 # solve ODEProblem
 using OrdinaryDiffEq
-# using DiffEqFlux
+using DiffEqFlux
 
 # deep learning
 using Lux
@@ -62,16 +62,38 @@ abstract type AbstractNetwork <: AbstractComponent end
 # const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 # const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
-include.(filter(contains(r".jl$"), readdir("utils"; join=true)))
+include("utils/graph.jl")
+include("utils/lossfunc.jl")
+include("utils/mtk.jl")
+include("utils/optimize.jl")
+include("utils/solver.jl")
 # framework build
 include("flux.jl")
 include("element.jl")
 include("unit.jl")
 include("node.jl")
-include("network.jl")
+# include("network.jl")
 # Implement Flux
-include.(filter(contains(r".jl$"), readdir("functions"; join=true)))
-# Implement Element
+include("functions/baseflow.jl")
+include("functions/evap.jl")
+include("functions/flow.jl")
+include("functions/infiltration.jl")
+include("functions/melt.jl")
+include("functions/miscellaneous.jl")
+include("functions/percolation.jl")
+include("functions/pet.jl")
+include("functions/rainfall.jl")
+include("functions/recharge.jl")
+include("functions/saturation.jl")
+include("functions/smoother.jl")
+include("functions/snowfall.jl")
+include("functions/surfaceflow.jl")
+include("functions/unithydro.jl")
 # Implements Models
-include.(filter(contains(r".jl$"), readdir("implements"; join=true)))
+# include("implements/PRNN.jl")
+include("implements/exphydro.jl")
+# include("implements/gr4j.jl")
+# include("implements/hbv.jl")
+# include("implements/hymod.jl")
+# include("implements/neuralode.jl")
 end

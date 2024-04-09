@@ -27,15 +27,14 @@ function (network::N)(
     params::NamedTuple,
     init_states::NamedTuple
 ) where {N<:Network,T<:Number}
-    #! 这个图貌似不需要添加属性进去
     # calculate subbasin and it's all upstream total area
     total_area::Dict{Symbol,T} = Dict()
     output::Dict{Symbol,Dict{Symbol,Vector{T}}} = Dict()
 
     for node_nm in topological_sort(network.topology)
-        tmp_area = get_prop(network.topology, node_nm, :node).area
+        tmp_area = network.areas[node_nm]
         for up_node_nm in get_all_upstream_node(network.topology, node_nm)
-            tmp_area += get_prop(network.topology, up_node_nm, :node).area
+            tmp_area += network.areas[up_node_nm]
         end
         total_area[node_nm] = tmp_area
     end

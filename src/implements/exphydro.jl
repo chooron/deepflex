@@ -1,8 +1,7 @@
-module ExpHydro
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SurfaceElement(; name::Symbol)
+function ExpHydro_SurfElement(; name::Symbol)
     funcs = [
         PetFlux([:temp, :lday]),
         SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
@@ -25,16 +24,15 @@ end
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SoilElement(; name::Symbol)
+function ExpHydro_SoilElement(; name::Symbol)
     funcs = [
         EvapFlux([:soilwater, :pet], param_names=[:Smax]),
         BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
         SurfaceflowFlux([:soilwater], param_names=[:Smax]),
-        FlowFlux([:baseflow, :surfaceflow])
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :flow]), :soilwater)
+        DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :baseflow, :surfaceflow]), :soilwater)
     ]
 
     HydroElement(
@@ -47,7 +45,7 @@ end
 """
 Inner Route Function in Exphydro
 """
-function RouteElement(; name::Symbol)
+function ExpHydro_RouteElement(; name::Symbol)
 
     funcs = [
         FlowFlux([:baseflow, :surfaceflow])
@@ -59,21 +57,18 @@ function RouteElement(; name::Symbol)
     )
 end
 
-function ExphydroUnit(; name::Symbol)
+function ExpHydro_Unit(; name::Symbol)
     elements = [
-        SurfaceElement(name=name),
-        SoilElement(name=name),
+        ExpHydro_SurfElement(name=name),
+        ExpHydro_SoilElement(name=name),
     ]
     HydroUnit(name, elements=elements)
 end
 
-function ExphydroNode(; name::Symbol)
+function ExpHydro_Node(; name::Symbol)
     HydroNode(
         name,
-        unit=ExphydroUnit(name=name),
-        route=RouteElement(name=name)
+        units=[ExpHydro_Unit(name=name)],
+        routes=namedtuple([name], [ExpHydro_RouteElement(name=name)])
     )
-end
-
-
 end

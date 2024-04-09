@@ -1,5 +1,5 @@
 # todo 像Sciml那样用Unit{false}和Unit{true}来区别基于mtk和非mtk的
-struct HydroUnit{E} <: AbstractUnit where {E<:AbstractElement}
+struct HydroUnit <: AbstractUnit
     #* component名称
     name::Symbol
     #* 输入输出名称
@@ -10,7 +10,7 @@ struct HydroUnit{E} <: AbstractUnit where {E<:AbstractElement}
     #* 参数名称
     param_names::Vector{Symbol}
     #* 产流计算元素组
-    elements::AbstractVector{E}
+    elements::AbstractVector
     #* 定义sys
     sys::ODESystem
 end
@@ -20,10 +20,8 @@ function HydroUnit(name::Symbol;
 ) where {E<:AbstractElement}
     #* 先从element中获取基础信息主要是输出,输入,参数名称等
     input_names, output_names, param_names, state_names = get_element_infos(elements)
-    #* 将信息整合到一个类中，便于管理
-    nameinfo = NameInfo(name, input_names, output_names, state_names, param_names)
     #* 将这些信息定义成mtk.jl的变量
-    sys = build_unit_system(elements, nameinfo)
+    sys = build_unit_system(elements, name=name)
     HydroUnit(
         name,
         input_names,
@@ -51,8 +49,8 @@ function get_element_infos(elements::Vector{E}) where {E<:AbstractElement}
 end
 
 function build_unit_system(
-    elements::AbstractVector{E},
-    nameinfo::NamedTuple,
+    elements::AbstractVector{E};
+    name::Symbol,
 ) where {E<:AbstractElement}
     eqs = []
     elements = elements
@@ -65,37 +63,64 @@ function build_unit_system(
                 vcat(tmp_ele2.input_names, tmp_ele2.output_names, tmp_ele2.state_names)
             )
             for nm in share_var_names
-                push!(eqs, getproperty(tmp_ele1.base_sys, nm) ~ getproperty(tmp_ele2.base_sys, nm))
+                push!(eqs, getproperty(tmp_ele1.sys, nm) ~ getproperty(tmp_ele2.sys, nm))
             end
         end
     end
-    compose(ODESystem(eqs, t; name=Symbol(nameinfo.name, :_sys)), [ele.sys for ele in elements]...)
+    compose(ODESystem(eqs, t; name=Symbol(name, :_sys)), [ele.sys for ele in elements]...)
 end
 
-function setup_input(unit::HydroUnit; input::NamedTuple, time::AbstractVector)
+function setup_input(
+    unit::HydroUnit;
+    input::NamedTuple,
+    time::AbstractVector
+)
     #* 首先构建data的插值系统
-    eqs = []
-    itp_sys = build_itp_system(input[ele.input_names], time, ele.varinfo, name=ele.name)
+    eqs = Equation[]
+    unit_varinfo = merge([ele.varinfo for ele in unit.elements]...)
+    itp_sys = build_itp_system(input[unit.input_names], time, unit_varinfo, name=unit.name)
     for ele in unit.elements
         for nm in filter(nm -> nm in ele.input_names, keys(input))
-            push!(eqs, getproperty(ele.sys, nm) ~ getproperty(itp_sys, nm))
+            push!(eqs, getproperty(getproperty(unit.sys, ele.sys.name), nm) ~ getproperty(itp_sys, nm))
         end
     end
-    compose_sys = compose(ODESystem(eqs, t; name=Symbol(ele.name, :comp_sys)), unit.sys, itp_sys)
+    compose_sys = compose(ODESystem(eqs, t; name=Symbol(unit.name, :_comp_sys)), unit.sys, itp_sys)
     structural_simplify(compose_sys)
 end
 
+function build_prob(
+    unit::HydroUnit,
+    sys::ODESystem;
+    input::NamedTuple,
+    params::NamedTuple,
+    init_states::NamedTuple,
+)
+    #* setup init states and parameters
+    x0 = Pair{Num,eltype(init_states)}[]
+    p = Pair{Num,eltype(params)}[]
+    for ele in unit.elements
+        for nm in filter(nm -> nm in ele.state_names, keys(init_states))
+            push!(x0, getproperty(getproperty(unit.sys, ele.sys.name), Symbol(nm)) => init_states[Symbol(nm)])
+        end
+        for nm in ModelingToolkit.parameters(ele.sys)
+            push!(x0, getproperty(getproperty(unit.sys, ele.sys.name), Symbol(nm)) => params[Symbol(nm)])
+        end
+    end
+    #* build problem
+    ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
+end
 
 function (unit::HydroUnit)(
     input::NamedTuple,
     params::NamedTuple,
-    init_states::NamedTuple,
-    step::Bool=false
+    init_states::NamedTuple;
+    step::Bool=false,
+    solver::AbstractSolver=ODESolver()
 )
     if step
-        return _step_forward(unit, input, params, init_states)
+        return _step_forward(unit, input, params, init_states, solver)
     else
-        return _whole_forward(unit, input, params, init_states)
+        return _whole_forward(unit, input, params, init_states, solver)
     end
 end
 
@@ -104,11 +129,12 @@ function _step_forward(
     input::NamedTuple,
     params::NamedTuple,
     init_states::NamedTuple,
+    solver::AbstractSolver,
 )
     # * This function is calculated element by element
     fluxes = input
     for ele in unit.elements
-        fluxes = merge(fluxes, ele(fluxes, params, init_states))
+        fluxes = merge(fluxes, ele(fluxes, params, init_states, solver=solver))
     end
     fluxes
 end
@@ -118,16 +144,19 @@ function _whole_forward(
     input::NamedTuple,
     params::NamedTuple,
     init_states::NamedTuple,
+    solver::AbstractSolver,
 )
     sys = setup_input(unit, input=input[unit.input_names], time=input[:time])
-    solved_states = solve_prob(unit.elements,
-        sys=sys, input=fluxes, params=params,
-        init_states=init_states[ele.state_names]
+    prob = build_prob(unit, sys,
+        input=input, params=params,
+        init_states=init_states[unit.state_names]
     )
+    solved_states = solver(prob, unit.state_names)
     fluxes = merge(input, solved_states)
     for ele in unit.elements
-        fluxes = merge(fluxes, ele(fluxes, params))
+        fluxes = merge(fluxes, ele(fluxes, params, solved_states=solved_states))
     end
+    fluxes
 end
 
 function get_all_luxnnflux(unit::HydroUnit)

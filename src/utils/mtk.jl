@@ -1,14 +1,19 @@
 # mtk.jl utils
-function init_var_param(nameinfo::NameInfo)
-    var_names = vcat(nameinfo.input_names, nameinfo.output_names, nameinfo.state_names)
+function init_var_param(
+    input_names::AbstractVector{Symbol},
+    output_names::AbstractVector{Symbol},
+    state_names::AbstractVector{Symbol},
+    param_names::AbstractVector{Symbol},
+)
+    var_names = vcat(input_names, output_names, state_names)
     varinfo = namedtuple(var_names, [first(@variables $nm(t)) for nm in var_names])
-    paraminfo = namedtuple(nameinfo.param_names, [first(@parameters $nm) for nm in nameinfo.param_names])
+    paraminfo = namedtuple(param_names, [first(@parameters $nm) for nm in param_names])
     varinfo, paraminfo
 end
 
 function build_ele_system(
-    funcs::AbstractVector{AbstractFlux},
-    dfuncs::AbstractVector{AbstractFlux},
+    funcs::AbstractVector{<:AbstractFlux},
+    dfuncs::AbstractVector{<:AbstractFlux},
     varinfo::NamedTuple,
     paraminfo::NamedTuple;
     name::Symbol
@@ -38,5 +43,5 @@ function build_itp_system(
         tmp_itp = LinearInterpolation(input[nm], time, extrapolate=true)
         push!(eqs, varinfo[nm] ~ tmp_itp(t))
     end
-    ODESystem(eqs, t; name=Symbol(name, :itp_sys))
+    ODESystem(eqs, t; name=Symbol(name, :_itp_sys))
 end

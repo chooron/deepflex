@@ -1,8 +1,7 @@
-module HBV
 """
 SnowWaterReservoir in HyMOD
 """
-function SurfElement(; name::Symbol)
+function HBV_SurfElement(; name::Symbol)
     funcs = [
         SnowfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
         SimpleFlux([:temp], :refreeze, param_names=[:cfr, :cfmax, :ttm],
@@ -24,7 +23,7 @@ function SurfElement(; name::Symbol)
     )
 end
 
-function SoilElement(; name::Symbol)
+function HBV_SoilElement(; name::Symbol)
 
     funcs = [
         SimpleFlux([:soilwater], :capillary, param_names=[:cflux, :fc],
@@ -45,7 +44,7 @@ function SoilElement(; name::Symbol)
     )
 end
 
-function RouteElement(; name::Symbol)
+function HBV_RouteElement(; name::Symbol)
 
     funcs = [
         RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
@@ -74,20 +73,18 @@ function RouteElement(; name::Symbol)
     )
 end
 
-function HBVUnit(; name::Symbol)
+function HBV_Unit(; name::Symbol)
     elements = [
-        SurfaceElement(name=name),
-        SoilElement(name=name),
+        HyMOD_SurfElement(name=name),
+        HyMOD_SoilElement(name=name),
     ]
     HydroUnit(name, elements=elements)
 end
 
-function HBVNode(; name::Symbol)
+function HBV_Node(; name::Symbol)
     HydroNode(
         name,
-        unit=HBVUnit(name=name),
-        route=RouteElement(name=name)
+        unit=HBV_Unit(name=name),
+        route=HBV_RouteElement(name=name)
     )
-end
-
 end

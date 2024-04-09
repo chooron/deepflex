@@ -1,8 +1,7 @@
-module HyMOD
 """
 SnowWaterReservoir in HyMOD
 """
-function SurfElement(; name::Symbol)
+function HyMOD_SurfElement(; name::Symbol)
     funcs = [
         RainfallFlux([:prcp, :pet]),
         SimpleFlux([:prcp, :pet], :pet,
@@ -20,7 +19,7 @@ end
 """
 SoilWaterReservoir in HYMOD
 """
-function SoilElement(; name::Symbol)
+function HyMOD_SoilElement(; name::Symbol)
 
     funcs = [
         SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
@@ -43,7 +42,7 @@ function SoilElement(; name::Symbol)
 end
 
 
-function RouteElement(; name::Symbol)
+function HyMOD_RouteElement(; name::Symbol)
 
     funcs = [
         SimpleFlux([:fr1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr1]),
@@ -67,19 +66,18 @@ function RouteElement(; name::Symbol)
     )
 end
 
-function HyMODUnit(; name::Symbol)
+function HyMOD_Unit(; name::Symbol)
     elements = [
-        SurfElement(name=name),
-        SoilElement(name=name),
+        HyMOD_SurfElement(name=name),
+        HyMOD_SoilElement(name=name),
     ]
     HydroUnit(name, elements=elements)
 end
 
-function HyMODNode(; name::Symbol)
+function HyMOD_Node(; name::Symbol)
     HydroNode(
         name,
-        unit=HyMODUnit(name=name),
-        route=RouteElement(name=name)
+        unit=HyMOD_Unit(name=name),
+        route=HyMOD_RouteElement(name=name)
     )
-end
 end

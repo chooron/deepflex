@@ -24,8 +24,8 @@ end
 function HydroElement(
     ; name::Symbol,
     funcs::Vector,
-    dfuncs::Vector=[],
-    lfuncs::Vector=[],
+    dfuncs::Vector=SimpleFlux[],
+    lfuncs::Vector=SimpleFlux[],
 )
     # combine the info of func and d_func
     input_names1, output_names, param_names1 = get_func_infos(funcs)
@@ -39,7 +39,7 @@ function HydroElement(
     # 合并两种类型函数的参数
     param_names = union(param_names1, param_names2)
     # 条件判断，有时候不需要构建
-    varinfo, paraminfo = init_var_param(nameinfo)
+    varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
     sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
     return HydroElement(
         name,
@@ -68,7 +68,7 @@ function get_all_luxnnflux(ele::HydroElement)
 end
 
 # 带入中间状态后计算
-function (ele::HydroElement)(
+function (ele::HydroElement)(;
     input::NamedTuple,
     params::Union{NamedTuple,ComponentVector},
 )
@@ -83,8 +83,9 @@ end
 function (ele::HydroElement)(
     input::NamedTuple,
     params::Union{NamedTuple,ComponentVector},
-    init_states::Union{NamedTuple,ComponentVector},
-    solver::AbstractSolver
+    init_states::Union{NamedTuple,ComponentVector}=NamedTuple();
+    solved_states::NamedTuple=NamedTuple(),
+    solver::AbstractSolver=ODESolver()
 )
     # todo 这里需要添加input，params，init_states的参数校核
     fluxes = input
@@ -94,17 +95,20 @@ function (ele::HydroElement)(
             fluxes = merge(fluxes, lf(input, params))
         end
     end
-    #* 当存在dflux时需要构建ode问题进行计算
-    if length(ele.dfuncs) > 0
-        #* 根据方程构建基础系统
-        sys = setup_input(ele, input=input, time=input[:time])
-        #* 设定系统参数构建ode problem
-        prob = build_prob(ele,
-            sys=sys, input=input, params=params,
-            init_states=init_states[ele.state_names])
-        solved_states = solver(prob, ele.state_names)
-        fluxes = merge(fluxes, solved_states)
+    #* 当外部提供了指定的求解后的states时就可以跳过求解
+    if solved_states isa Nothing
+        #* 当存在dflux时需要构建ode问题进行计算
+        if length(ele.dfuncs) > 0
+            #* 根据方程构建基础系统
+            sys = setup_input(ele, input=input, time=input[:time])
+            #* 设定系统参数构建ode problem
+            prob = build_prob(ele, sys,
+                input=input, params=params,
+                init_states=init_states[ele.state_names])
+            solved_states = solver(prob, ele.state_names)
+        end
     end
+    fluxes = merge(fluxes, solved_states)
     #* 最后就是直接通过flux进行计算
     for func in ele.funcs
         fluxes = merge(fluxes, func(fluxes, params))
@@ -126,8 +130,8 @@ function setup_input(
 end
 
 function build_prob(
-    ele::HydroElement;
-    sys::ODESystem,
+    ele::HydroElement,
+    sys::ODESystem;
     input::NamedTuple,
     params::NamedTuple,
     init_states::NamedTuple,
@@ -140,27 +144,6 @@ function build_prob(
     ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
 end
 
-function build_prob(
-    elements::AbstractVector{HydroElement};
-    sys::ODESystem,
-    input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple,
-)
-    #* setup init states and parameters
-    x0 = Pair{Num,eltype(init_states)}[]
-    p = Pair{Num,eltype(params)}[]
-    for ele in elements
-        for nm in filter(nm -> nm in ele.state_names, keys(init_states))
-            push!(x0, getproperty(ele.sys, Symbol(nm)) => init_states[Symbol(nm)])
-        end
-        for nm in ModelingToolkit.parameters(ele.sys)
-            push!(p, getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)])
-        end
-    end
-    #* build problem
-    ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
-end
 
 function build_prob(
     ele::HydroElement;

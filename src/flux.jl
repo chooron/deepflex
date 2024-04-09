@@ -119,15 +119,15 @@ function get_func_infos(funcs::Vector)
     input_names, output_names, param_names
 end
 
-function get_dfunc_infos(funcs::Vector{F}) where {F<:AbstractFlux}
+function get_dfunc_infos(dfuncs::Vector)
     input_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
     param_names = Vector{Symbol}()
 
-    for func in funcs
-        union!(input_names, get_input_names(func))
-        union!(state_names, get_output_names(func))
-        union!(param_names, func.param_names)
+    for dfunc in dfuncs
+        union!(input_names, get_input_names(dfunc))
+        union!(state_names, get_output_names(dfunc))
+        union!(param_names, dfunc.param_names)
     end
     input_names, state_names, param_names
 end

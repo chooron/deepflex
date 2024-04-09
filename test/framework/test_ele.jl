@@ -7,27 +7,7 @@ using BenchmarkTools
 using NamedTupleTools
 include("../../src/DeepFlex.jl")
 
-function Surface_ExpHydro(; name::Symbol)
-    funcs = [
-        DeepFlex.PetFlux([:temp, :lday]),
-        DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        DeepFlex.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.InfiltrationFlux([:rainfall, :melt])
-    ]
-
-    dfuncs = [
-        DeepFlex.DifferFlux(Dict(:In => [:snowfall], :Out => [:melt]), :snowwater),
-    ]
-
-    DeepFlex.HydroElement(
-        name=name,
-        funcs=funcs,
-        dfuncs=dfuncs
-    )
-end
-
-ele = Surface_ExpHydro(name=:sf)
+ele = DeepFlex.ExpHydro_SurfElement(name=:sf)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
@@ -38,7 +18,5 @@ data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
 input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-# @btime DeepFlex.build_prob!(ele, input=input, params=params, init_states=init_states)
-@btime results = ele(input, params, init_states)
-# @btime sol = DeepFlex.solve_prob(ele, input=input, params=params, init_states=init_states) # 1.47s
-# @btime sol = DeepFlex.solve_probv2(ele, input=input, params=params, init_states=init_states) # 35.292ms
+solver = DeepFlex.ODESolver()
+@btime results = ele(input, params, init_states, solver=solver)

@@ -1,4 +1,3 @@
-module GR4J
 """
 SnowWaterReservoir in HyMOD
 """
@@ -24,7 +23,7 @@ SoilWaterReservoir in HYMOD
 """
 SoilWaterReservoir in GR4J
 """
-function SoilElement(; name::Symbol)
+function GR4J_SoilElement(; name::Symbol)
 
     funcs = [
         SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
@@ -48,7 +47,7 @@ function SoilElement(; name::Symbol)
     )
 end
 
-function RouteElement(; name::Symbol)
+function GR4J_RouteElement(; name::Symbol)
 
     funcs = [
         RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
@@ -77,20 +76,18 @@ function RouteElement(; name::Symbol)
     )
 end
 
-function GR4JUnit(; name::Symbol)
+function GR4J_Unit(; name::Symbol)
     elements = [
-        SurfaceElement(name=name),
-        SoilElement(name=name),
+        GR4J_SurfElement(name=name),
+        GR4J_SoilElement(name=name),
     ]
     HydroUnit(name, elements=elements)
 end
 
-function GR4JNode(; name::Symbol)
+function GR4J_Node(; name::Symbol)
     HydroNode(
         name,
-        unit=GR4JUnit(name=name),
-        route=RouteElement(name=name)
+        unit=GR4J_Unit(name=name),
+        route=GR4J_RouteElement(name=name)
     )
-end
-
 end
