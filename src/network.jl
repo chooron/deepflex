@@ -1,4 +1,4 @@
-struct Network{T<:Number} <: AbstractComponent
+struct RiverNetwork <: AbstractRiverNetwork
     name::Symbol
     nodes::AbstractVector{HydroNode}
     areas::NamedTuple

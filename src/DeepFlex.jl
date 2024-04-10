@@ -48,15 +48,17 @@ abstract type AbstractOptimizer end
 
 abstract type AbstractFlux end
 abstract type AbstractNNFlux <: AbstractFlux end
-
+abstract type AbstractReach end
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractUnit <: AbstractComponent end
 #* 负责单元的坡面汇流和洪水演进计算
 abstract type AbstractNode <: AbstractComponent end
-#* 负责单元的河网汇流计算
+#* 负责基于节点的网络计算
 abstract type AbstractNetwork <: AbstractComponent end
+abstract type AbstractRiverNetwork <: AbstractNetwork end
+abstract type AbstractGridNetwork <: AbstractNetwork end
 
 ## Sensealg type
 # const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
@@ -69,6 +71,7 @@ include("utils/optimize.jl")
 include("utils/solver.jl")
 # framework build
 include("flux.jl")
+include("reach.jl")
 include("element.jl")
 include("unit.jl")
 include("node.jl")

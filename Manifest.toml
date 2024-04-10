@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "0a5d7194de9b9299c244728362ba1802318fb369"
+project_hash = "72e7ff273ed729d59ee9f0520d805df4ba54d8e1"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -1361,9 +1361,9 @@ version = "1.2.0"
 
 [[deps.NonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "DiffEqBase", "FastBroadcast", "FastClosures", "FiniteDiff", "ForwardDiff", "LazyArrays", "LineSearches", "LinearAlgebra", "LinearSolve", "MaybeInplace", "PrecompileTools", "Preferences", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SparseArrays", "SparseDiffTools", "StaticArraysCore", "TimerOutputs"]
-git-tree-sha1 = "1638addfc31707aea26333ff822afcf9d2e6f7de"
+git-tree-sha1 = "b9e12aa04c90a05d2aaded6f7c4d8b39e77751db"
 uuid = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
-version = "3.8.3"
+version = "3.9.1"
 
     [deps.NonlinearSolve.extensions]
     NonlinearSolveBandedMatricesExt = "BandedMatrices"
