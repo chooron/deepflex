@@ -11,6 +11,8 @@ struct HydroNode <: AbstractComponent
     units::AbstractVector{HydroUnit}
     #* 演进模块
     routes::NamedTuple
+    #* 节点对应的面积
+    area::Number
 end
 
 function HydroNode(name; unit::HydroUnit, route::AbstractElement)
@@ -21,7 +23,7 @@ function HydroNode(name; unit::HydroUnit, route::AbstractElement)
     )
 end
 
-function HydroNode(name; units::AbstractVector{HydroUnit}, routes::NamedTuple)
+function HydroNode(name; units::AbstractVector{HydroUnit}, routes::NamedTuple, area::Number=100)
     input_names, output_names, param_names, state_names = get_unit_infos(units)
     #* 合并参数名称
     param_names = merge(param_names, (weights=[unit.name for unit in units],))
@@ -37,6 +39,7 @@ function HydroNode(name; units::AbstractVector{HydroUnit}, routes::NamedTuple)
         param_names,
         units,
         routes,
+        area
     )
 end
 

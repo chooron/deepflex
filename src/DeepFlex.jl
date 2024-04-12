@@ -25,6 +25,8 @@ using DataInterpolations
 # solve ODEProblem
 using OrdinaryDiffEq
 using DiffEqFlux
+# solver NonlinearProblem
+using NonlinearSolve
 
 # deep learning
 using Lux
@@ -75,7 +77,7 @@ include("reach.jl")
 include("element.jl")
 include("unit.jl")
 include("node.jl")
-# include("network.jl")
+include("network.jl")
 # Implement Flux
 include("functions/baseflow.jl")
 include("functions/evap.jl")

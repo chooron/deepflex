@@ -1,44 +1,64 @@
 struct RiverNetwork <: AbstractRiverNetwork
     name::Symbol
+    #* 水文计算节点,出流量为discharge(m^3/s)
     nodes::AbstractVector{HydroNode}
-    areas::NamedTuple
-    routes::NamedTuple
+    #* 河道对象,用于洪水演进模拟,包含基于水文的马斯京根模拟和一维水动计算方式(todo) 
+    reaches::AbstractVector{AbstractReach}
+    #* 河网
     topology::AbstractGraph
 end
 
-function Network(;
+struct GridNetwork <: AbstractGridNetwork
+    # todo 通过网格实现flux传播
+end
+
+function RiverNetwork(;
     name::Symbol,
     nodes::AbstractVector{HydroNode},
-    areas::NamedTuple,
-    routes::NamedTuple,
-    topology::AbstractGraph
+    reaches::AbstractVector{AbstractReach}
 )
-    topology = MetaDiGraph(topology)
-    for node in nodes
-        node_name = node.nameinfo.name
-        set_props!(topology, node_name, Dict(:node => node, :area => areas[node_name]))
-    end
-    # todo 添加连接线的属性
-    Network(name, nodes, topology)
+    node_names = [node.name for node in name]
+    reach_nodes = [reach.upstream => reach.downstream for reach in reaches]
+    topology = build_topology(node_names, reach_nodes)
+    RiverNetwork(name, nodes, reaches, topology)
 end
 
-function (network::N)(
+function (network::RiverNetwork)(
+    input::NamedTuple,
+    params::NamedTuple,
+    init_states::NamedTuple;
+    dt::Number=1.0,
+)
+    # 先同时计算各个节点，然后自上而下计算河网汇流
+    # 1.计算然后收集计算结果
+    # 2.按层次遍历所有节点，判断这个节点上游最近一层的所有节点，找到该节点与上游节点的所有边，根据边获取所有的演进公式并带入计算
+    node_names = [node.nm for nm in network.nodes]
+    # todo 添加node的并行计算
+    node_result_tuple = namedtuple(
+        node_names, [node(input, params, init_states, step=false)[:discharge] for nm in network.nodes]
+    )
+
+    for node_idx in topological_sort(network.topology)
+        node_name = node_names[node_idx]
+        if length(get_all_upstream_node(network.topology, node_nm)) != 0
+            node_result = node_result_tuple[node_name]
+            for up_node_idx in get_all_upstream_node(network.topology, node_nm)
+                up_node_name = node_names[up_node_idx]
+                up_node_result = node_result_tuple[up_node_name]
+                node_result = node_result .+ network.reach[edge_index(network.topology, up_node_idx, idx)](up_node_result, dt)
+            end
+        end
+        node_result_tuple = merge(node_result_tuple, namedtuple([node_name], [node_result_tuple[node_name]]))
+    end
+    node_result_tuple
+end
+
+
+function (network::GridNetwork)(
     input::NamedTuple,
     params::NamedTuple,
     init_states::NamedTuple
-) where {N<:Network,T<:Number}
-    # calculate subbasin and it's all upstream total area
-    total_area::Dict{Symbol,T} = Dict()
-    output::Dict{Symbol,Dict{Symbol,Vector{T}}} = Dict()
-
-    for node_nm in topological_sort(network.topology)
-        tmp_area = network.areas[node_nm]
-        for up_node_nm in get_all_upstream_node(network.topology, node_nm)
-            tmp_area += network.areas[up_node_nm]
-        end
-        total_area[node_nm] = tmp_area
-    end
-
+)
     for node_nm in topological_sort(network.topology)
         tmp_node = get_prop(network.topology, node_nm, :node)
         # calculate current subbasin output
