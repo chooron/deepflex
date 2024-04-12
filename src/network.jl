@@ -17,7 +17,7 @@ function RiverNetwork(;
     nodes::AbstractVector{HydroNode},
     reaches::AbstractVector{AbstractReach}
 )
-    node_names = [node.name for node in name]
+    node_names = [node.name for node in nodes]
     reach_nodes = [reach.upstream => reach.downstream for reach in reaches]
     topology = build_topology(node_names, reach_nodes)
     RiverNetwork(name, nodes, reaches, topology)
@@ -32,27 +32,23 @@ function (network::RiverNetwork)(
     # 先同时计算各个节点，然后自上而下计算河网汇流
     # 1.计算然后收集计算结果
     # 2.按层次遍历所有节点，判断这个节点上游最近一层的所有节点，找到该节点与上游节点的所有边，根据边获取所有的演进公式并带入计算
-    node_names = [node.nm for nm in network.nodes]
+    node_names = [node.name for node in network.nodes]
     # todo 添加node的并行计算
     node_result_tuple = namedtuple(
         node_names, [node(input, params, init_states, step=false)[:discharge] for nm in network.nodes]
     )
-
     for node_idx in topological_sort(network.topology)
         node_name = node_names[node_idx]
-        if length(get_all_upstream_node(network.topology, node_nm)) != 0
-            node_result = node_result_tuple[node_name]
-            for up_node_idx in get_all_upstream_node(network.topology, node_nm)
-                up_node_name = node_names[up_node_idx]
-                up_node_result = node_result_tuple[up_node_name]
-                node_result = node_result .+ network.reach[edge_index(network.topology, up_node_idx, idx)](up_node_result, dt)
-            end
+        node_result = node_result_tuple[node_name]
+        for up_node_idx in inneighbors(network.topology, node_idx)
+            up_node_name = node_names[up_node_idx]
+            up_node_result = node_result_tuple[up_node_name]
+            node_result = node_result .+ network.reaches[edge_index(network.topology, up_node_idx, node_idx)](up_node_result, dt)
         end
-        node_result_tuple = merge(node_result_tuple, namedtuple([node_name], [node_result_tuple[node_name]]))
+        node_result_tuple = merge(node_result_tuple, namedtuple([node_name], [node_result]))
     end
     node_result_tuple
 end
-
 
 function (network::GridNetwork)(
     input::NamedTuple,

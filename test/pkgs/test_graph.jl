@@ -3,7 +3,17 @@ using MetaGraphs
 # using GraphPlot
 
 # 创建一个空图
-g = path_graph(10)
+g = DiGraph(5)
+add_edge!(g, 1, 2)
+add_edge!(g, 2, 3)
+add_edge!(g, 2, 4)
+add_edge!(g, 3, 5)
+add_edge!(g, 4, 5)
+
+inneighbors(g, 4)
+inneighbors(g, 3)
+outneighbors(g, 3)
+
 Graphs.Edge(2,4)
 
 # 添加不同类型的节点

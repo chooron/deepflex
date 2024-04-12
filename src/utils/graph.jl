@@ -1,4 +1,4 @@
-function build_topology(node_names::AbstractVector{Symbol}, reaches::AbstractVector{Pair})
+function build_topology(node_names::AbstractVector{Symbol}, reaches::AbstractVector)
     node_tuple = namedtuple(node_names, collect(1:length(node_names)))
     topology = SimpleDiGraph(length(nodes))
     # add edge

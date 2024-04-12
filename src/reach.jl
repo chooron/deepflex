@@ -7,6 +7,7 @@ struct BaseReach <: AbstractReach
     attr::NamedTuple
     # reach feature curve
     curve::NamedTuple
+    weight::Number
     upstream::Symbol
     downstream::Symbol
 end
@@ -15,6 +16,7 @@ struct MuskingumReach <: AbstractReach
     name::Symbol
     attr::NamedTuple
     params::NamedTuple
+    weight::Number
     upstream::Symbol
     downstream::Symbol
 end
@@ -26,7 +28,7 @@ end
 """
 河宽,河长,坡降,糙率,河深
 """
-function BaseReach(name::Symbol; attr::NamedTuple, upstream::Symbol, downstream::Symbol, resolution=50)
+function BaseReach(name::Symbol; attr::NamedTuple, upstream::Symbol, downstream::Symbol, weight=1.0, resolution=50)
     stage = range(1e-4, get(attr, :max_stage, 10.0), resolution)
     width = repeat([get(attr, :width, 100.0)], resolution)
     area = stage .* width
@@ -46,12 +48,13 @@ function BaseReach(name::Symbol; attr::NamedTuple, upstream::Symbol, downstream:
         name,
         attr,
         curve,
+        weight,
         upstream,
         downstream
     )
 end
 
-function TrapezoidalReach(name::Symbol; attr::NamedTuple, upstream::Symbol, downstream::Symbol, resolution=50)
+function TrapezoidalReach(name::Symbol; attr::NamedTuple, upstream::Symbol, downstream::Symbol, weight=1.0, resolution=50)
     stage = range(0.0, get(attr, :max_stage, 10.0), resolution)
     #* calculate top width and use it as reach width
     width = @.(get(attr, :bottem_width, 100.0) + stage * get(attr, :side_slope, 100.0))
@@ -72,12 +75,13 @@ function TrapezoidalReach(name::Symbol; attr::NamedTuple, upstream::Symbol, down
         name,
         attr,
         curve,
+        weight,
         upstream,
         downstream
     )
 end
 
-function RectangleReach(name; attr, upstream::Symbol, downstream::Symbol, resolution=50)
+function RectangleReach(name; attr, upstream::Symbol, downstream::Symbol, weight=1.0, resolution=50)
     stage = range(1e-4, get(attr, :max_stage, 10.0), resolution)
     #* calculate top width and use it as reach width
     area = stage .* get(attr, :width, 100.0)
@@ -94,6 +98,7 @@ function RectangleReach(name; attr, upstream::Symbol, downstream::Symbol, resolu
         name,
         attr,
         (k=k, x=x),
+        weight,
         upstream,
         downstream
     )
@@ -145,7 +150,7 @@ function (reach::BaseReach)(input::AbstractVector, dt::Number=1.0)
         sol = solve(prob, NewtonRaphson())
         output[i+1] = first(sol.u)
     end
-    output
+    output .* reach.weight
 end
 
 function (reach::MuskingumReach)(input::AbstractVector, dt::Number=1.0)
@@ -161,5 +166,5 @@ function (reach::MuskingumReach)(input::AbstractVector, dt::Number=1.0)
         q_out = (c0 * input[i+1]) + (c1 * input[i]) + (c2 * outflows[i])
         output[i+1] = max(minimum(input), q_out)
     end
-    output
+    output .* reach.weight
 end
