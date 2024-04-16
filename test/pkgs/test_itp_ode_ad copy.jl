@@ -30,8 +30,10 @@ Qb(S1, f, Smax, Qmax) = step_fct(S1) * step_fct(S1 - Smax) * Qmax + step_fct(S1)
 
 # peak flow
 Qs(S1, Smax) = step_fct(S1) * step_fct(S1 - Smax) * (S1 - Smax)
+
+
 df = DataFrame(CSV.File("data/camels/01013500.csv"))
-time = 1:1000
+time = 1:10000
 lday_vec = df[time, "dayl(day)"]
 prcp_vec = df[time, "prcp(mm/day)"]
 temp_vec = df[time, "tmean(C)"]
@@ -42,9 +44,6 @@ itp_T(t) = LinearInterpolation(temp_vec, time)(t)
 
 @variables t, snow(t), soil(t)
 @parameters f, Smax, Qmax, Df, Tmax, Tmin
-@register_symbolic itp_Lday(t)
-@register_symbolic itp_P(t)
-@register_symbolic itp_T(t)
 
 eqs = [
     snow ~ Ps(itp_P(t), itp_T(t), Tmin) - M(snow, itp_T(t), Df, Tmax),
@@ -59,7 +58,7 @@ params = [f => 0.05, Smax => 1000.0, Qmax => 20.0, Df => 3.0, Tmax => 1.0, Tmin 
 # params = [var => value for (var, value) in zip(parameters(model), 1:length(parameters(model)))]
 idxs = ModelingToolkit.varmap_to_vars(params, parameters(model))
 prob = samefile(model, u0, tspan, params)
-sol = solve(prob, FBDF(), saveat=1.0)
+sol = solve(prob, Tsit5(), saveat=1.0)
 
 # function loss_func(u, p)
 #     u0 = [snow => 0.0, soil => 1303.004248]

@@ -3,7 +3,7 @@ Simple flux
 """
 struct SimpleFlux <: AbstractFlux
     # attribute
-    input_names::Union{Symbol,Vector{Symbol},Dict{Symbol,Symbol}}
+    input_names::Union{Symbol,Vector{Symbol},Vector{Pair}}
     output_names::Union{Symbol,Vector{Symbol}}
     param_names::Vector{Symbol}
     # function 
@@ -13,7 +13,7 @@ struct SimpleFlux <: AbstractFlux
 end
 
 function SimpleFlux(
-    input_names::Union{Symbol,Vector{Symbol},Dict{Symbol,Symbol}},
+    input_names::Union{Symbol,Vector{Symbol},Vector{Pair}},
     output_names::Union{Symbol,Vector{Symbol}};
     param_names::Vector{Symbol},
     func::Function
@@ -57,21 +57,21 @@ end
 
 
 function DifferFlux(
-    input_names::Dict{Symbol,Vector{Symbol}},
-    output_names::Symbol;
+    influx_names::Vector{Symbol},
+    outflux_names::Vector{Symbol},
+    state_names::Symbol;
 )
-    tmp_input_names = collect(union(map(x -> x, [Set(nms) for nms in values(input_names)])...))
     SimpleFlux(
-        tmp_input_names,
-        output_names,
+        vcat(influx_names, outflux_names),
+        state_names,
         param_names=Symbol[],
-        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in input_names[:In]]) - sum([i[nm] for nm in input_names[:Out]])
+        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in influx_names]) - sum([i[nm] for nm in outflux_names])
     )
 end
 
 function get_input_names(func::AF) where {AF<:AbstractFlux}
-    if func.input_names isa Dict
-        input_names = Vector(keys(func.input_names))
+    if eltype(func.input_names) isa Pair
+        input_names = [v for (_, v) in func.input_names]
     elseif func.input_names isa Vector
         input_names = func.input_names
     else
@@ -134,9 +134,10 @@ end
 
 ## ----------------------------------------------------------------------
 ## callable function
-function (flux::SimpleFlux)(input::NamedTuple, parameters::NamedTuple)
+function (flux::SimpleFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
     tmp_input = extract_input(input, flux.input_names)
-    func_output = flux.func(tmp_input, parameters[flux.param_names], flux.step_func)
+    tmp_params = extract_params(params, flux.param_names)
+    func_output = flux.func(tmp_input, tmp_params, flux.step_func)
     process_output(flux.output_names, func_output)
 end
 
@@ -148,8 +149,16 @@ function extract_input(input::NamedTuple, input_names::Vector{Symbol})
     namedtuple(input_names, [input[k] for k in input_names])
 end
 
-function extract_input(input::NamedTuple, input_names::Dict{Symbol,Symbol})
-    namedtuple(collect(values(input_names)), [input[k] for k in keys(input_names)])
+function extract_input(input::NamedTuple, input_names::Vector{Pair})
+    namedtuple([k for (_, k) in input_names], [input[k] for (k, _) in input_names])
+end
+
+function extract_params(params::ComponentVector, param_names::Vector{Symbol})
+    namedtuple(param_names, [params[k] for k in param_names])
+end
+
+function extract_params(params::NamedTuple, param_names::Vector{Symbol})
+    params
 end
 
 function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
@@ -189,7 +198,7 @@ function LagFlux(
 end
 
 
-function (flux::LagFlux)(input::NamedTuple, params::NamedTuple)
+function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
     l_input = input[flux.input_names]
     #* 首先将lagflux转换为discrete problem
     function discrete_prob!(du, u, p, t)
@@ -210,6 +219,8 @@ function (flux::LagFlux)(input::NamedTuple, params::NamedTuple)
     sol_u = hcat((sol.u)...)
     namedtuple([flux.input_names], [sol_u[1, :] .* l_input])
 end
+
+# TODO 关于Lux nn还需要进一步调整
 
 struct LuxNNFlux <: AbstractNNFlux
     input_names::Vector{Symbol}

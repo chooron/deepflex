@@ -57,8 +57,8 @@ end
 # todo parallel computing
 function (node::HydroNode)(
     input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple;
+    params::ComponentVector,
+    init_states::ComponentVector;
     step::Bool=false,
     solver::AbstractSolver=ODESolver()
 )
@@ -66,17 +66,20 @@ function (node::HydroNode)(
     unit_ouputs = namedtuple(unit_names, [
         begin
             tmp_ouput = unit(
-                input[Symbol(unit.name, :_unit)],
-                params[Symbol(unit.name, :_unit)],
-                init_states[Symbol(unit.name, :_unit)],
+                input[Symbol(unit.name)],
+                params[Symbol(unit.name)][:unit],
+                init_states[Symbol(unit.name)][:unit],
                 step=step, solver=solver)
+            route_params = params[Symbol(unit.name)][:route]
             route_output = node.routes[unit.name](
-                tmp_ouput, params[Symbol(unit.name, :_route)],
-                init_states, solver=solver)
+                tmp_ouput,
+                route_params isa AbstractVector ? ComponentVector() : route_params,
+                init_states,
+                solver=solver)
             route_output_name = first(node.routes[unit.name].output_names)
             namedtuple(
                 [route_output_name],
-                [route_output[route_output_name] .* params[:weights][Symbol(unit.name)]]
+                [route_output[route_output_name] .* params[Symbol(unit.name)][:weight]]
             )
         end
         for unit in node.units

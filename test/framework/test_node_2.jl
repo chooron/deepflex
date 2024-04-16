@@ -25,11 +25,14 @@ unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 unit_input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
-input = (exphydro1_unit=unit_input, exphydro2_unit=unit_input)
-params = (
-    exphydro1_unit=unit_params, exphydro2_unit=unit_params,
-    exphydro1_route=NamedTuple(), exphydro2_route=NamedTuple(),
-    weights=(exphydro2=0.5, exphydro1=0.5),
+input = (exphydro1=unit_input, exphydro2=unit_input)
+params = ComponentVector(
+    exphydro1=(unit=unit_params, route=ComponentVector(), weight=0.5),
+    exphydro2=(unit=unit_params, route=ComponentVector(), weight=0.5)
 )
-init_states = (exphydro1_unit=unit_init_states, exphydro2_unit=unit_init_states)
+init_states = ComponentVector(
+    exphydro1=(unit=unit_init_states,),
+    exphydro2=(unit=unit_init_states,)
+)
+
 results = model(input, params, init_states, step=false) # 分开计算和同时计算消耗的资源差不多

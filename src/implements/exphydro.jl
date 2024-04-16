@@ -11,7 +11,7 @@ function ExpHydro_SurfElement(; name::Symbol)
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:snowfall], :Out => [:melt]), :snowwater),
+        DifferFlux([:snowfall], [:melt], :snowwater),
     ]
 
     HydroElement(
@@ -32,7 +32,7 @@ function ExpHydro_SoilElement(; name::Symbol)
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:infiltration], :Out => [:evap, :baseflow, :surfaceflow]), :soilwater)
+        DifferFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
     HydroElement(

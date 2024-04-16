@@ -70,7 +70,7 @@ end
 # 带入中间状态后计算
 function (ele::HydroElement)(;
     input::NamedTuple,
-    params::Union{NamedTuple,ComponentVector},
+    params::ComponentVector,
 )
     fluxes = input
     for func in vcat(ele.lfuncs, ele.funcs)
@@ -82,8 +82,8 @@ end
 # 求解并计算
 function (ele::HydroElement)(
     input::NamedTuple,
-    params::Union{NamedTuple,ComponentVector},
-    init_states::Union{NamedTuple,ComponentVector}=NamedTuple();
+    params::ComponentVector,
+    init_states::ComponentVector=ComponentVector();
     solved_states::NamedTuple=NamedTuple(),
     solver::AbstractSolver=ODESolver()
 )

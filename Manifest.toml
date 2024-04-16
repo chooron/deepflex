@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "72e7ff273ed729d59ee9f0520d805df4ba54d8e1"
+project_hash = "485d44eb86c1caf3b33910be2d6f19228fca1894"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -1149,10 +1149,10 @@ version = "0.5.31"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.LuxCore]]
-deps = ["Functors", "Random", "Setfield"]
-git-tree-sha1 = "dcd371fe4cd17e91188ab023a41cbac4657fbb68"
+deps = ["FastClosures", "Functors", "Random", "Setfield"]
+git-tree-sha1 = "f799f3aa8599f79ed5e2c9fbaf74907c1ebe15ce"
 uuid = "bb33d45b-7691-41d6-9220-0943567d0623"
-version = "0.1.13"
+version = "0.1.14"
 
 [[deps.LuxDeviceUtils]]
 deps = ["Adapt", "ChainRulesCore", "FastClosures", "Functors", "LuxCore", "PrecompileTools", "Preferences", "Random"]
@@ -1286,6 +1286,12 @@ version = "9.9.0"
     [deps.ModelingToolkit.weakdeps]
     BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
     DeepDiffs = "ab62b9b5-e342-54a8-a765-a90f495de1a6"
+
+[[deps.ModelingToolkitStandardLibrary]]
+deps = ["ChainRulesCore", "DiffEqBase", "IfElse", "LinearAlgebra", "ModelingToolkit", "Symbolics"]
+git-tree-sha1 = "50b27ae73c39ecba91bd3e48325b586bc970cd24"
+uuid = "16a59e39-deab-5bd0-87e4-056b12336739"
+version = "2.6.0"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"

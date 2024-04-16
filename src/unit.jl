@@ -15,7 +15,8 @@ struct HydroUnit <: AbstractUnit
     sys::ODESystem
 end
 
-function HydroUnit(name::Symbol;
+function HydroUnit(
+    name::Symbol;
     elements::Vector{E}
 ) where {E<:AbstractElement}
     #* 先从element中获取基础信息主要是输出,输入,参数名称等
@@ -92,8 +93,8 @@ function build_prob(
     unit::HydroUnit,
     sys::ODESystem;
     input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple,
+    params::ComponentVector,
+    init_states::ComponentVector,
 )
     #* setup init states and parameters
     x0 = Pair{Num,eltype(init_states)}[]
@@ -112,8 +113,8 @@ end
 
 function (unit::HydroUnit)(
     input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple;
+    params::ComponentVector,
+    init_states::ComponentVector;
     step::Bool=false,
     solver::AbstractSolver=ODESolver()
 )
@@ -127,8 +128,8 @@ end
 function _step_forward(
     unit::HydroUnit,
     input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple,
+    params::ComponentVector,
+    init_states::ComponentVector,
     solver::AbstractSolver,
 )
     # * This function is calculated element by element
@@ -142,8 +143,8 @@ end
 function _whole_forward(
     unit::HydroUnit,
     input::NamedTuple,
-    params::NamedTuple,
-    init_states::NamedTuple,
+    params::ComponentVector,
+    init_states::ComponentVector,
     solver::AbstractSolver,
 )
     sys = setup_input(unit, input=input[unit.input_names], time=input[:time])

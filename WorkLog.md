@@ -14,13 +14,13 @@
 - [ ] lagflux如何改造成mtk.jl
   - [ ] lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变
 - [ ] mtk.jl貌似只能支持一对一输入输出
+- [ ] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
 
 # 工作计划
 
 - [ ] routing function编写
 - [X] 创建模型搭建基础类
 - [X] 针对之前的模型进行ComponentArrays改造
-- [X] 直接将element分为三个大类：ODE，Lag和Simple
 - [X] 0实参构建模型
 - [ ] 构建模型中，应该有构建合理性的校验和提示功能，主要的提示功能就是对模型各层计算数据是否存在缺失的功能，并对于缺失的模块提出增加建议
 - [ ] 复现当前部分模型
@@ -36,3 +36,23 @@
 - [ ] 将多个unit糅合到一块后应该如何表示参数，中间状态等参数，可以像lux.jl那样表示，比较清楚
 - [ ] Node和Network的并行计算
 - [ ] 搭建参数动态估计问题
+- [ ] 如何将水文通量(Flux)转换成一系列类似于MTKstandarylibrary.jl那样的模块
+- [ ] input数据采用namedtuple类型,参数采用ComponentArray类型
+
+# 一些结论
+
+* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型
+
+# 关键功能和实现技术
+
+* [X] Component基本计算实现, 涉及从某计算模块至整个流域汇流网络的计算
+  * [X] 常微分方程求解(ModelingToolkit.jl, DifferentialEquations.jl)
+  * [X] 网络拓扑计算(Graphs.jl)
+* [ ] Component基础的param_optimize参数优化功能实现
+  * [ ] 参数优化
+* [ ] 参数动态模拟估计，Time-vary parameter estimation
+* [ ] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
+
+# 即将需要做的东西
+
+- [ ] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray
