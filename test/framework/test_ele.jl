@@ -13,10 +13,12 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 
+pas = ComponentVector(params=params, initstates=init_states)
+
 file_path = "data/camels/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
 input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = DeepFlex.ODESolver()
-@btime results = ele(input, params, init_states, solver=solver)
+@btime results = ele(input, pas, solver=solver)

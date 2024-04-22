@@ -45,7 +45,7 @@ end
 """
 Inner Route Function in Exphydro
 """
-function ExpHydro_RouteElement(; name::Symbol)
+function ExpHydro_ZoneElement(; name::Symbol)
 
     funcs = [
         FlowFlux([:baseflow, :surfaceflow])
@@ -57,10 +57,23 @@ function ExpHydro_RouteElement(; name::Symbol)
     )
 end
 
+function ExpHydro_RouteElement(; name::Symbol)
+
+    funcs = [
+        SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+    ]
+
+    RouteElement(
+        name=name,
+        funcs=funcs
+    )
+end
+
 function ExpHydro_Unit(; name::Symbol)
     elements = [
         ExpHydro_SurfElement(name=name),
         ExpHydro_SoilElement(name=name),
+        ExpHydro_ZoneElement(name=name),
     ]
     HydroUnit(name, elements=elements)
 end

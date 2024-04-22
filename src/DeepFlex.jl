@@ -15,6 +15,8 @@ using BenchmarkTools
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using Symbolics
+using SymbolicIndexingInterface: parameter_values, state_values
+using SciMLStructures: Tunable, replace, replace!
 
 # graph compute
 using Graphs
@@ -72,6 +74,7 @@ include("utils/mtk.jl")
 include("utils/optimize.jl")
 include("utils/solver.jl")
 include("utils/smoother.jl")
+include("utils/ca.jl")
 # framework build
 include("flux.jl")
 include("reach.jl")

@@ -18,3 +18,9 @@ prob = OptimizationProblem(rosenbrock, x0, p, lb=ComponentVector([-1.0, -1.0],x_
 # prob = OptimizationProblem(rosenbrock, x0, p)
 sol = solve(prob, BBO_adaptive_de_rand_1_bin_radiuslimited())
 
+function f1(input::NamedTuple, param::ComponentVector)
+end
+
+
+function f1(input::NamedTuple, param::NamedTuple)
+end

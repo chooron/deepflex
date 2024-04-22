@@ -98,7 +98,7 @@ function get_param_names(func::AF) where {AF<:AbstractFlux}
     param_names
 end
 
-function get_func_infos(funcs::Vector)
+function get_func_infos(funcs::Vector; exclude_output_names::Bool=true)
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     param_names = Vector{Symbol}()
@@ -108,7 +108,8 @@ function get_func_infos(funcs::Vector)
         tmp_output_names = get_output_names(func)
         tmp_param_names = get_param_names(func)
         # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
-        tmp_output_names = setdiff(tmp_output_names, tmp_input_names)
+        # tmp_output_names = exclude_output_names ? setdiff(tmp_output_names, tmp_input_names) : tmp_output_names
+        tmp_output_names = setdiff(tmp_output_names, input_names)
         # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
         tmp_input_names = setdiff(tmp_input_names, output_names)
         # 合并名称

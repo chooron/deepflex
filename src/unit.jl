@@ -34,7 +34,7 @@ function HydroUnit(
     )
 end
 
-function get_element_infos(elements::Vector{E}) where {E<:AbstractElement}
+function get_element_infos(elements::Vector{HydroElement})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
@@ -99,43 +99,46 @@ function build_prob(
     #* setup init states and parameters
     x0 = Pair{Num,eltype(init_states)}[]
     p = Pair{Num,eltype(params)}[]
+
     for ele in unit.elements
         for nm in filter(nm -> nm in ele.state_names, keys(init_states))
             push!(x0, getproperty(getproperty(unit.sys, ele.sys.name), Symbol(nm)) => init_states[Symbol(nm)])
         end
         for nm in ModelingToolkit.parameters(ele.sys)
-            push!(x0, getproperty(getproperty(unit.sys, ele.sys.name), Symbol(nm)) => params[Symbol(nm)])
+            push!(p, getproperty(getproperty(unit.sys, ele.sys.name), Symbol(nm)) => params[Symbol(nm)])
         end
     end
+
     #* build problem
-    ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
+    println(parameter_values(prob))
+    
+    prob
 end
 
 function (unit::HydroUnit)(
     input::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector;
+    pas::ComponentVector;
     step::Bool=false,
     solver::AbstractSolver=ODESolver()
 )
     if step
-        return _step_forward(unit, input, params, init_states, solver)
+        return _step_forward(unit, input, pas, solver)
     else
-        return _whole_forward(unit, input, params, init_states, solver)
+        return _whole_forward(unit, input, pas, solver)
     end
 end
 
 function _step_forward(
     unit::HydroUnit,
     input::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector,
+    pas::ComponentVector,
     solver::AbstractSolver,
 )
     # * This function is calculated element by element
     fluxes = input
     for ele in unit.elements
-        fluxes = merge(fluxes, ele(fluxes, params, init_states, solver=solver))
+        fluxes = merge(fluxes, ele(fluxes, pas, solver=solver))
     end
     fluxes
 end
@@ -143,10 +146,10 @@ end
 function _whole_forward(
     unit::HydroUnit,
     input::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector,
+    pas::ComponentVector,
     solver::AbstractSolver,
 )
+    params, init_states = pas[:params], pas[:initstates]
     sys = setup_input(unit, input=input[unit.input_names], time=input[:time])
     prob = build_prob(unit, sys,
         input=input, params=params,
@@ -155,7 +158,9 @@ function _whole_forward(
     solved_states = solver(prob, unit.state_names)
     fluxes = merge(input, solved_states)
     for ele in unit.elements
-        fluxes = merge(fluxes, ele(fluxes, params, solved_states=solved_states))
+        for func in ele.funcs
+            fluxes = merge(fluxes, func(fluxes, params))
+        end
     end
     fluxes
 end

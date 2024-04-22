@@ -6,8 +6,8 @@ end
 
 function param_box_optim(
     component::AbstractComponent;
-    tunable_params::ComponentArray,
-    const_params::ComponentArray,
+    tunable_pas::ComponentArray,
+    const_pas::ComponentArray,
     input::NamedTuple,
     target::NamedTuple,
     kwargs...,
@@ -16,36 +16,38 @@ function param_box_optim(
     针对模型参数进行二次优化
     """
     # 获取需要优化的参数名称
-    tunable_param_axes = getaxes(tunable_params)
-
     solve_alg = get(kwargs, :solve_alg, BBO_adaptive_de_rand_1_bin_radiuslimited())
     target_name = get(kwargs, :target_name, :flow)
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
-    lb = get(kwargs, :lb, zeros(length(tunable_params)))
-    ub = get(kwargs, :ub, ones(length(tunable_params)) .* 100)
-    maxiters=get(kwargs, :maxiters, 10)
+    lb = get(kwargs, :lb, zeros(length(tunable_pas)))
+    ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
+    maxiters = get(kwargs, :maxiters, 10)
+
+    tunable_pas_axes = getaxes(tunable_pas)
 
     predict_func(x, p) = begin
-        tunable_params_type = eltype(x)
-        tmp_tunable_params = ComponentVector(x, tunable_param_axes)
-        tmp_params = ComponentVector(tmp_tunable_params; tunable_params_type.(const_params)...)
-        component(input, tmp_params, tmp_params)
+        tunable_pas_type = eltype(x)
+        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+        const_pas = tunable_pas_type.(const_pas)
+        tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
+        component(input, tmp_pas)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
 
     # 构建问题
     optf = Optimization.OptimizationFunction(objective)
-    optprob = Optimization.OptimizationProblem(optf, collect(tunable_params), lb=lb, ub=ub)
+    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), lb=lb, ub=ub)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
-    namedtuple(tunable_param_names, sol.u)
+
+    ComponentVector(sol.u, tunable_pas_axes)
 end
 
 function param_grad_optim(
     component::AbstractComponent;
-    tunable_params::AbstractVector,
-    const_params::AbstractVector,
+    tunable_pas::AbstractVector,
+    const_pas::AbstractVector,
     input::NamedTuple,
     target::NamedTuple,
     kwargs...,
@@ -54,43 +56,32 @@ function param_grad_optim(
     针对模型参数进行二次优化
     """
     # 获取需要优化的参数名称
-    tunable_param_names = [p.name for p in tunable_params]
-    default_values = [p.default for p in tunable_params]
-
-    # 设置默认weight和errfunc
-    error_weight = get(kwargs, :error_weight, Dict(k => 1.0 for k in keys(target)))
-    error_func = get(kwargs, :error_func, Dict(k => rmse for k in keys(target)))
-
     solve_alg = get(kwargs, :solve_alg, Adam())
+    adtype = get(kwargs, :adtype, Optimization.AutoFiniteDiff())  # AutoForwardDiff and AutoFiniteDiff
+    target_name = get(kwargs, :target_name, :flow)
+    loss_func = get(kwargs, :loss_func, mse)
+    callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
 
-    # build problem
-    # for ele in vcat(component.surf_layer, component.soil_layer, component.slope_layer)
-    #     if length(ele.dfuncs) > 0
-    #         build_prob!(ele, input=input)
-    #     end
-    # end
-
-    # TODO 联合callback库有一个统一的标准
-    function callback_func(p, l)
-        @info l
-        false
-    end
+    tunable_pas_axes = getaxes(tunable_pas)
 
     # 内部构造一个function
-    function objective(u, p)
-        tmp_tunable_params = namedtuple(tunable_param_names, u)
-        tmp_params = merge(tmp_tunable_params, namedtuple([p.name for p in const_params], eltype(u).([p.value for p in const_params])))
-        predict = component(input, tmp_params[component.param_names], tmp_params[component.state_names])
-        loss = sum((target[:flow] .- predict[:flow]) .^ 2) / length(target[:flow])
-        return loss
+    predict_func(x, p) = begin
+        tunable_pas_type = eltype(x)
+        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+        const_pas = tunable_pas_type.(const_pas)
+        tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
+        component(input, tmp_pas, step=false)
     end
 
+    objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
+
     # 构建问题
-    optf = Optimization.OptimizationFunction(objective, get(kwargs, :adtype, Optimization.AutoForwardDiff())) # AutoForwardDiff and AutoFiniteDiff
-    optprob = Optimization.OptimizationProblem(optf, default_values)
+    optf = Optimization.OptimizationFunction(objective, adtype)
+    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas))
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
-    namedtuple(tunable_param_names, sol.u)
+    
+    ComponentVector(sol.u, tunable_pas_axes)
 end
 
 function hybridparams_optimize!()
