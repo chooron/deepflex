@@ -17,7 +17,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 tunable_pas = ComponentVector(exphydro=(unit=(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin),),))
 const_pas = ComponentVector(exphydro=(unit=(initstates=ComponentVector(snowwater=0.0, soilwater=1300.0),), route=(params=ComponentVector(),), weight=1.0))
 
-params_axes = getaxes(default_params)
+params_axes = getaxes(tunable_pas)
 
 model = DeepFlex.ExpHydro_Node(name=:exphydro)
 
@@ -43,5 +43,4 @@ best_pas = DeepFlex.param_grad_optim(
 )
 
 total_params = merge_ca(best_pas, const_pas)[:param]
-
-reulst = model(input, total_params)
+result = model(input, total_params, step=false)

@@ -40,8 +40,25 @@ function build_itp_system(
 )
     eqs = Equation[]
     for nm in keys(input)
-        tmp_itp = LinearInterpolation(input[nm], time, extrapolate=true)
-        push!(eqs, varinfo[nm] ~ tmp_itp(t))
+        #* 这个是原始的构建方法
+        # # tmp_itp = LinearInterpolation(input[nm], time, extrapolate=true)
+        # # push!(eqs, varinfo[nm] ~ tmp_itp(t))
+
+        #* 这个是采用eval实现注册的构建方法
+        # func_nm = Symbol(nm, "_itp")
+        # tmp_itp(t) = LinearInterpolation(input[nm], time)(t)
+        # eval(:($(func_nm)(t) = $tmp_itp(t)))
+        # eval(:(@register_symbolic $(func_nm)(t)))
+        # push!(eqs, eval(:($(varinfo[nm]) ~ $(func_nm)(t))))
+
+        func_nm = Symbol(nm, "_itp")
+        ex = :($(func_nm)(t) -> LinearInterpolation(input[nm], time)(t))
+        
+
+        tmp_itp(t) = LinearInterpolation(input[nm], time)(t)
+        eval(:($(func_nm)(t) = $tmp_itp(t)))
+        eval(:(@register_symbolic $(func_nm)(t)))
+        push!(eqs, eval(:($(varinfo[nm]) ~ $(func_nm)(t))))
     end
     ODESystem(eqs, t; name=Symbol(name, :_itp_sys))
 end

@@ -71,7 +71,7 @@ function param_grad_optim(
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         const_pas = tunable_pas_type.(const_pas)
         tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
-        component(input, tmp_pas, step=false)
+        component(input, tmp_pas, step=true)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])

@@ -110,10 +110,7 @@ function build_prob(
     end
 
     #* build problem
-    prob = ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
-    println(parameter_values(prob))
-    
-    prob
+    ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
 end
 
 function (unit::HydroUnit)(

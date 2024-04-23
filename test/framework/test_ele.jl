@@ -21,4 +21,4 @@ df = DataFrame(data);
 ts = 1:10000
 input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = DeepFlex.ODESolver()
-@btime results = ele(input, pas, solver=solver)
+results = ele(input, pas, solver=solver)
