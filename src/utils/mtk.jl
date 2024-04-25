@@ -32,6 +32,15 @@ function build_ele_system(
     ODESystem(eqs, t; name=Symbol(name, :sys))
 end
 
+macro itpfn(name, data, time)
+    fn = Symbol(name, :_itp)
+    quote
+        $(esc(fn))(t) = LinearInterpolation($(esc(data)), $(esc(time)))(t)
+        $(esc(fn))(t::Num) = SymbolicUtils.term($(esc(fn)), Symbolics.unwrap(t))
+        $(esc(fn))(t)
+    end
+end
+
 function build_itp_system(
     input::NamedTuple,
     time::AbstractVector,
@@ -39,26 +48,9 @@ function build_itp_system(
     name::Symbol
 )
     eqs = Equation[]
-    for nm in keys(input)
-        #* 这个是原始的构建方法
-        # # tmp_itp = LinearInterpolation(input[nm], time, extrapolate=true)
-        # # push!(eqs, varinfo[nm] ~ tmp_itp(t))
-
-        #* 这个是采用eval实现注册的构建方法
-        # func_nm = Symbol(nm, "_itp")
-        # tmp_itp(t) = LinearInterpolation(input[nm], time)(t)
-        # eval(:($(func_nm)(t) = $tmp_itp(t)))
-        # eval(:(@register_symbolic $(func_nm)(t)))
-        # push!(eqs, eval(:($(varinfo[nm]) ~ $(func_nm)(t))))
-
-        func_nm = Symbol(nm, "_itp")
-        ex = :($(func_nm)(t) -> LinearInterpolation(input[nm], time)(t))
-        
-
-        tmp_itp(t) = LinearInterpolation(input[nm], time)(t)
-        eval(:($(func_nm)(t) = $tmp_itp(t)))
-        eval(:(@register_symbolic $(func_nm)(t)))
-        push!(eqs, eval(:($(varinfo[nm]) ~ $(func_nm)(t))))
+    for (nm, ip) in pairs(input)
+        tmp_itp = @itpfn(nm, ip, time)
+        push!(eqs, varinfo[nm] ~ tmp_itp)
     end
     ODESystem(eqs, t; name=Symbol(name, :_itp_sys))
 end

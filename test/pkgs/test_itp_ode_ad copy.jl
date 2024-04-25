@@ -5,8 +5,7 @@ using DataFrames
 using CSV
 using DataInterpolations
 using SciMLSensitivity
-# using Zygote
-# using ComponentArrays , Optimisers
+
 using BenchmarkTools
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
@@ -43,10 +42,8 @@ itp_L(t) = LinearInterpolation(lday_vec, time)(t)
 itp_P(t) = LinearInterpolation(prcp_vec, time)(t)
 itp_T(t) = LinearInterpolation(temp_vec, time)(t)
 
-var_nm = :flow
-
-eval(Meta.parse("itp_$(var_nm)(t) = LinearInterpolation($(var_nm)_vec, time)(t)"))
-eval(Meta.parse("@register_symbolic itp_$(var_nm)(t)"))
+# eval(Meta.parse("itp_$(var_nm)(t) = LinearInterpolation($(var_nm)_vec, time)(t)"))
+# eval(Meta.parse("@register_symbolic itp_$(var_nm)(t)"))
 
 # @register_symbolic itp_L(t)
 # @register_symbolic itp_P(t)

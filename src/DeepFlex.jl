@@ -7,6 +7,9 @@ using Random
 using ComponentArrays
 using NamedTupleTools
 using DataFrames
+using Reexport
+using RuntimeGeneratedFunctions
+RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # run time stats
 using BenchmarkTools
@@ -15,6 +18,7 @@ using BenchmarkTools
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using Symbolics
+using SymbolicUtils
 using SymbolicIndexingInterface: parameter_values, state_values
 using SciMLStructures: Tunable, replace, replace!
 

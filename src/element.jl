@@ -68,6 +68,10 @@ function HydroElement(
     )
 end
 
+# macro hydroelement(def)
+
+# end
+
 function RouteElement(;
     name::Symbol,
     funcs::Vector)
