@@ -1,60 +1,111 @@
+using ModelingToolkitNeuralNets
 using ModelingToolkit
-using ModelingToolkitStandardLibrary.Blocks: RealInput, RealOutput
-using Optimization, OptimizationOptimisers
+import ModelingToolkit.t_nounits as t
+import ModelingToolkit.D_nounits as Dt
+using ModelingToolkitStandardLibrary.Blocks
+using OrdinaryDiffEq
+using Optimization
+using OptimizationOptimisers: Adam
+using SciMLStructures
+using SciMLStructures: Tunable
+using SymbolicIndexingInterface
+using StableRNGs
 using Lux
-using Random
-using ComponentArrays
-using LuxCore: stateless_apply
+using Plots
 
-model = Lux.Chain(Lux.Dense(3, 16, tanh), Lux.Dense(16, 16, leakyrelu), Lux.Dense(16, 1, leakyrelu), name=:model)
-rng = MersenneTwister()
-Random.seed!(rng, 42)
-ps, st = Lux.setup(rng, model)
-time = 1:100
-x1 = sin.(time)
-x2 = cos.(time)
-x3 = tan.(time)
-x = hcat(x1, x2, x3)'
-y = @.(2 * x1 + 3 * x2 - 5 * x3) + rand(100)
-y_hat = vec(model(x, ps, st)[1])
-ca = ComponentArray{Float64}(ps)
-@variables t
-@parameters p[1:length(ca)] = Vector(ca)
-@parameters T::typeof(typeof(p))=typeof(p) [tunable = false]
-
-@named input = RealInput(nin = 3)
-@named output = RealOutput(nout = 1)
-
-function lazyconvert(T, x::Symbolics.Arr)
-    Symbolics.array_term(convert, T, x, size = size(x))
+Fbrk = 100.0
+vbrk = 10.0
+Fc = 80.0
+vst = vbrk / 10
+vcol = vbrk * sqrt(2)
+function friction(v)
+    sqrt(2 * MathConstants.e) * (Fbrk - Fc) * exp(-(v / vst)^2) * (v / vst) +
+    Fc * tanh(v / vcol)
 end
 
-out = stateless_apply(model, input.u, lazyconvert(typeof(ca), p))
-eqs = [output.u ~ out]
-@named ude_comp = ODESystem(
-    eqs, t_nounits, [], [p, T], systems = [input, output])
-# @variables layer1_w[1:16, 1:3], layer1_b[1:16, 1:1]
-# @variables layer2_w[1:16, 1:16], layer2_b[1:16, 1:1]
-# @variables layer3_w[1:1, 1:16], layer3_b[1:1, 1:1]
+function friction_true()
+    @variables y(t) = 0.0
+    @constants Fu = 120.0
+    eqs = [
+        Dt(y) ~ Fu - friction(y)
+    ]
+    return ODESystem(eqs, t, name = :friction_true)
+end
 
-# # function loss_func(p)
-# #     y_hat = vec(model(x, p, st)[1])
-# #     sum(abs(y .- y_hat))
-# # end
-# p_tuple = (layer_1=(weight=layer1_w, bias=layer1_b), layer_2=(weight=layer2_w, bias=layer2_b), layer_3=(weight=layer3_w, bias=layer3_b))
-# loss_func = (sum((y .- vec(model(x, p_tuple, st)[1])) .^ 2))
+model_true = structural_simplify(friction_true())
+prob_true = ODEProblem(model_true, [], (0, 0.1), [])
+sol_ref = solve(prob_true, Rodas4(); saveat = 0.001)
 
+scatter(sol_ref, label = "velocity")
+scatter(sol_ref.t, friction.(first.(sol_ref.u)), label = "friction force")
 
-# sys = OptimizationSystem(loss_func, [layer1_w; layer1_b; layer2_w; layer2_b; layer3_w; layer3_b], [], name=:sys)
-# sys = complete(sys)
-# u0 = [
-#     layer1_w => ps[:layer_1][:weight],
-#     layer1_b => ps[:layer_1][:bias],
-#     layer2_w => ps[:layer_2][:weight],
-#     layer2_b => ps[:layer_2][:bias],
-#     layer3_w => ps[:layer_3][:weight],
-#     layer3_b => ps[:layer_3][:bias],
-# ]
-# prob = OptimizationProblem(sys, u0)
-# solve(prob, GradientDescent())
+function friction_ude(Fu)
+    @variables y(t) = 0.0
+    @constants Fu = Fu
+    @named nn_in = RealInputArray(nin = 1)
+    @named nn_out = RealOutputArray(nout = 1)
+    eqs = [Dt(y) ~ Fu - nn_in.u[1]
+           y ~ nn_out.u[1]]
+    return ODESystem(eqs, t, name = :friction, systems = [nn_in, nn_out])
+end
 
+Fu = 120.0
+model = friction_ude(Fu)
+
+chain = Lux.Chain(
+    Lux.Dense(1 => 10, Lux.mish, use_bias = false),
+    Lux.Dense(10 => 10, Lux.mish, use_bias = false),
+    Lux.Dense(10 => 1, use_bias = false)
+)
+@named nn = NeuralNetworkBlock(1, 1; chain = chain, rng = StableRNG(1111))
+
+eqs = [connect(model.nn_in, nn.output)
+       connect(model.nn_out, nn.input)]
+
+ude_sys = complete(ODESystem(eqs, t, systems = [model, nn], name = :ude_sys))
+sys = structural_simplify(ude_sys)
+
+function loss(x, (prob, sol_ref, get_vars, get_refs))
+    new_p = SciMLStructures.replace(Tunable(), prob.p, x)
+    new_prob = remake(prob, p = new_p, u0 = eltype(x).(prob.u0))
+    ts = sol_ref.t
+    new_sol = solve(new_prob, Rodas4(), saveat = ts, abstol = 1e-8, reltol = 1e-8)
+    loss = zero(eltype(x))
+    for i in eachindex(new_sol.u)
+        loss += sum(abs2.(get_vars(new_sol, i) .- get_refs(sol_ref, i)))
+    end
+    if SciMLBase.successful_retcode(new_sol)
+        loss
+    else
+        Inf
+    end
+end
+
+of = OptimizationFunction{true}(loss, AutoFiniteDiff())
+
+prob = ODEProblem(sys, [], (0, 0.1), [])
+get_vars = getu(sys, [sys.friction.y])
+get_refs = getu(model_true, [model_true.y])
+x0 = reduce(vcat, getindex.((default_values(sys),), tunable_parameters(sys)))
+
+cb = (opt_state, loss) -> begin
+    @info "step $(opt_state.iter), loss: $loss"
+    return false
+end
+
+op = OptimizationProblem(of, x0, (prob, sol_ref, get_vars, get_refs))
+res = solve(op, Adam(5e-3); maxiters = 1000, callback = cb)
+
+res_p = SciMLStructures.replace(Tunable(), prob.p, res)
+res_prob = remake(prob, p = res_p)
+res_sol = solve(res_prob, Rodas4(), saveat = sol_ref.t)
+
+initial_sol = solve(prob, Rodas4(), saveat = sol_ref.t)
+
+scatter(sol_ref, idxs = [model_true.y], label = "ground truth velocity")
+plot!(res_sol, idxs = [sys.friction.y], label = "velocity after training")
+plot!(initial_sol, idxs = [sys.friction.y], label = "velocity before training")
+
+scatter(sol_ref.t, friction.(first.(sol_ref.u)), label = "ground truth friction")
+plot!(res_sol.t, Fu .- first.(res_sol(res_sol.t, Val{1}).u),
+    label = "friction from neural network")

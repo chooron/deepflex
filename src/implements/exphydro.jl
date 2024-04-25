@@ -1,11 +1,12 @@
 @reexport module ExpHydro
 
 using ..DeepFlex
+using ..DeepFlex.NamedTupleTools
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SurfElement(; name::Symbol)
+function Surface(; name::Symbol)
     funcs = [
         DeepFlex.PetFlux([:temp, :lday]),
         DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
@@ -19,74 +20,74 @@ function SurfElement(; name::Symbol)
     ]
 
     DeepFlex.HydroElement(
-        name=Symbol(name, :_surf_),
+        Symbol(name, :_surf_),
         funcs=funcs,
         dfuncs=dfuncs
     )
 end
 
-# """
-# SoilWaterReservoir in Exp-Hydro
-# """
-# function SoilElement(; name::Symbol)
-#     funcs = [
-#         EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-#         BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
-#         SurfaceflowFlux([:soilwater], param_names=[:Smax]),
-#     ]
+"""
+SoilWaterReservoir in Exp-Hydro
+"""
+function Soil(; name::Symbol)
+    funcs = [
+        DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
+        DeepFlex.BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
+        DeepFlex.SurfaceflowFlux([:soilwater], param_names=[:Smax]),
+    ]
 
-#     dfuncs = [
-#         DifferFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
-#     ]
+    dfuncs = [
+        DeepFlex.DifferFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
+    ]
 
-#     HydroElement(
-#         name=Symbol(name, :_soil_),
-#         funcs=funcs,
-#         dfuncs=dfuncs
-#     )
-# end
+    DeepFlex.HydroElement(
+        Symbol(name, :_soil_),
+        funcs=funcs,
+        dfuncs=dfuncs
+    )
+end
 
-# """
-# Inner Route Function in Exphydro
-# """
-# function ZoneElement(; name::Symbol)
+"""
+Inner Route Function in Exphydro
+"""
+function Zone(; name::Symbol)
 
-#     funcs = [
-#         FlowFlux([:baseflow, :surfaceflow])
-#     ]
+    funcs = [
+        DeepFlex.FlowFlux([:baseflow, :surfaceflow])
+    ]
 
-#     HydroElement(
-#         name=name,
-#         funcs=funcs
-#     )
-# end
+    DeepFlex.HydroElement(
+        Symbol(name, :_zone_),
+        funcs=funcs
+    )
+end
 
-# function Route(; name::Symbol)
+function Route(; name::Symbol)
 
-#     funcs = [
-#         SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
-#     ]
+    funcs = [
+        DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+    ]
 
-#     RouteElement(
-#         name=name,
-#         funcs=funcs
-#     )
-# end
+    DeepFlex.HydroElement(
+        name,
+        funcs=funcs
+    )
+end
 
-# function Unit(; name::Symbol)
-#     elements = [
-#         SurfElement(name=name),
-#         SoilElement(name=name),
-#         ZoneElement(name=name),
-#     ]
-#     HydroUnit(name, elements=elements)
-# end
+function Unit(; name::Symbol)
+    elements = [
+        Surface(name=name),
+        Soil(name=name),
+        Zone(name=name),
+    ]
+    DeepFlex.HydroUnit(name, elements=elements)
+end
 
-# function Node(; name::Symbol)
-#     HydroNode(
-#         name,
-#         units=[Unit(name=name)],
-#         routes=namedtuple([name], [Route(name=name)])
-#     )
-# end
+function Node(; name::Symbol)
+    DeepFlex.HydroNode(
+        name,
+        units=[Unit(name=name)],
+        routes=namedtuple([name], [Route(name=name)])
+    )
+end
 end

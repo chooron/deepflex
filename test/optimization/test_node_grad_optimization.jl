@@ -19,7 +19,7 @@ const_pas = ComponentVector(exphydro=(unit=(initstates=ComponentVector(snowwater
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.ExpHydro_Node(name=:exphydro)
+model = DeepFlex.ExpHydro.Node(name=:exphydro)
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -42,5 +42,5 @@ best_pas = DeepFlex.param_grad_optim(
     target=output,
 )
 
-total_params = merge_ca(best_pas, const_pas)[:param]
+total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
 result = model(input, total_params, step=false)

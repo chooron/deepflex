@@ -10,9 +10,9 @@ include("../../src/DeepFlex.jl")
 
 model = DeepFlex.HydroNode(
     :exphydro_node,
-    units=[DeepFlex.ExpHydro_Unit(name=:exphydro1), DeepFlex.ExpHydro_Unit(name=:exphydro2)],
+    units=[DeepFlex.ExpHydro.Unit(name=:exphydro1), DeepFlex.ExpHydro.Unit(name=:exphydro2)],
     routes=namedtuple([:exphydro1, :exphydro2],
-        [DeepFlex.ExpHydro_RouteElement(name=:exphydro1), DeepFlex.ExpHydro_RouteElement(name=:exphydro2)])
+        [DeepFlex.ExpHydro.Route(name=:exphydro1), DeepFlex.ExpHydro.Route(name=:exphydro2)])
 )
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 

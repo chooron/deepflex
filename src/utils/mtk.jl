@@ -5,7 +5,7 @@ function init_var_param(
     state_names::AbstractVector{Symbol},
     param_names::AbstractVector{Symbol},
 )
-    var_names = vcat(input_names, output_names, state_names)
+    var_names = unique(vcat(input_names, output_names, state_names))
     varinfo = namedtuple(var_names, [first(@variables $nm(t)) for nm in var_names])
     paraminfo = namedtuple(param_names, [first(@parameters $nm) for nm in param_names])
     varinfo, paraminfo
@@ -24,12 +24,24 @@ function build_ele_system(
         tmp_param = namedtuple(get_param_names(func), [paraminfo[nm] for nm in get_param_names(func)])
         push!(eqs, varinfo[first(get_output_names(func))] ~ func(tmp_input, tmp_param)[first(get_output_names(func))])
     end
+
     for dfunc in dfuncs
         tmp_input = namedtuple(get_input_names(dfunc), [varinfo[nm] for nm in get_input_names(dfunc)])
         tmp_param = namedtuple(get_param_names(dfunc), [paraminfo[nm] for nm in get_param_names(dfunc)])
         push!(eqs, D(varinfo[first(get_output_names(dfunc))]) ~ dfunc(tmp_input, tmp_param)[first(get_output_names(dfunc))])
     end
-    ODESystem(eqs, t; name=Symbol(name, :sys))
+    if length(nfuncs) > 0
+        eqs2 = Equation[]
+        base_sys = ODESystem(eqs, t; name=Symbol(name, :base_sys))
+        for nfunc in nfuncs
+            for (idx, nm) in enumerate(get_output_names(nfunc))
+                push!(eqs2, connect(getfield(base_sys, nm), nfunc.nn.output[idx]))
+            end
+        end
+        return complete(ODESystem(eqs2, t, systems = vcat([base_sys], [nfunc.nn for nfunc in nfuncs]), name = :sys)) 
+    else
+        return ODESystem(eqs, t; name=Symbol(name, :base_sys))
+    end
 end
 
 macro itpfn(name, data, time)
@@ -49,8 +61,7 @@ function build_itp_system(
 )
     eqs = Equation[]
     for (nm, ip) in pairs(input)
-        tmp_itp = @itpfn(nm, ip, time)
-        push!(eqs, varinfo[nm] ~ tmp_itp)
+        push!(eqs, varinfo[nm] ~ @itpfn(nm, ip, time))
     end
     ODESystem(eqs, t; name=Symbol(name, :_itp_sys))
 end

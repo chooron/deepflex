@@ -17,7 +17,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 tunable_pas = ComponentVector(exphydro=(unit=(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin),),))
 const_pas = ComponentVector(exphydro=(unit=(initstates=ComponentVector(snowwater=0.0, soilwater=1300.0),), route=(params=ComponentVector(),), weight=1.0))
 
-params_axes = getaxes(default_params)
+params_axes = getaxes(tunable_pas)
 
 lb_list = [0.0, 100.0, 10.0, 0.0, 0.0, -3.0]
 ub_list = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
@@ -25,7 +25,7 @@ ub_list = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
 tunable_param_lb = ComponentVector(lb_list, getaxes(tunable_pas))
 tunable_param_ub = ComponentVector(ub_list, getaxes(tunable_pas))
 
-model = DeepFlex.ExpHydro_Node(name=:exphydro)
+model = DeepFlex.ExpHydro.Node(name=:exphydro)
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -50,6 +50,6 @@ best_pas = DeepFlex.param_box_optim(
     ub=tunable_param_ub,
 )
 
-total_params = merge_ca(best_pas, const_pas)[:param]
+total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
 
 reulst = model(input, total_params)

@@ -57,7 +57,7 @@ function param_grad_optim(
     """
     # 获取需要优化的参数名称
     solve_alg = get(kwargs, :solve_alg, Adam())
-    adtype = get(kwargs, :adtype, Optimization.AutoFiniteDiff())  # AutoForwardDiff and AutoFiniteDiff
+    adtype = get(kwargs, :adtype, Optimization.AutoForwardDiff())  # AutoForwardDiff and AutoFiniteDiff
     target_name = get(kwargs, :target_name, :flow)
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)

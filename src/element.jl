@@ -18,75 +18,42 @@ struct HydroElement <: AbstractElement
     varinfo::NamedTuple
     paraminfo::NamedTuple
     sys::Union{ODESystem,Nothing}
-    prob::Union{ODEProblem,Nothing}
-end
 
-struct RouteElement <: AbstractElement
-    #* component名称
-    name::Symbol
-    #* 输入输出名称
-    input_names::Vector{Symbol}
-    output_names::Vector{Symbol}
-    #* 参数名称
-    param_names::Vector{Symbol}
-    #* fluxes (混有simpleflux和RouteFlux)
-    funcs::Vector
-end
-
-function HydroElement(
-    ; name::Symbol,
-    funcs::Vector,
-    dfuncs::Vector=SimpleFlux[],
-)
-    # combine the info of func and d_func
-    input_names1, output_names, param_names1 = get_func_infos(funcs)
-    input_names2, state_names, param_names2 = get_dfunc_infos(dfuncs)
-    # 避免一些中间变量混淆为输入要素
-    setdiff!(input_names2, output_names)
-    # 合并两种func的输入要素
-    input_names = union(input_names1, input_names2)
-    # 删除输入要素的状态要素
-    setdiff!(input_names, state_names)
-    # 合并两种类型函数的参数
-    param_names = union(param_names1, param_names2)
-    # 条件判断，有时候不需要构建
-    varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
-    sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
-    prob = nothing
-    return HydroElement(
-        name,
-        input_names,
-        output_names,
-        state_names,
-        param_names,
-        funcs,
-        dfuncs,
-        varinfo,
-        paraminfo,
-        sys,
-        prob
+    function HydroElement(
+        name::Symbol;
+        funcs::Vector,
+        dfuncs::Vector=SimpleFlux[],
     )
+        # combine the info of func and d_func
+        input_names1, output_names, param_names1 = get_func_infos(funcs)
+        input_names2, state_names, param_names2 = get_dfunc_infos(dfuncs)
+        # 避免一些中间变量混淆为输入要素
+        setdiff!(input_names2, output_names)
+        # 合并两种func的输入要素
+        input_names = union(input_names1, input_names2)
+        # 删除输入要素的状态要素
+        setdiff!(input_names, state_names)
+        # 合并两种类型函数的参数
+        param_names = union(param_names1, param_names2)
+        # 条件判断，有时候不需要构建
+        varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
+        sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
+        return new(
+            name,
+            input_names,
+            output_names,
+            state_names,
+            param_names,
+            funcs,
+            dfuncs,
+            varinfo,
+            paraminfo,
+            sys
+        )
+    end
+
 end
 
-# macro hydroelement(def)
-
-# end
-
-function RouteElement(;
-    name::Symbol,
-    funcs::Vector)
-
-    # funcs including both SimpleFLux and RouteFlux
-    input_names, output_names, param_names = get_func_infos(funcs)
-
-    return RouteElement(
-        name,
-        input_names,
-        output_names,
-        param_names,
-        funcs,
-    )
-end
 
 # Element Methods
 function get_all_luxnnflux(ele::HydroElement)
@@ -106,9 +73,10 @@ function (ele::HydroElement)(
     pas::ComponentVector;
     solver::AbstractSolver=ODESolver()
 )
-    params, init_states = pas[:params], pas[:initstates]
+    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
     fluxes = input
     if length(ele.dfuncs) > 0
+        init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
         solved_states = solve_prob(ele, input, params, init_states, solver=solver)
         fluxes = merge(input, solved_states)
     end
@@ -116,32 +84,6 @@ function (ele::HydroElement)(
         fluxes = merge(fluxes, func(fluxes, params))
     end
     fluxes
-end
-
-function (ele::RouteElement)(;
-    input::NamedTuple,
-    pas::ComponentVector,
-)
-    params = pas[:params]
-    params = params isa AbstractVector ? ComponentVector() : params
-    fluxes = input
-    for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, params))
-    end
-    fluxes
-end
-
-function (ele::RouteElement)(
-    input::NamedTuple,
-    params::ComponentVector,
-)
-    # todo 这里需要添加input，params，init_states的参数校核
-    fluxes = input
-    #* 最后就是直接通过flux进行计算
-    for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, params))
-    end
-    return fluxes
 end
 
 function setup_input(
@@ -171,7 +113,6 @@ function build_prob(
     #* build problem
     ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
 end
-
 
 function build_prob(
     ele::HydroElement;

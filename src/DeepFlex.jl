@@ -8,8 +8,7 @@ using ComponentArrays
 using NamedTupleTools
 using DataFrames
 using Reexport
-using RuntimeGeneratedFunctions
-RuntimeGeneratedFunctions.init(@__MODULE__)
+using StableRNGs
 
 # run time stats
 using BenchmarkTools

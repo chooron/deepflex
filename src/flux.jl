@@ -10,64 +10,57 @@ struct SimpleFlux <: AbstractFlux
     func::Function
     # step function
     step_func::Function
-end
 
-function SimpleFlux(
-    input_names::Union{Symbol,Vector{Symbol},Vector{Pair}},
-    output_names::Union{Symbol,Vector{Symbol}};
-    param_names::Vector{Symbol},
-    func::Function
-)
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names,
-        func,
-        DEFAULT_SMOOTHER
+    function SimpleFlux(
+        input_names::Union{Symbol,Vector{Symbol},Vector{Pair}},
+        output_names::Union{Symbol,Vector{Symbol}};
+        param_names::Vector{Symbol},
+        func::Function
     )
+        return new(
+            input_names,
+            output_names,
+            param_names,
+            func,
+            DEFAULT_SMOOTHER
+        )
+    end
 end
 
-function StdNormFlux(
+StdNormFlux(
     input_names::Symbol,
     output_names::Symbol=Symbol(:norm_, input_names);
     param_names::Vector{Symbol}=[Symbol(:mean_, input_names), Symbol(:std_, input_names)]
+) = SimpleFlux(
+    input_names,
+    output_names,
+    param_names=param_names,
+    func=(i::NamedTuple, p::NamedTuple, sf::Function) ->
+        @.((i[input_names] - p[param_names[1]]) / p[param_names[2]])
 )
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=(i::NamedTuple, p::NamedTuple, sf::Function) ->
-            @.((i[input_names] - p[param_names[1]]) / p[param_names[2]])
-    )
-end
 
-function MinMaxNormFlux(
+MinMaxNormFlux(
     input_names::Symbol,
     output_names::Symbol=Symbol(:norm_, input_names);
     param_names::Vector{Symbol}=[Symbol(:max_, input_names), Symbol(:min_, input_names)]
+) = SimpleFlux(
+    input_names,
+    output_names,
+    param_names=param_names,
+    func=(i::NamedTuple, p::NamedTuple, sf::Function) ->
+        @.((i[input_names] - p[param_names[2]]) / (p[param_names[1]] - p[param_names[2]]))
 )
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=(i::NamedTuple, p::NamedTuple, sf::Function) ->
-            @.((i[input_names] - p[param_names[2]]) / (p[param_names[1]] - p[param_names[2]]))
-    )
-end
 
-
-function DifferFlux(
+DifferFlux(
     influx_names::Vector{Symbol},
     outflux_names::Vector{Symbol},
     state_names::Symbol;
+) = SimpleFlux(
+    vcat(influx_names, outflux_names),
+    state_names,
+    param_names=Symbol[],
+    func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in influx_names]) - sum([i[nm] for nm in outflux_names])
 )
-    SimpleFlux(
-        vcat(influx_names, outflux_names),
-        state_names,
-        param_names=Symbol[],
-        func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in influx_names]) - sum([i[nm] for nm in outflux_names])
-    )
-end
 
 function get_input_names(func::AF) where {AF<:AbstractFlux}
     if eltype(func.input_names) isa Pair
@@ -98,7 +91,7 @@ function get_param_names(func::AF) where {AF<:AbstractFlux}
     param_names
 end
 
-function get_func_infos(funcs::Vector; exclude_output_names::Bool=true)
+function get_func_infos(funcs::Vector)
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     param_names = Vector{Symbol}()
@@ -108,7 +101,6 @@ function get_func_infos(funcs::Vector; exclude_output_names::Bool=true)
         tmp_output_names = get_output_names(func)
         tmp_param_names = get_param_names(func)
         # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
-        # tmp_output_names = exclude_output_names ? setdiff(tmp_output_names, tmp_input_names) : tmp_output_names
         tmp_output_names = setdiff(tmp_output_names, input_names)
         # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
         tmp_input_names = setdiff(tmp_input_names, output_names)
@@ -222,32 +214,26 @@ function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
 end
 
 # TODO 关于Lux nn还需要进一步调整
-
-struct LuxNNFlux <: AbstractNNFlux
+struct NeuralFlux <: AbstractNNFlux
     input_names::Vector{Symbol}
     output_names::Union{Vector{Symbol},Symbol}
     param_names::Symbol
-    init_params::NamedTuple
     func::Function
 end
 
-function LuxNNFlux(
+function NeuralFlux(
     input_names::Vector{Symbol},
     output_names::Symbol;
     param_names::Symbol,
     model::Lux.AbstractExplicitLayer,
-    seed::Integer=42
-)
-    rng = MersenneTwister()
-    Random.seed!(rng, seed)
-    ps, st = Lux.setup(rng, model)
-    func = (x, p) -> model(x, p, st)[1]
-    LuxNNFlux(input_names, output_names, param_names, ps, func)
+)    
+    func = (x, p) -> stateless_apply(model, x, p)[1]
+    LuxNNFlux(input_names, output_names, param_names, func)
 end
 
-function (flux::LuxNNFlux)(input::NamedTuple, parameters::Union{ComponentVector,NamedTuple})
+function (flux::NeuralFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
     x = hcat([input[nm] for nm in flux.input_names]...)'
-    y_pred = flux.func(x, parameters[flux.param_names])
+    y_pred = flux.func(x, params[flux.param_names])
     if size(y_pred, 2) > 1
         output = namedtuple(flux.output_names, [y_pred[i, :] for (i, k) in enumerate(flux.output_names)])
     else
@@ -255,3 +241,17 @@ function (flux::LuxNNFlux)(input::NamedTuple, parameters::Union{ComponentVector,
     end
     return output
 end
+
+# macro simpleflux(input_names, output_names, param_names)
+#     func_nm = Symbol(output_names, :_func)
+#     println(func_nm)
+#     quote
+#         simple_flux = SimpleFlux(
+#             $(esc(input_names)),
+#             $(esc(output_names)),
+#             param_names=$(esc(param_names)),
+#             func=$(func_nm),
+#         )
+#         simple_flux
+#     end
+# end
