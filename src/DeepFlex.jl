@@ -16,6 +16,7 @@ using BenchmarkTools
 # ModelingToolkit building
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkitNeuralNets
 using Symbolics
 using SymbolicUtils
 using SymbolicIndexingInterface: parameter_values, state_values
@@ -102,6 +103,7 @@ include("functions/unithydro.jl")
 # Implements Models
 # include("implements/PRNN.jl")
 include("implements/exphydro.jl")
+include("implements/m50.jl")
 # include("implements/gr4j.jl")
 # include("implements/hbv.jl")
 # include("implements/hymod.jl")

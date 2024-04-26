@@ -59,7 +59,8 @@ DifferFlux(
     vcat(influx_names, outflux_names),
     state_names,
     param_names=Symbol[],
-    func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in influx_names]) - sum([i[nm] for nm in outflux_names])
+    func=(i::NamedTuple, p::NamedTuple, sf::Function) -> sum([i[nm] for nm in influx_names]) -
+                                                         sum([i[nm] for nm in outflux_names])
 )
 
 function get_input_names(func::AF) where {AF<:AbstractFlux}
@@ -190,7 +191,6 @@ function LagFlux(
     )
 end
 
-
 function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
     l_input = input[flux.input_names]
     #* 首先将lagflux转换为discrete problem
@@ -219,16 +219,19 @@ struct NeuralFlux <: AbstractNNFlux
     output_names::Union{Vector{Symbol},Symbol}
     param_names::Symbol
     func::Function
+    nn::ODESystem
 end
 
 function NeuralFlux(
     input_names::Vector{Symbol},
-    output_names::Symbol;
+    output_names::Vector{Symbol};
     param_names::Symbol,
-    model::Lux.AbstractExplicitLayer,
-)    
+    chain::Lux.AbstractExplicitLayer,
+    seed::Int=42,
+)
     func = (x, p) -> stateless_apply(model, x, p)[1]
-    LuxNNFlux(input_names, output_names, param_names, func)
+    @named nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed))
+    NeuralFlux(input_names, output_names, param_names, func, nn)
 end
 
 function (flux::NeuralFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
