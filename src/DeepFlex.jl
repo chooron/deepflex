@@ -17,6 +17,7 @@ using BenchmarkTools
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkitNeuralNets
+using ModelingToolkitStandardLibrary.Blocks
 using Symbolics
 using SymbolicUtils
 using SymbolicIndexingInterface: parameter_values, state_values
@@ -48,7 +49,6 @@ using OptimizationOptimisers
 
 ## Abstract Component Types
 abstract type AbstractComponent end
-
 abstract type AbstractParamInfo end
 abstract type AbstractSmoother end
 abstract type AbstractSolver end
@@ -67,6 +67,9 @@ abstract type AbstractNode <: AbstractComponent end
 abstract type AbstractNetwork <: AbstractComponent end
 abstract type AbstractRiverNetwork <: AbstractNetwork end
 abstract type AbstractGridNetwork <: AbstractNetwork end
+
+# work for lux nn
+Base.length(::Symbol) = 1
 
 ## Sensealg type
 # const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())

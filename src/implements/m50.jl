@@ -29,8 +29,17 @@ end
 function Soil(; name::Symbol)
 
     # 神经网络的定义是在模型之内，需要提取到模型的参数
-    et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
-    q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+    et_ann = Lux.Chain(
+        Lux.Dense(3 => 16, Lux.tanh),
+        Lux.Dense(16 => 16, Lux.leakyrelu),
+        Lux.Dense(16 => 1, Lux.leakyrelu)
+    )
+
+    q_ann = Lux.Chain(
+        Lux.Dense(2 => 16, Lux.tanh),
+        Lux.Dense(16 => 16, Lux.leakyrelu),
+        Lux.Dense(16 => 1, Lux.leakyrelu)
+    )
 
     funcs = [
         # normalize
@@ -39,9 +48,9 @@ function Soil(; name::Symbol)
         DeepFlex.StdNormFlux(:temp, :norm_temp),
         DeepFlex.StdNormFlux(:prcp, :norm_prcp),
         # ET ANN
-        DeepFlex.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], [:evap], param_names=:etnn, chain=et_ann),
+        DeepFlex.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
         # Q ANN
-        DeepFlex.NeuralFlux([:norm_slw, :norm_prcp], [:flow], param_names=:qnn, chain=q_ann),
+        DeepFlex.NeuralFlux([:norm_slw, :norm_prcp], :flow, param_names=:qnn, chain=q_ann),
     ]
 
     dfuncs = [

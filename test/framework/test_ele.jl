@@ -21,6 +21,14 @@ df = DataFrame(data);
 ts = 1:10000
 input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = DeepFlex.ODESolver()
+# sys = DeepFlex.setup_input(ele, input=input, time=ts)
+# prob = ODEProblem(sys, [], (1, 10000), [])
+# new_p = SciMLStructures.replace(Tunable(), prob.p, [-2.09, 2.6745, 0.1757])
+
+# new_prob = remake(prob,
+#     p=[sys.sf_surf_base_sys.Df => Df, sys.sf_surf_base_sys.Tmax => Tmax, sys.sf_surf_base_sys.Tmin => Tmin],
+#     u0=[sys.sf_surf_base_sys.snowwater => 0.0])
+# ModelingToolkit.MTKParameters
 results = ele(input, pas, solver=solver)
 
 # DeepFlex.@simpleflux([:temp, :lday], "pet", Symbol[])

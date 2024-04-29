@@ -1,3 +1,4 @@
+
 # mtk.jl utils
 function init_var_param(
     input_names::AbstractVector{Symbol},
@@ -6,8 +7,8 @@ function init_var_param(
     param_names::AbstractVector{Symbol},
 )
     var_names = unique(vcat(input_names, output_names, state_names))
-    varinfo = namedtuple(var_names, [first(@variables $nm(t)) for nm in var_names])
-    paraminfo = namedtuple(param_names, [first(@parameters $nm) for nm in param_names])
+    varinfo = namedtuple(var_names, [first(@variables $nm(t) = 0.0) for nm in var_names])
+    paraminfo = namedtuple(param_names, [first(@parameters $nm = 0.0 [tunable = true]) for nm in param_names])
     varinfo, paraminfo
 end
 
@@ -19,42 +20,35 @@ function build_ele_system(
     name::Symbol
 )
     eqs = Equation[]
+    sub_sys = ODESystem[]
     for func in funcs
         if func isa NeuralFlux
-            for (idx, nm) in enumerate(get_input_names(func))
-                push!(eqs, varinfo[nm] ~ func.nn.input.u[idx])
-            end
-            for (idx, nm) in enumerate(get_output_names(func))
-                push!(eqs, varinfo[nm] ~ func.nn.output.u[idx])
-            end
+            # for (idx, nm) in enumerate(get_input_names(func))
+            #     push!(eqs, varinfo[nm] ~ func.nn.input.u[idx])
+            # end
+            # for (idx, nm) in enumerate(get_output_names(func))
+            #     push!(eqs, varinfo[nm] ~ func.nn.output.u[idx])
+            # end
+            # push!(sub_sys, func.nn)
+            nn_in = RealInputArray(nin=length(func.input_names), name=Symbol(func.param_names, :_in_sys))
+            nn_out = RealOutputArray(nout=length(func.output_names), name=Symbol(func.param_names, :_out_sys))
+            eqs = vcat(eqs, [varinfo[nm] ~ nn_in.u[idx] for (idx, nm) in enumerate(get_input_names(func))])
+            eqs = vcat(eqs, [varinfo[nm] ~ nn_out.u[idx] for (idx, nm) in enumerate(get_output_names(func))])
+            eqs = vcat(eqs, [connect(nn_in, func.nn.input), connect(nn_out, func.nn.output)])
+            sub_sys = vcat(sub_sys, [func.nn, nn_in, nn_out])
         else
             tmp_input = namedtuple(get_input_names(func), [varinfo[nm] for nm in get_input_names(func)])
             tmp_param = namedtuple(get_param_names(func), [paraminfo[nm] for nm in get_param_names(func)])
-            # push!(eqs, varinfo[first(get_output_names(func))] ~ func(tmp_input, tmp_param)[first(get_output_names(func))])
-            for nm in get_output_names(func)
-                push!(eqs, varinfo[nm] ~ func(tmp_input, tmp_param)[nm])
-            end
+            eqs = vcat(eqs, [varinfo[nm] ~ func(tmp_input, tmp_param)[nm] for nm in get_output_names(func)])
         end
-
     end
     for dfunc in dfuncs
-        if dfunc isa NeuralFlux
-            for (idx, nm) in enumerate(get_input_names(func))
-                push!(eqs, varinfo[nm] ~ dfunc.nn.input.u[idx])
-            end
-            for (idx, nm) in enumerate(get_output_names(func))
-                push!(eqs, D(varinfo[nm]) ~ dfunc.nn.output.u[idx])
-            end
-        else
-            tmp_input = namedtuple(get_input_names(dfunc), [varinfo[nm] for nm in get_input_names(dfunc)])
-            tmp_param = namedtuple(get_param_names(dfunc), [paraminfo[nm] for nm in get_param_names(dfunc)])
-            # push!(eqs, D(varinfo[first(get_output_names(dfunc))]) ~ dfunc(tmp_input, tmp_param)[first(get_output_names(dfunc))])
-            for nm in get_output_names(dfunc)
-                push!(eqs, D(varinfo[nm]) ~ dfunc(tmp_input, tmp_param)[nm])
-            end
-        end
+        tmp_input = namedtuple(get_input_names(dfunc), [varinfo[nm] for nm in get_input_names(dfunc)])
+        tmp_param = namedtuple(get_param_names(dfunc), [paraminfo[nm] for nm in get_param_names(dfunc)])
+        eqs = vcat(eqs, [D(varinfo[nm]) ~ dfunc(tmp_input, tmp_param)[nm] for nm in get_output_names(dfunc)])
     end
-    return ODESystem(eqs, t; name=Symbol(name, :base_sys))
+    base_sys = ODESystem(eqs, t; name=Symbol(name, :base_sys), systems=sub_sys)
+    base_sys
 end
 
 macro itpfn(name, data, time)
@@ -76,7 +70,7 @@ function build_itp_system(
     for (nm, ip) in pairs(input)
         push!(eqs, varinfo[nm] ~ @itpfn(nm, ip, time))
     end
-    ODESystem(eqs, t; name=Symbol(name, :_itp_sys))
+    ODESystem(eqs, t; name=Symbol(name, :itp_sys))
 end
 
 # function build_nn_system(

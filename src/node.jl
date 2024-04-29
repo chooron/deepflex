@@ -13,35 +13,43 @@ struct HydroNode <: AbstractComponent
     routes::NamedTuple
     #* 节点对应的面积
     area::Number
-end
 
-function HydroNode(name; unit::HydroUnit, route::AbstractElement)
-    HydroNode(
-        name,
-        units=[unit],
-        routes=namedtuple([name], [route]),
-    )
-end
-
-function HydroNode(name; units::AbstractVector{HydroUnit}, routes::NamedTuple, area::Number=100)
-    input_names, output_names, param_names, state_names = get_unit_infos(units)
-
-    #* 合并参数名称
-    param_names = merge(param_names, (weights=[unit.name for unit in units],))
-    for (nm, route) in pairs(routes)
-        param_names = merge(param_names, namedtuple([Symbol(nm, :_route)], [route.param_names]))
+    function HydroNode(name; unit::AbstractVector{<:AbstractElement}, route::AbstractElement, area::Number=100)
+        HydroNode(
+            name,
+            units=namedtuple([name], [unit]),
+            routes=namedtuple([name], [route]),
+            area=area
+        )
     end
 
-    HydroNode(
-        name,
-        input_names,
-        output_names,
-        state_names,
-        param_names,
-        units,
-        routes,
-        area
-    )
+    function HydroNode(name; units::NamedTuple, routes::NamedTuple, area::Number=100)
+        param_tuple_list = []
+        state_tuple_list = []
+        input_names_list = []
+        output_names_list = []
+
+        for nm in keys(units)
+            ele_list, route = units[nm], routes[nm]
+            ele_name_infos = get_element_infos(ele_list)
+            route_name_infos = get_element_infos([route])
+            push!(param_tuple_list, (unit=ele_name_infos[3], route=route_name_infos[3]))
+            push!(state_tuple_list, (unit=ele_name_infos[4], route=route_name_infos[4]))
+            push!(input_names_list, ele_name_infos[1])
+            push!(output_names_list, unique(vcat(ele_name_infos[2], route_name_infos[2])))
+        end
+
+        new(
+            name,
+            namedtuple(keys(units), input_names_list),
+            namedtuple(keys(units), output_names_list),
+            namedtuple(keys(units), state_tuple_list),
+            namedtuple(keys(units), param_tuple_list),
+            units,
+            routes,
+            area
+        )
+    end
 end
 
 function get_unit_infos(units::AbstractVector{HydroUnit})

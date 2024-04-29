@@ -13,12 +13,12 @@
   - [X] 采用mtk.jl对element公式进行整合
 - [ ] lagflux如何改造成mtk.jl
   - [ ] lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变
-- [ ] mtk.jl貌似只能支持一对一输入输出
+- [X] mtk.jl貌似只能支持一对一输入输出(已解决)
 - [ ] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
 
 # 工作计划
 
-- [ ] routing function编写
+- [X] routing function编写
 - [X] 创建模型搭建基础类
 - [X] 针对之前的模型进行ComponentArrays改造
 - [X] 0实参构建模型
@@ -33,11 +33,12 @@
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
 - [X] 将lag function嵌入至Node模块中
 - [ ] Node中添加参数共享的设置
-- [ ] 将多个unit糅合到一块后应该如何表示参数，中间状态等参数，可以像lux.jl那样表示，比较清楚
+- [X] 将多个unit糅合到一块后应该如何表示参数，中间状态等参数，可以像lux.jl那样表示，比较清楚
 - [ ] Node和Network的并行计算
 - [ ] 搭建参数动态估计问题
 - [ ] 如何将水文通量(Flux)转换成一系列类似于MTKstandarylibrary.jl那样的模块
-- [ ] input数据采用namedtuple类型,参数采用ComponentArray类型
+- [X] input数据采用namedtuple类型,参数采用ComponentArray类型
+- [ ] superflexpy中unit是否具有存在意义, unit简单来说就是多个element的组合,可以考虑直接用elements list替代
 
 # 一些结论
 
@@ -48,11 +49,11 @@
 * [X] Component基本计算实现, 涉及从某计算模块至整个流域汇流网络的计算
   * [X] 常微分方程求解(ModelingToolkit.jl, DifferentialEquations.jl)
   * [X] 网络拓扑计算(Graphs.jl)
-* [ ] Component基础的param_optimize参数优化功能实现
-  * [ ] 参数优化
+* [X] Component基础的param_optimize参数优化功能实现
+  * [X] 参数优化
 * [ ] 参数动态模拟估计，Time-vary parameter estimation
-* [ ] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
+* [X] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
 
 # 即将需要做的东西
 
-- [ ] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray
+- [X] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray

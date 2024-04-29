@@ -3,6 +3,7 @@ default_callback_func(p, l) = begin
     @info l
     false
 end
+using ForwardDiff
 
 function param_box_optim(
     component::AbstractComponent;
@@ -23,6 +24,7 @@ function param_box_optim(
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
     maxiters = get(kwargs, :maxiters, 10)
+    step = get(kwargs, :step, false)
 
     tunable_pas_axes = getaxes(tunable_pas)
 
@@ -31,7 +33,7 @@ function param_box_optim(
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         const_pas = tunable_pas_type.(const_pas)
         tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
-        component(input, tmp_pas)
+        component(input, tmp_pas, step=step)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
@@ -62,16 +64,15 @@ function param_grad_optim(
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
+    step = get(kwargs, :step, true)
 
     tunable_pas_axes = getaxes(tunable_pas)
 
     # 内部构造一个function
-    predict_func(x, p) = begin
-        tunable_pas_type = eltype(x)
+    function predict_func(x::AbstractVector{T}, p) where T
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        const_pas = tunable_pas_type.(const_pas)
         tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
-        component(input, tmp_pas, step=true)
+        component(input, tmp_pas, step=step)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])

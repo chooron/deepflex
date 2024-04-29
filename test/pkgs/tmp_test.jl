@@ -8,7 +8,14 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 
 itp_func(t) = LinearInterpolation(rand(100), 1:100, extrapolate=true)(t)
 eqs = [
-    D(x) ~ (α - β * y) * x + itp_func(t)
-    D(y) ~ (δ * x - γ) * y + itp_func(t)
+    D(x) ~ (α - β * y) * x
+    D(y) ~ (δ * x - γ) * y
 ]
-@mtkbuild odesys = ODESystem(eqs, t)
+odesys = structural_simplify(ODESystem(eqs, t, name=:sys))
+
+add_eqs =
+    [x ~ itp_func(t),
+        y ~ itp_func(t)
+    ]
+compose(ODESystem(add_eqs, t; name=Symbol(ele.name, :comp_sys)), odesys)
+# prob = ODEProblem(odesys, [], (0.0, 10.0), [])

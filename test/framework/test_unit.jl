@@ -18,6 +18,6 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/camels/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:100
+ts = 1:10000
 input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-@benchmark results = model(input, pas, step=false) # 分开计算和同时计算消耗的资源差不多
+@benchmark results = model(input, pas, step=true) # 分开计算和同时计算消耗的资源差不多 @benchmark 

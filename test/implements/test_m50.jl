@@ -1,43 +1,50 @@
-# import lib
+# 导入模块
 using CSV
 using DataFrames
+using ComponentArrays
 using BenchmarkTools
-
-# test exphydro model
+using NamedTupleTools
+using DataFrames
+using Lux, LuxCore
+using StableRNGs
+using OrdinaryDiffEq
+using ModelingToolkit
 include("../../src/DeepFlex.jl")
 
-# load data
-file_path = "data/camels/01013500.csv"
+model = DeepFlex.M50.Unit(name=:m50)
+# base param names
+f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
+
+# input data
+file_path = "data/cache/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-time = 1:10000
-lday_vec = df[time, "dayl(day)"]
-prcp_vec = df[time, "prcp(mm/day)"]
-temp_vec = df[time, "tmean(C)"]
-flow_vec = df[time, "flow(mm)"]
+ts = 1:100
 
-# build model
-model = DeepFlex.M50(name=:m50)
+mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
+mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
+mean_temp, std_temp = mean(df[ts, "Temp"]), std(df[ts, "Temp"])
+mean_prcp, std_prcp = mean(df[ts, "Prcp"]), std(df[ts, "Prcp"])
 
+input = (time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"])
 
-# pretrain model
-# DeepFlex.nn_param_optim(model)
+et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+et_ann_p = LuxCore.initialparameters(StableRNG(42), et_ann)
+q_ann_p = LuxCore.initialparameters(StableRNG(42), q_ann)
 
+params = ComponentVector(
+    f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin,
+    mean_snowwater=mean_snowwater, std_snowwater=std_snowwater,
+    mean_soilwater=mean_soilwater, std_soilwater=std_soilwater,
+    mean_temp=mean_temp, std_temp=std_temp,
+    mean_prcp=mean_prcp, std_prcp=std_prcp,
+    etnn=et_ann_p, qnn=q_ann_p)
+initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
+pas = ComponentVector(params=params, initstates=initstates)
 
-inputs = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec))
-
-f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
-params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
-init_states = (snowwater=0.0, soilwater=1303.004248)
-
-
-result = model(input, params, init_states);
-
-result_df = DataFrame(result)
-
-# plot result
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, time, flow_vec, color=:red)
-lines!(ax, time, result_df[!, :flow], color=:blue)
-fig
+solver = DeepFlex.ODESolver()
+prob = DeepFlex.setup_input(model.elements[2], input=input[model.elements[2].input_names], time=ts)
+new_prob = DeepFlex.setup_prob(model.elements[2], prob, input=input[model.elements[2].input_names], params=params, init_states=initstates)
+solved_state = solver(new_prob, model.elements[2].state_names)
+@btime results = model(input, pas)

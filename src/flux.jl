@@ -213,7 +213,7 @@ function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
     namedtuple([flux.input_names], [sol_u[1, :] .* l_input])
 end
 
-# TODO 关于Lux nn还需要进一步调整
+
 struct NeuralFlux <: AbstractNNFlux
     input_names::Vector{Symbol}
     output_names::Union{Vector{Symbol},Symbol}
@@ -224,25 +224,20 @@ end
 
 function NeuralFlux(
     input_names::Vector{Symbol},
-    output_names::Vector{Symbol};
+    output_names::Union{Symbol, Vector{Symbol}};
     param_names::Symbol,
     chain::Lux.AbstractExplicitLayer,
     seed::Int=42,
 )
-    func = (x, p) -> stateless_apply(model, x, p)[1]
-    @named nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed))
+    func = (x, p) -> LuxCore.stateless_apply(chain, x, p)[1]
+    nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed), name=param_names)
     NeuralFlux(input_names, output_names, param_names, func, nn)
 end
 
 function (flux::NeuralFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
     x = hcat([input[nm] for nm in flux.input_names]...)'
     y_pred = flux.func(x, params[flux.param_names])
-    if size(y_pred, 2) > 1
-        output = namedtuple(flux.output_names, [y_pred[i, :] for (i, k) in enumerate(flux.output_names)])
-    else
-        output = namedtuple(flux.output_names, [first(y_pred[i, :]) for (i, k) in enumerate(flux.output_names)])
-    end
-    return output
+    process_output(flux.output_names, y_pred)
 end
 
 # macro simpleflux(input_names, output_names, param_names)

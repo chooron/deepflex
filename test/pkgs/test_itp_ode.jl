@@ -11,23 +11,17 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 # smoothing step function
 step_fct(x) = (tanh(5.0 * x) + 1.0) * 0.5
-
 # snow precipitation
 Ps(P, T, Tmin) = step_fct(Tmin - T) * P
-
 # rain precipitation
 Pr(P, T, Tmin) = step_fct(T - Tmin) * P
-
 # snow melt
 M(S0, T, Df, Tmax) = step_fct(T - Tmax) * step_fct(S0) * minimum([S0, Df * (T - Tmax)])
-
 # evapotranspiration
 PET(T, Lday) = 29.8 * Lday * 24.0 * 0.611 * exp((17.3 * T) / (T + 237.3)) / (T + 273.2)
 ET(S1, T, Lday, Smax) = step_fct(S1) * step_fct(S1 - Smax) * PET(T, Lday) + step_fct(S1) * step_fct(Smax - S1) * PET(T, Lday) * (S1 / Smax)
-
 # base flow
 Qb(S1, f, Smax, Qmax) = step_fct(S1) * step_fct(S1 - Smax) * Qmax + step_fct(S1) * step_fct(Smax - S1) * Qmax * exp(-f * (Smax - S1))
-
 # peak flow
 Qs(S1, Smax) = step_fct(S1) * step_fct(S1 - Smax) * (S1 - Smax)
 

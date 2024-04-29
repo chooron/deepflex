@@ -54,6 +54,20 @@ struct HydroElement <: AbstractElement
 
 end
 
+function get_element_infos(elements::Vector{HydroElement})
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
+    param_names = Vector{Symbol}()
+
+    for ele in elements
+        union!(input_names, setdiff(ele.input_names, output_names))
+        union!(output_names, ele.output_names)
+        union!(param_names, ele.param_names)
+        union!(state_names, ele.state_names)
+    end
+    input_names, output_names, param_names, state_names
+end
 
 # Element Methods
 function get_all_luxnnflux(ele::HydroElement)
@@ -66,7 +80,6 @@ function get_all_luxnnflux(ele::HydroElement)
     luxnn_tuple
 end
 
-
 # 求解并计算
 function (ele::HydroElement)(
     input::NamedTuple,
@@ -77,7 +90,9 @@ function (ele::HydroElement)(
     fluxes = input
     if length(ele.dfuncs) > 0
         init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
-        solved_states = solve_prob(ele, input, params, init_states, solver=solver)
+        prob = setup_input(ele, input=fluxes[ele.input_names], time=input[:time])
+        new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states)
+        solved_states = solver(new_prob, ele.state_names)
         fluxes = merge(input, solved_states)
     end
     for func in ele.funcs
@@ -86,67 +101,59 @@ function (ele::HydroElement)(
     fluxes
 end
 
+function get_sol_u0(ele, input0, params, init_states)
+    #* 跳过常微分方程求解直接计算各中间变量的初始状态
+    input = merge(input0, init_states)
+    for func in ele.funcs
+        input = merge(input, func(input, params))
+    end
+    input
+end
+
 function setup_input(
     ele::HydroElement;
     input::NamedTuple,
     time::AbstractVector
 )
-    #* 首先构建data的插值系统
-    itp_sys = build_itp_system(input[ele.input_names], time, ele.varinfo, name=ele.name)
-    #* 连接系统
-    eqs = [getproperty(ele.sys, nm) ~ getproperty(itp_sys, nm) for nm in ele.input_names]
-    compose_sys = compose(ODESystem(eqs, t; name=Symbol(ele.name, :comp_sys)), ele.sys, itp_sys)
-    structural_simplify(compose_sys)
+    #* 构建data的插值系统
+    itp_eqs = Equation[getproperty(ele.sys, nm) ~ @itpfn(nm, ip, time) for (nm, ip) in pairs(input)]
+    compose_sys = compose(ODESystem(itp_eqs, t; name=Symbol(ele.name, :comp_sys)), ele.sys)
+    sys = structural_simplify(compose_sys)
+    build_u0 = Pair[]
+    for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
+        func_nn_sys = getproperty(ele.sys, func.param_names)
+        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(eltype(eltype(input)), length(func.input_names)))
+    end
+    prob = ODEProblem(sys, build_u0, (time[1], time[end]), [], warn_initialize_determined=true)
+    prob
 end
 
-function build_prob(
+function setup_prob(
     ele::HydroElement,
-    sys::ODESystem;
+    prob::ODEProblem;
     input::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector,
 )
+    #* 将设定的参数赋予给问题
     #* setup init states
-    x0 = Pair{Num,eltype(init_states)}[getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states)]
-    #* setup parameters
-    p = Pair{Num,eltype(params)}[getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)] for nm in ModelingToolkit.parameters(ele.sys)]
-    #* build problem
-    ODEProblem{true,SciMLBase.FullSpecialize}(sys, x0, (input[:time][1], input[:time][end]), p)
-end
-
-function build_prob(
-    ele::HydroElement;
-    input::NamedTuple,
-    params::Union{NamedTuple,ComponentVector},
-    init_states::Union{NamedTuple,ComponentVector}
-)
-    itp_dict = namedtuple(ele.input_names, [LinearInterpolation(input[nm], input[:time], extrapolate=true) for nm in ele.input_names])
-    function singel_ele_ode_func!(du, u, p, t)
-        tmp_input = namedtuple(ele.input_names, [itp_dict[nm](t) for nm in ele.input_names])
-        tmp_states = namedtuple(ele.state_names, u)
-        tmp_fluxes = merge(tmp_input, tmp_states)
-        for func in ele.funcs
-            tmp_fluxes = merge(tmp_fluxes, func(tmp_fluxes, params))
-        end
-        du[:] = [dfunc(tmp_fluxes, params)[dfunc.output_names] for dfunc in ele.dfuncs]
+    u0 = Pair[getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states) if nm in ele.state_names]
+    sol_0 = get_sol_u0(ele, namedtuple(ele.input_names, [input[nm][1] for nm in ele.input_names]),
+        params, namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)]))
+    for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
+        func_nn_sys = getproperty(ele.sys, func.param_names)
+        u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(func.input_names)])
     end
-    prob = ODEProblem(singel_ele_ode_func!, collect(init_states[ele.state_names]), (input[:time][1], input[:time][end]))
-    prob
-end
-
-function solve_prob(
-    ele::HydroElement,
-    input::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector;
-    solver::AbstractSolver=ODESolver()
-)
-    #* 当存在dflux时需要构建ode问题进行计算
-    #* 根据方程构建基础系统
-    sys = setup_input(ele, input=input, time=input[:time])
-    #* 设定系统参数构建ode problem
-    prob = build_prob(ele, sys,
-        input=input, params=params,
-        init_states=init_states[ele.state_names])
-    solver(prob, ele.state_names)
+    #* setup parameters
+    p = Pair[]
+    for nm in ModelingToolkit.parameters(ele.sys)
+        if contains(string(nm), "₊")
+            tmp_nn = split(string(nm), "₊")[1]
+            push!(p, getproperty(getproperty(ele.sys, Symbol(tmp_nn)), :p) => Vector(params[Symbol(tmp_nn)]))
+        else
+            push!(p, getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)])
+        end
+    end
+    new_prob = remake(prob, p=p, u0=u0)
+    new_prob
 end
