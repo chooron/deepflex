@@ -74,20 +74,18 @@ function Route(; name::Symbol)
     )
 end
 
-function Unit(; name::Symbol)
+function Node(; name::Symbol)
     elements = [
         Surface(name=name),
         Soil(name=name),
         Zone(name=name),
     ]
-    DeepFlex.HydroUnit(name, elements=elements)
-end
 
-function Node(; name::Symbol)
     DeepFlex.HydroNode(
         name,
-        units=[Unit(name=name)],
+        units=(namedtuple([name], [elements])),
         routes=namedtuple([name], [Route(name=name)])
     )
 end
+
 end

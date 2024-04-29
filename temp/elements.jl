@@ -21,7 +21,7 @@ function solve_prob(
     prob = ODEProblem(singel_ele_ode_func!, collect(init_states[ele_state_names]), (input[:time][1], input[:time][end]))
     sol = solve(prob, Tsit5(), saveat=input[:time])
     solved_u = hcat(sol.u...)
-    sol
+    solved_u
     # state_names = collect(keys(init_states))
     # namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
 end
@@ -45,4 +45,17 @@ function build_prob(
     end
     prob = ODEProblem(singel_ele_ode_func!, collect(init_states[ele.state_names]), (input[:time][1], input[:time][end]))
     prob
+end
+
+
+
+# Element Methods
+function get_all_luxnnflux(ele::HydroElement)
+    luxnn_tuple = namedtuple()
+    for func in vcat(ele.funcs, ele.dfuncs)
+        if func isa AbstractNNFlux
+            merge!(luxnn_tuple, namedtuple([func.param_names], [func]))
+        end
+    end
+    luxnn_tuple
 end

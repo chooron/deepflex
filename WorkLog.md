@@ -38,7 +38,8 @@
 - [ ] 搭建参数动态估计问题
 - [ ] 如何将水文通量(Flux)转换成一系列类似于MTKstandarylibrary.jl那样的模块
 - [X] input数据采用namedtuple类型,参数采用ComponentArray类型
-- [ ] superflexpy中unit是否具有存在意义, unit简单来说就是多个element的组合,可以考虑直接用elements list替代
+- [X] superflexpy中unit是否具有存在意义, unit简单来说就是多个element的组合,可以考虑直接用elements list替代
+- [ ] 将input_names, output_names等信息通过函数调度，不作为模型存储的属性
 
 # 一些结论
 

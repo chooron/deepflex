@@ -63,7 +63,7 @@ DifferFlux(
                                                          sum([i[nm] for nm in outflux_names])
 )
 
-function get_input_names(func::AF) where {AF<:AbstractFlux}
+function get_input_names(func::AbstractFlux)
     if eltype(func.input_names) isa Pair
         input_names = [v for (_, v) in func.input_names]
     elseif func.input_names isa Vector
@@ -74,7 +74,7 @@ function get_input_names(func::AF) where {AF<:AbstractFlux}
     input_names
 end
 
-function get_output_names(func::AF) where {AF<:AbstractFlux}
+function get_output_names(func::AbstractFlux)
     if func.output_names isa Vector
         output_names = func.output_names
     else
@@ -83,7 +83,7 @@ function get_output_names(func::AF) where {AF<:AbstractFlux}
     output_names
 end
 
-function get_param_names(func::AF) where {AF<:AbstractFlux}
+function get_param_names(func::AbstractFlux)
     if func.param_names isa Vector
         param_names = func.param_names
     else
@@ -92,39 +92,57 @@ function get_param_names(func::AF) where {AF<:AbstractFlux}
     param_names
 end
 
-function get_func_infos(funcs::Vector)
+function get_func_io_names(funcs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
     for func in funcs
         # extract the input and output name in flux
-        tmp_input_names = get_input_names(func)
-        tmp_output_names = get_output_names(func)
-        tmp_param_names = get_param_names(func)
         # 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
-        tmp_output_names = setdiff(tmp_output_names, input_names)
+        tmp_output_names = setdiff(get_output_names(func), input_names)
         # 输入需要排除已有的输出变量，表明这个输入是中间计算得到的
-        tmp_input_names = setdiff(tmp_input_names, output_names)
+        tmp_input_names = setdiff(get_input_names(func), output_names)
         # 合并名称
         union!(input_names, tmp_input_names)
         union!(output_names, tmp_output_names)
-        union!(param_names, tmp_param_names)
     end
-    input_names, output_names, param_names
+    input_names, output_names
 end
 
-function get_dfunc_infos(dfuncs::Vector)
+function get_dfunc_io_names(dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
-    param_names = Vector{Symbol}()
 
     for dfunc in dfuncs
         union!(input_names, get_input_names(dfunc))
         union!(state_names, get_output_names(dfunc))
-        union!(param_names, dfunc.param_names)
     end
-    input_names, state_names, param_names
+    input_names, state_names
 end
+
+function get_input_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
+    # combine the info of func and d_func
+    input_names1, output_names = get_func_io_names(funcs)
+    input_names2, state_names = get_dfunc_io_names(dfuncs)
+    # 避免一些中间变量混淆为输入要素
+    setdiff!(input_names2, output_names)
+    # 合并两种func的输入要素
+    input_names = union(input_names1, input_names2)
+    setdiff!(input_names, state_names)
+    input_names
+end
+
+get_output_names(funcs::Vector{<:AbstractFlux}) = get_func_io_names(funcs)[2]
+
+get_state_names(dfuncs::Vector{<:AbstractFlux}) = get_dfunc_io_names(dfuncs)[2]
+
+function get_param_names(funcs::Vector{<:AbstractFlux})
+    param_names = Vector{Symbol}()
+    for func in funcs
+        union!(param_names, func.param_names)
+    end
+    param_names
+end
+
 
 ## ----------------------------------------------------------------------
 ## callable function
@@ -133,34 +151,6 @@ function (flux::SimpleFlux)(input::NamedTuple, params::Union{ComponentVector,Nam
     tmp_params = extract_params(params, flux.param_names)
     func_output = flux.func(tmp_input, tmp_params, flux.step_func)
     process_output(flux.output_names, func_output)
-end
-
-function extract_input(input::NamedTuple, input_names::Symbol)
-    namedtuple([input_names], [input[input_names]])
-end
-
-function extract_input(input::NamedTuple, input_names::Vector{Symbol})
-    namedtuple(input_names, [input[k] for k in input_names])
-end
-
-function extract_input(input::NamedTuple, input_names::Vector{Pair})
-    namedtuple([k for (_, k) in input_names], [input[k] for (k, _) in input_names])
-end
-
-function extract_params(params::ComponentVector, param_names::Vector{Symbol})
-    namedtuple(param_names, [params[k] for k in param_names])
-end
-
-function extract_params(params::NamedTuple, param_names::Vector{Symbol})
-    params
-end
-
-function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
-    namedtuple([output_names], [output])
-end
-
-function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}
-    namedtuple(output_names, output)
 end
 
 struct LagFlux <: AbstractFlux
@@ -224,7 +214,7 @@ end
 
 function NeuralFlux(
     input_names::Vector{Symbol},
-    output_names::Union{Symbol, Vector{Symbol}};
+    output_names::Union{Symbol,Vector{Symbol}};
     param_names::Symbol,
     chain::Lux.AbstractExplicitLayer,
     seed::Int=42,

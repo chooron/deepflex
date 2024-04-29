@@ -20,7 +20,6 @@ using ModelingToolkitNeuralNets
 using ModelingToolkitStandardLibrary.Blocks
 using Symbolics
 using SymbolicUtils
-using SymbolicIndexingInterface: parameter_values, state_values
 using SciMLStructures: Tunable, replace, replace!
 
 # graph compute
@@ -45,7 +44,7 @@ using OptimizationBBO
 using OptimizationOptimisers
 
 ## package version
-# const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
+const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
 ## Abstract Component Types
 abstract type AbstractComponent end
@@ -77,6 +76,7 @@ Base.length(::Symbol) = 1
 # utils
 include("utils/graph.jl")
 include("utils/lossfunc.jl")
+include("utils/data.jl")
 include("utils/mtk.jl")
 include("utils/optimize.jl")
 include("utils/solver.jl")
@@ -86,7 +86,6 @@ include("utils/ca.jl")
 include("flux.jl")
 include("reach.jl")
 include("element.jl")
-include("unit.jl")
 include("node.jl")
 include("network.jl")
 # Implement Flux
