@@ -17,25 +17,37 @@ struct HydroElement <: AbstractElement
         funcs::Vector,
         dfuncs::Vector=SimpleFlux[],
     )
-        input_names = get_input_names(funcs, dfuncs)
-        output_names = get_output_names(funcs)
-        state_names = get_state_names(dfuncs)
-        param_names = get_param_names(vcat(funcs, dfuncs))
+        if length(dfuncs) == 0
+            return new(
+                name,
+                funcs,
+                SimpleFlux[],
+                NamedTuple(),
+                NamedTuple(),
+                nothing
+            )
+        else
+            input_names = get_input_names(funcs, dfuncs)
+            output_names = get_output_names(funcs)
+            state_names = get_state_names(dfuncs)
+            param_names = get_param_names(vcat(funcs, dfuncs))
 
-        varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
-        sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
-        return new(
-            name,
-            funcs,
-            dfuncs,
-            varinfo,
-            paraminfo,
-            sys
-        )
+            varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
+            sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
+
+            return new(
+                name,
+                funcs,
+                dfuncs,
+                varinfo,
+                paraminfo,
+                sys
+            )
+        end
     end
 end
 
-function get_ele_io_names(elements::Vector{<:AbstractElement})
+function get_ele_io_names(elements::Vector{HydroElement})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     for ele in elements
@@ -45,7 +57,7 @@ function get_ele_io_names(elements::Vector{<:AbstractElement})
     input_names, output_names
 end
 
-function get_ele_param_names(elements::Vector{<:AbstractElement})
+function get_ele_param_names(elements::Vector{HydroElement})
     param_names = Vector{Symbol}()
     for ele in elements
         union!(param_names, get_param_names(vcat(ele.funcs, ele.dfuncs)))
@@ -53,7 +65,7 @@ function get_ele_param_names(elements::Vector{<:AbstractElement})
     param_names
 end
 
-function get_ele_state_names(elements::Vector{<:AbstractElement})
+function get_ele_state_names(elements::Vector{HydroElement})
     state_names = Vector{Symbol}()
     for ele in elements
         union!(state_names, get_state_names(ele.dfuncs))
@@ -116,7 +128,7 @@ function setup_input(
     build_u0 = Pair[]
     for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
         func_nn_sys = getproperty(ele.sys, func.param_names)
-        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(eltype(eltype(input)), get_input_names(func)))
+        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(eltype(eltype(input)), length(get_input_names(func))))
     end
     prob = ODEProblem(sys, build_u0, (time[1], time[end]), [], warn_initialize_determined=true)
     prob

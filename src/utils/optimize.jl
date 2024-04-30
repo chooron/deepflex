@@ -59,12 +59,11 @@ function param_grad_optim(
     """
     # 获取需要优化的参数名称
     solve_alg = get(kwargs, :solve_alg, Adam())
-    adtype = get(kwargs, :adtype, Optimization.AutoForwardDiff())  # AutoForwardDiff and AutoFiniteDiff
+    adtype = get(kwargs, :adtype, Optimization.AutoFiniteDiff())  # AutoForwardDiff and AutoFiniteDiff
     target_name = get(kwargs, :target_name, :flow)
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
-    step = get(kwargs, :step, true)
 
     tunable_pas_axes = getaxes(tunable_pas)
 
@@ -72,7 +71,7 @@ function param_grad_optim(
     function predict_func(x::AbstractVector{T}, p) where T
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
-        component(input, tmp_pas, step=step)
+        component(input, tmp_pas)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])

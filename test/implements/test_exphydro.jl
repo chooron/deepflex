@@ -3,6 +3,7 @@ using CSV
 using DataFrames
 using CairoMakie
 using BenchmarkTools
+using ComponentArrays
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
@@ -19,13 +20,15 @@ flow_vec = df[time, "flow(mm)"]
 
 # build model
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
-params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
-init_states = (snowwater=0.0, soilwater=1303.004248)
+unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
+unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
-model = DeepFlex.ExpHydro(name=:exphydro)
+pas = ComponentVector(exphydro=(unit=(params=unit_params, initstates=unit_init_states), route=(params=ComponentVector(),), weight=1.0))
 
-inputs = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec))
-result = model(input, params, init_states);
+model = DeepFlex.ExpHydro.Node(name=:exphydro)
+
+input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
+result = model(input, pas);
 result_df = DataFrame(result)
 
 # plot result

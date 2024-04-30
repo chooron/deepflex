@@ -85,12 +85,15 @@ end
 Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
 """
 
-function Unit(; name::Symbol)
+function Node(; name::Symbol)
     elements = [
         Surface(name=name),
         Soil(name=name)
     ]
-    DeepFlex.HydroUnit(name, elements=elements)
+    DeepFlex.HydroNode(
+        name,
+        units=elements
+    )
 end
 
 

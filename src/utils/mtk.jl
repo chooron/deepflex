@@ -23,13 +23,6 @@ function build_ele_system(
     sub_sys = ODESystem[]
     for func in funcs
         if func isa NeuralFlux
-            # for (idx, nm) in enumerate(get_input_names(func))
-            #     push!(eqs, varinfo[nm] ~ func.nn.input.u[idx])
-            # end
-            # for (idx, nm) in enumerate(get_output_names(func))
-            #     push!(eqs, varinfo[nm] ~ func.nn.output.u[idx])
-            # end
-            # push!(sub_sys, func.nn)
             nn_in = RealInputArray(nin=length(func.input_names), name=Symbol(func.param_names, :_in_sys))
             nn_out = RealOutputArray(nout=length(func.output_names), name=Symbol(func.param_names, :_out_sys))
             eqs = vcat(eqs, [varinfo[nm] ~ nn_in.u[idx] for (idx, nm) in enumerate(get_input_names(func))])

@@ -1,39 +1,59 @@
 # import lib
 using CSV
 using DataFrames
-using CairoMakie
-using Zygote, Lux, LuxCUDA
-using OrdinaryDiffEq
-using DiffEqFlux
+# using CairoMakie
+using ComponentArrays
+using OptimizationOptimisers
+using BenchmarkTools
+using NamedTupleTools
+using Lux
+using StableRNGs
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
 
-# load data
-file_path = "data/camels/01013500.csv"
+# base param names
+f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
+# input data
+file_path = "data/cache/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-lday_vec = df[1:1000, "dayl(day)"]
-prcp_vec = df[1:1000, "prcp(mm/day)"]
-temp_vec = df[1:1000, "tmean(C)"]
-flow_vec = df[1:1000, "flow(mm)"]
+ts = 1:10000
+input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
+output = (flow=df[ts, "Flow"],)
 
-dev_gpu = Lux.gpu_device()
-inputs = Dict(:Prcp => prcp_vec, :Lday => lday_vec, :Temp => temp_vec)
-output = Dict(:Q => flow_vec)
+mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
+mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
+mean_temp, std_temp = mean(df[ts, "Temp"]), std(df[ts, "Temp"])
+mean_prcp, std_prcp = mean(df[ts, "Prcp"]), std(df[ts, "Prcp"])
 
-input_layer = Lux.Dense(3, 10, relu)
-nn_layer = Lux.Chain(
-    Lux.Dense(10, 20, relu),
-    Lux.Dense(20, 20, relu),
-    Lux.Dense(20, 10, relu)
+et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+et_ann_p = LuxCore.initialparameters(StableRNG(42), et_ann)
+q_ann_p = LuxCore.initialparameters(StableRNG(42), q_ann)
+
+tunable_pas = ComponentVector(m50=(params=ComponentVector(
+    f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin,
+    etnn=et_ann_p, qnn=q_ann_p),),)
+
+const_pas = ComponentVector(m50=(params=ComponentVector(
+        mean_snowwater=mean_snowwater, std_snowwater=std_snowwater,
+        mean_soilwater=mean_soilwater, std_soilwater=std_soilwater,
+        mean_temp=mean_temp, std_temp=std_temp,
+        mean_prcp=mean_prcp, std_prcp=std_prcp), initstates=ComponentVector(snowwater=0.0, soilwater=1300.0), weight=1.0),)
+
+params_axes = getaxes(tunable_pas)
+
+model = DeepFlex.M50.Node(name=:m50)
+
+best_pas = DeepFlex.param_grad_optim(
+    model,
+    tunable_pas=tunable_pas,
+    const_pas=const_pas,
+    input=input,
+    target=output,
 )
 
-model_no_ode = Lux.Chain(; input_layer, nn_layer, output_layer)
-# ele = DeepFlex.LuxElement(model_no_ode, device=dev_gpu)
-
-# res = DeepFlex.node_params_optimize(ele, input=inputs, output=output)
-# # output = DeepFlex.get_output(ele, input=inputs)
-
-
+total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
+result = model(input, total_params, step=false)

@@ -19,3 +19,17 @@ add_eqs =
     ]
 compose(ODESystem(add_eqs, t; name=Symbol(ele.name, :comp_sys)), odesys)
 # prob = ODEProblem(odesys, [], (0.0, 10.0), [])
+
+struct f2
+    a
+    b
+    c
+    function f2(a; b, c)
+        new(a, b, c)
+    end
+
+    function f2(a; b)
+        new(a, b, 0.0)
+    end
+end
+

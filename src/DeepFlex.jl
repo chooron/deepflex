@@ -29,6 +29,7 @@ using MetaGraphs
 # data interpolataion
 using DataInterpolations
 # solve ODEProblem
+using SciMLBase
 using OrdinaryDiffEq
 using DiffEqFlux
 # solver NonlinearProblem
@@ -106,7 +107,7 @@ include("functions/unithydro.jl")
 # include("implements/PRNN.jl")
 include("implements/exphydro.jl")
 include("implements/m50.jl")
-# include("implements/gr4j.jl")
+include("implements/gr4j.jl")
 # include("implements/hbv.jl")
 # include("implements/hymod.jl")
 # include("implements/neuralode.jl")

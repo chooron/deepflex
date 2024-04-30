@@ -18,7 +18,11 @@ function (solver::ODESolver)(
         abstol=solver.abstol,
         sensealg=solver.sensealg
     )
-    sol
+    # if SciMLBase.successful_retcode(sol)
+    #     @info "ode solved successfully"
+    # else
+    #     @error "ode failed to solve"
+    # end
     solved_u = hcat(sol.u...)
     namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
 end

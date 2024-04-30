@@ -2,37 +2,26 @@ struct HydroNode <: AbstractComponent
     name::Symbol
     #* 单元
     units::NamedTuple
-    #* 演进模块
-    routes::NamedTuple
     #* 节点对应的面积
     area::Number
 
-    function HydroNode(name; unit::AbstractVector{<:AbstractElement}, route::AbstractElement, area::Number=100)
-        HydroNode(
-            name,
-            units=namedtuple([name], [unit]),
-            routes=namedtuple([name], [route]),
-            area=area
-        )
-    end
-
-    function HydroNode(name; units::NamedTuple, routes::NamedTuple, area::Number=100)
+    function HydroNode(name; units::Union{NamedTuple, AbstractVector{<:AbstractElement}}, area::Number=100)
+        units = units isa AbstractVector ? namedtuple([name], [units]) : units
         new(
             name,
             units,
-            routes,
             area
         )
     end
 end
 
-function get_ele_io_names(units::NamedTuple, routes::NamedTuple)
+function get_ele_io_names(units::NamedTuple)
     input_names_list = []
     output_names_list = []
-    for nm in keys(units)
-        ele_input_names, ele_output_names = get_ele_io_names(units[nm])
+    for unit in keys(units)
+        ele_input_names, ele_output_names = get_ele_io_names(unit)
         push!(input_names_list, ele_input_names)
-        push!(output_names_list, unique(vcat(ele_output_names, get_ele_io_names([routes[nm]])[2])))
+        push!(output_names_list, ele_output_names)
     end
     namedtuple(keys(units), input_names_list), namedtuple(keys(units), output_names_list)
 end
@@ -53,7 +42,6 @@ function get_ele_state_names(units::NamedTuple)
     state_tuple_list
 end
 
-
 # todo parallel computing
 function (node::HydroNode)(
     input::NamedTuple,
@@ -63,15 +51,9 @@ function (node::HydroNode)(
     output_list = []
     for nm in keys(node.units)
         unit = node.units[nm]
-        tmp_unit_pas = pas[nm]
-        tmp_ouput = unit(
-            input[nm],
-            tmp_unit_pas[:unit],
-            solver=solver)
-        route_output = node.routes[nm](tmp_ouput, tmp_unit_pas[:route])
-        #todo 这里需要改一改
-        route_weight_output = route_output[first(get_ele_io_names([node.routes[nm]])[2])] .* tmp_unit_pas[:weight]
-        push!(output_list, route_weight_output)
+        tmp_ouput = unit(input[nm], pas[nm], solver=solver)
+        # println(namedtuple(keys(tmp_ouput), [length(tmp_ouput[nm]) for nm in keys(tmp_ouput)]))
+        push!(output_list, tmp_ouput[:flow] .* pas[nm][:weight])
     end
     (flow=sum(output_list),)
 end

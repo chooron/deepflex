@@ -22,6 +22,5 @@ unit_input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=d
 unit_init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 
 input = (exphydro=unit_input,)
-pas = ComponentVector(exphydro=(unit=(params=unit_params, initstates=unit_init_states), route=(params=ComponentVector(),), weight=1.0))
+pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 results = model(input, pas)
-

@@ -119,6 +119,8 @@ function get_dfunc_io_names(dfuncs::Vector{<:AbstractFlux})
     input_names, state_names
 end
 
+get_input_names(funcs::Vector{<:AbstractFlux}) = get_func_io_names(funcs)[1]
+
 function get_input_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
     # combine the info of func and d_func
     input_names1, output_names = get_func_io_names(funcs)
@@ -138,7 +140,7 @@ get_state_names(dfuncs::Vector{<:AbstractFlux}) = get_dfunc_io_names(dfuncs)[2]
 function get_param_names(funcs::Vector{<:AbstractFlux})
     param_names = Vector{Symbol}()
     for func in funcs
-        union!(param_names, func.param_names)
+        union!(param_names, get_param_names(func))
     end
     param_names
 end
@@ -181,7 +183,7 @@ function LagFlux(
     )
 end
 
-function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
+function (flux::LagFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
     l_input = input[flux.input_names]
     #* 首先将lagflux转换为discrete problem
     function discrete_prob!(du, u, p, t)
@@ -198,7 +200,7 @@ function (flux::LagFlux)(input::NamedTuple, params::ComponentVector)
     lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
     prob = DiscreteProblem(discrete_prob!, zeros(eltype(l_input), length(ts)), (1.0, length(l_input)), lag_weights)
     #* 求解这个问题
-    sol = solve(prob)
+    sol = solve(prob, FunctionMap())
     sol_u = hcat((sol.u)...)
     namedtuple([flux.input_names], [sol_u[1, :] .* l_input])
 end
@@ -219,7 +221,7 @@ function NeuralFlux(
     chain::Lux.AbstractExplicitLayer,
     seed::Int=42,
 )
-    func = (x, p) -> LuxCore.stateless_apply(chain, x, p)[1]
+    func = (x, p) -> LuxCore.stateless_apply(chain, x, p)
     nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed), name=param_names)
     NeuralFlux(input_names, output_names, param_names, func, nn)
 end
