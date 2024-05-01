@@ -60,8 +60,8 @@ eqs = [
 base_sys = ODESystem(eqs, t, name=:sys)
 sys = structural_simplify(base_sys)
 params_list = [0.05, 100.0, 20.0, 3.0, 1.0, -1.0]
-u0_list = [snw => 0.0, slw => 100.0]
-prob = ODEProblem(sys, [snw => 0.0, slw => 100.0], (1.0, 100.0), params_list)
+u0_list = [snw => 0.0, slw => 1000.0]
+prob = ODEProblem(sys, u0_list, (1.0, 100.0), params_list)
 
 sol = solve(prob, BS3(), dt=1.0)
 

@@ -147,7 +147,7 @@ end
 
 ## ----------------------------------------------------------------------
 ## callable function
-function (flux::SimpleFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
+function (flux::SimpleFlux)(input::Union{ComponentVector,NamedTuple}, params::Union{ComponentVector,NamedTuple})
     tmp_input = extract_input(input, flux.input_names)
     tmp_params = extract_params(params, flux.param_names)
     func_output = flux.func(tmp_input, tmp_params, flux.step_func)
@@ -182,7 +182,7 @@ function LagFlux(
     )
 end
 
-function (flux::LagFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
+function (flux::LagFlux)(input::Union{ComponentVector,NamedTuple}, params::Union{ComponentVector,NamedTuple})
     l_input = input[flux.input_names]
     #* 首先将lagflux转换为discrete problem
     function discrete_prob!(du, u, p, t)
@@ -225,7 +225,7 @@ function NeuralFlux(
     NeuralFlux(input_names, output_names, param_names, func, nn)
 end
 
-function (flux::NeuralFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})
+function (flux::NeuralFlux)(input::Union{ComponentVector,NamedTuple}, params::Union{ComponentVector,NamedTuple})
     x = hcat([input[nm] for nm in flux.input_names]...)'
     y_pred = flux.func(x, params[flux.param_names])
     process_output(flux.output_names, y_pred)

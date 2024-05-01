@@ -1,13 +1,13 @@
 #* used for flux calculate
-function extract_input(input::NamedTuple, input_names::Symbol)
+function extract_input(input::Union{ComponentVector,NamedTuple}, input_names::Symbol)
     namedtuple([input_names], [input[input_names]])
 end
 
-function extract_input(input::NamedTuple, input_names::Vector{Symbol})
+function extract_input(input::Union{ComponentVector,NamedTuple}, input_names::Vector{Symbol})
     namedtuple(input_names, [input[k] for k in input_names])
 end
 
-function extract_input(input::NamedTuple, input_names::Vector{Pair})
+function extract_input(input::Union{ComponentVector,NamedTuple}, input_names::Vector{Pair})
     namedtuple([k for (_, k) in input_names], [input[k] for (k, _) in input_names])
 end
 

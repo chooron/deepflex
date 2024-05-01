@@ -18,8 +18,8 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/camels/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:10000
-input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
+ts = 1:100
+input = ComponentVector(time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = DeepFlex.ODESolver()
 # sys = DeepFlex.setup_input(ele, input=input, time=ts)
 # prob = ODEProblem(sys, [], (1, 10000), [])

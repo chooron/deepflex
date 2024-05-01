@@ -44,7 +44,7 @@ end
 
 # todo parallel computing
 function (node::HydroNode)(
-    input::NamedTuple,
+    input::ComponentVector,
     pas::ComponentVector;
     solver::AbstractSolver=ODESolver()
 )

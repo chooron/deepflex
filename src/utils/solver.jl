@@ -1,6 +1,6 @@
 @kwdef struct ODESolver <: AbstractSolver
     alg::OrdinaryDiffEqAlgorithm = Tsit5()
-    sensealg = ForwardDiffSensitivity
+    sensealg = ForwardDiffSensitivity()
     reltol = 1e-3
     abstol = 1e-3
     saveat = 1.0
@@ -24,7 +24,7 @@ function (solver::ODESolver)(
         @error "ode failed to solve"
     end
     solved_u = hcat(sol.u...)
-    namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
+    ComponentVector(namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)]))
 end
 
 

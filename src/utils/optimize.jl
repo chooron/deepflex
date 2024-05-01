@@ -49,8 +49,8 @@ function param_grad_optim(
     component::AbstractComponent;
     tunable_pas::AbstractVector,
     const_pas::AbstractVector,
-    input::NamedTuple,
-    target::NamedTuple,
+    input::ComponentVector,
+    target::ComponentVector,
     kwargs...,
 )
     """
@@ -67,19 +67,21 @@ function param_grad_optim(
     tunable_pas_axes = getaxes(tunable_pas)
 
     # build predict function
-    function predict_func(x::AbstractVector{T}, p) where T
+    function predict_func(x::AbstractVector{T}, p) where {T}
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
-        component(input, tmp_pas)
+        component(T.(input), tmp_pas)
     end
 
-    objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
+    function objective(x::AbstractVector{T}, p) where {T}
+        loss_func(T.(target[target_name]), predict_func(x, p)[target_name])
+    end
 
     # build optim problem
     optf = Optimization.OptimizationFunction(objective, adtype)
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas))
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
-    
+
     ComponentVector(sol.u, tunable_pas_axes)
 end
 
@@ -102,7 +104,7 @@ function param_grad_optimv2(
     tunable_pas_axes = getaxes(tunable_pas)
 
     # 内部构造一个function
-    function predict_func(x::AbstractVector{T}) where T
+    function predict_func(x::AbstractVector{T}) where {T}
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
         output = component(input, tmp_pas)
@@ -112,7 +114,7 @@ function param_grad_optimv2(
 
     objective(x) = loss_func(target[target_name], predict_func(x)[target_name])
 
-    result = Optim.optimize(objective, collect(tunable_pas), LBFGS(); autodiff = :forward)
+    result = Optim.optimize(objective, collect(tunable_pas), LBFGS(); autodiff=:forward)
     result
 end
 

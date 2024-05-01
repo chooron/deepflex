@@ -32,8 +32,8 @@ temp_vec = df[1:1000, "tmean(C)"]
 flow_vec = df[1:1000, "flow(mm)"]
 
 # parameters optimization
-input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
-output = (flow=flow_vec,)
+input = ComponentVector(exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
+output = ComponentVector(flow=flow_vec,)
 
 best_pas = DeepFlex.param_grad_optim(
     model,
