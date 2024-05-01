@@ -6,7 +6,7 @@ using ..DeepFlex.NamedTupleTools
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Surface(; name::Symbol)
+function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
         DeepFlex.PetFlux([:temp, :lday]),
         DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
@@ -22,14 +22,15 @@ function Surface(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk,
     )
 end
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Soil(; name::Symbol)
+function Soil(; name::Symbol, mtk::Bool=true)
     funcs = [
         DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
         DeepFlex.BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
@@ -43,14 +44,15 @@ function Soil(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
 """
 Inner Route Function in Exphydro
 """
-function Zone(; name::Symbol)
+function Zone(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         DeepFlex.FlowFlux([:baseflow, :surfaceflow])
@@ -58,11 +60,12 @@ function Zone(; name::Symbol)
 
     DeepFlex.HydroElement(
         Symbol(name, :_zone_),
-        funcs=funcs
+        funcs=funcs,
+        mtk=mtk,
     )
 end
 
-function Route(; name::Symbol)
+function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
@@ -70,16 +73,17 @@ function Route(; name::Symbol)
 
     DeepFlex.HydroElement(
         name,
-        funcs=funcs
+        funcs=funcs,
+        mtk=mtk,
     )
 end
 
-function Node(; name::Symbol)
+function Node(; name::Symbol, mtk::Bool=true)
     unit = [
-        Surface(name=name),
-        Soil(name=name),
-        Zone(name=name),
-        Route(name=name),
+        Surface(name=name, mtk=mtk),
+        Soil(name=name, mtk=mtk),
+        Zone(name=name, mtk=mtk),
+        Route(name=name, mtk=mtk),
     ]
 
     DeepFlex.HydroNode(

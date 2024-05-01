@@ -24,7 +24,6 @@ function param_box_optim(
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
     maxiters = get(kwargs, :maxiters, 10)
-    step = get(kwargs, :step, false)
 
     tunable_pas_axes = getaxes(tunable_pas)
 
@@ -33,7 +32,7 @@ function param_box_optim(
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         const_pas = tunable_pas_type.(const_pas)
         tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
-        component(input, tmp_pas, step=step)
+        component(input, tmp_pas)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
@@ -59,7 +58,7 @@ function param_grad_optim(
     """
     # 获取需要优化的参数名称
     solve_alg = get(kwargs, :solve_alg, Adam())
-    adtype = get(kwargs, :adtype, Optimization.AutoFiniteDiff())  # AutoForwardDiff and AutoFiniteDiff
+    adtype = get(kwargs, :adtype, Optimization.AutoForwardDiff())  # AutoForwardDiff and AutoFiniteDiff AutoZygote
     target_name = get(kwargs, :target_name, :flow)
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
@@ -70,7 +69,7 @@ function param_grad_optim(
     # 内部构造一个function
     function predict_func(x::AbstractVector{T}, p) where T
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
+        tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
         component(input, tmp_pas)
     end
 

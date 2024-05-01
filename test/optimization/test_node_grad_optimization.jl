@@ -16,10 +16,11 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 
 tunable_pas = ComponentVector(exphydro=(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin),))
 const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, soilwater=1300.0), weight=1.0))
+# ComponentVector(tunable_pas;const_pas...)
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro)
+model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true)
 
 # load data
 file_path = "data/camels/01013500.csv"

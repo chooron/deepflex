@@ -6,7 +6,7 @@ import ..DeepFlex: Lux
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Surface(; name::Symbol)
+function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
         DeepFlex.PetFlux([:temp, :lday]),
         DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
@@ -22,11 +22,12 @@ function Surface(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
-function Soil(; name::Symbol)
+function Soil(; name::Symbol, mtk::Bool=true)
 
     # 神经网络的定义是在模型之内，需要提取到模型的参数
     et_ann = Lux.Chain(
@@ -65,11 +66,12 @@ function Soil(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
-function Route(; name::Symbol)
+function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
@@ -77,7 +79,8 @@ function Route(; name::Symbol)
 
     DeepFlex.HydroElement(
         Symbol(name, :_route_),
-        funcs=funcs
+        funcs=funcs,
+        mtk=mtk
     )
 end
 
@@ -85,10 +88,10 @@ end
 Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
 """
 
-function Node(; name::Symbol)
+function Node(; name::Symbol, mtk::Bool=true)
     elements = [
-        Surface(name=name),
-        Soil(name=name)
+        Surface(name=name,mtk=mtk),
+        Soil(name=name,mtk=mtk)
     ]
     DeepFlex.HydroNode(
         name,

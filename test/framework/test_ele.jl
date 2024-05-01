@@ -8,7 +8,7 @@ using NamedTupleTools
 
 include("../../src/DeepFlex.jl")
 
-ele = DeepFlex.ExpHydro.Surface(name=:sf)
+ele = DeepFlex.ExpHydro.Surface(name=:sf, mtk=true)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
@@ -29,6 +29,6 @@ solver = DeepFlex.ODESolver()
 #     p=[sys.sf_surf_base_sys.Df => Df, sys.sf_surf_base_sys.Tmax => Tmax, sys.sf_surf_base_sys.Tmin => Tmin],
 #     u0=[sys.sf_surf_base_sys.snowwater => 0.0])
 # ModelingToolkit.MTKParameters
-results = ele(input, pas, solver=solver)
+@btime results = ele(input, pas, solver=solver)
 
 # DeepFlex.@simpleflux([:temp, :lday], "pet", Symbol[])

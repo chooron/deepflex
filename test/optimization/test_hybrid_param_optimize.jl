@@ -45,7 +45,7 @@ const_pas = ComponentVector(m50=(params=ComponentVector(
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.M50.Node(name=:m50)
+model = DeepFlex.M50.Node(name=:m50, mtk=true)
 
 best_pas = DeepFlex.param_grad_optim(
     model,

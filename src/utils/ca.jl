@@ -1,6 +1,8 @@
 function merge_ca(ca1::ComponentArray, ca2::ComponentArray, key::Symbol=:param)
     # 这里需要写一个名字相同时合并的方法
     share_keys = intersect(keys(ca1), keys(ca2))
+    # println((eltype(ca1)))
+    # println((eltype(ca2)))
     new_ca1 = ComponentVector{promote_type(eltype(ca1),eltype(ca2))}() # {eltype(ca1)}
     if length(share_keys) > 0
         for key in share_keys

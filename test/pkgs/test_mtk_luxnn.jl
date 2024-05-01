@@ -12,6 +12,9 @@ using SymbolicIndexingInterface
 using StableRNGs
 using Lux
 using Plots
+using BenchmarkTools
+using Zygote
+using SciMLSensitivity
 
 Fbrk = 100.0
 vbrk = 10.0
@@ -61,49 +64,43 @@ chain = Lux.Chain(
 )
 @named nn = NeuralNetworkBlock(2, 1; chain=chain, rng=StableRNG(1111))
 
-# eqs = [connect(model.nn_in, nn.output)
-#     connect(model.nn_out, nn.input)]
-
 eqs = [connect(model.nn_in, nn.input)
     connect(model.nn_out, nn.output)]
 
 ude_sys = complete(ODESystem(eqs, t, systems=[model, nn], name=:ude_sys))
-sys2 = structural_simplify(ude_sys)
-for p in ModelingToolkit.defaults(sys2)
-    # if typeof(p[2]) <: AbstractVector
-    println(p)
-    # end
-end
-prob = ODEProblem(sys2, [], (0, 1), Float32[])
+sys = structural_simplify(ude_sys)
+
+prob = ODEProblem(sys, [], (0, 1), Float32[])
 solve(prob, Rodas4())
-# get_vars = getu(sys, [sys.friction.y])
-# get_refs = getu(model_true, [model_true.y])
-# x0 = reduce(vcat, getindex.((default_values(sys),), tunable_parameters(sys)))
+get_vars = getu(sys, [sys.friction.y])
+get_refs = getu(model_true, [model_true.y])
+x0 = reduce(vcat, getindex.((default_values(sys),), tunable_parameters(sys)))
 
-# function loss(x, (prob, sol_ref, get_vars, get_refs))
-#     new_p = SciMLStructures.replace(Tunable(), prob.p, x)
-#     new_prob = remake(prob, p = new_p, u0 = eltype(x).(prob.u0))
-#     ts = sol_ref.t
-#     new_sol = solve(new_prob, Rodas4(), saveat = ts, abstol = 1e-8, reltol = 1e-8)
-#     loss = zero(eltype(x))
-#     for i in eachindex(new_sol.u)
-#         loss += sum(abs2.(get_vars(new_sol, i) .- get_refs(sol_ref, i)))
-#     end
-#     if SciMLBase.successful_retcode(new_sol)
-#         loss
-#     else
-#         Inf
-#     end
-# end
+function loss(x, (prob, sol_ref, get_vars, get_refs))
+    println(eltype(x))
+    new_p = SciMLStructures.replace(Tunable(), prob.p, x)
+    new_prob = remake(prob, p = new_p, u0 = eltype(x).(prob.u0))
+    ts = sol_ref.t
+    new_sol = solve(new_prob, Rodas4(), saveat = ts, abstol = 1e-8, reltol = 1e-8)
+    loss = zero(eltype(x))
+    for i in eachindex(new_sol.u)
+        loss += sum(abs2.(get_vars(new_sol, i) .- get_refs(sol_ref, i)))
+    end
+    if SciMLBase.successful_retcode(new_sol)
+        loss
+    else
+        Inf
+    end
+end
 
-# cb = (opt_state, loss) -> begin
-#     @info "step $(opt_state.iter), loss: $loss"
-#     return false
-# end
+cb = (opt_state, loss) -> begin
+    @info "step $(opt_state.iter), loss: $loss"
+    return false
+end
 
-# of = OptimizationFunction{true}(loss, AutoForwardDiff())
-# op = OptimizationProblem(of, x0, (prob, sol_ref, get_vars, get_refs))
-# res = solve(op, Adam(5e-3); maxiters = 1000, callback = cb)
+of = OptimizationFunction{true}(loss, AutoForwardDiff())
+op = OptimizationProblem(of, x0, (prob, sol_ref, get_vars, get_refs))
+@btime res = solve(op, Adam(5e-3); maxiters = 100, callback = cb)
 
 # res_p = SciMLStructures.replace(Tunable(), prob.p, res)
 # res_prob = remake(prob, p = res_p)

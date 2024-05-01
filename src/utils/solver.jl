@@ -1,6 +1,6 @@
 @kwdef struct ODESolver <: AbstractSolver
-    alg::OrdinaryDiffEqAlgorithm = Rosenbrock23()
-    sensealg = ForwardDiffSensitivity()
+    alg::OrdinaryDiffEqAlgorithm = Rosenbrock23(autodiff = false)
+    sensealg = ForwardSensitivity(autodiff = false)
     reltol = 1e-3
     abstol = 1e-3
     saveat = 1.0
