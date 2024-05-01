@@ -145,7 +145,6 @@ function get_param_names(funcs::Vector{<:AbstractFlux})
     param_names
 end
 
-
 ## ----------------------------------------------------------------------
 ## callable function
 function (flux::SimpleFlux)(input::NamedTuple, params::Union{ComponentVector,NamedTuple})

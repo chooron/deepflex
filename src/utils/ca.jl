@@ -1,5 +1,5 @@
 function merge_ca(ca1::ComponentArray, ca2::ComponentArray, key::Symbol=:param)
-    # 这里需要写一个名字相同时合并的方法
+    #* used for merge data
     share_keys = intersect(keys(ca1), keys(ca2))
     # println((eltype(ca1)))
     # println((eltype(ca2)))
@@ -22,4 +22,3 @@ function merge_ca(ca1::ComponentArray, ca2::ComponentArray, key::Symbol=:param)
     end
     ComponentVector(namedtuple([key],[new_ca1]))
 end
-promote_type

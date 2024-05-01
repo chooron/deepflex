@@ -6,6 +6,7 @@ using ComponentArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
+using Optimization
 
 # test exphydro model
 include("../../src/DeepFlex.jl")
@@ -16,7 +17,6 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 
 tunable_pas = ComponentVector(exphydro=(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin),))
 const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, soilwater=1300.0), weight=1.0))
-# ComponentVector(tunable_pas;const_pas...)
 
 params_axes = getaxes(tunable_pas)
 
@@ -41,6 +41,7 @@ best_pas = DeepFlex.param_grad_optim(
     const_pas=const_pas,
     input=input,
     target=output,
+    adtype=Optimization.AutoForwardDiff()
 )
 
 total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]

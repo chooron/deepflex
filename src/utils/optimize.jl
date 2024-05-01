@@ -54,7 +54,7 @@ function param_grad_optim(
     kwargs...,
 )
     """
-    针对模型参数进行二次优化
+    using Optimization.jl for param optimize
     """
     # 获取需要优化的参数名称
     solve_alg = get(kwargs, :solve_alg, Adam())
@@ -66,7 +66,7 @@ function param_grad_optim(
 
     tunable_pas_axes = getaxes(tunable_pas)
 
-    # 内部构造一个function
+    # build predict function
     function predict_func(x::AbstractVector{T}, p) where T
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
@@ -75,12 +75,45 @@ function param_grad_optim(
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
 
-    # 构建问题
+    # build optim problem
     optf = Optimization.OptimizationFunction(objective, adtype)
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas))
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     
     ComponentVector(sol.u, tunable_pas_axes)
+end
+
+function param_grad_optimv2(
+    component::AbstractComponent;
+    tunable_pas::AbstractVector,
+    const_pas::AbstractVector,
+    input::NamedTuple,
+    target::NamedTuple,
+    kwargs...,
+)
+    """
+    using Optim.jl for optimization, which has the same problem in param_grad_optim
+    """
+    # 获取需要优化的参数名称
+    target_name = get(kwargs, :target_name, :flow)
+    loss_func = get(kwargs, :loss_func, mse)
+
+
+    tunable_pas_axes = getaxes(tunable_pas)
+
+    # 内部构造一个function
+    function predict_func(x::AbstractVector{T}) where T
+        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+        tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
+        output = component(input, tmp_pas)
+        println(eltype(output[target_name]))
+        output
+    end
+
+    objective(x) = loss_func(target[target_name], predict_func(x)[target_name])
+
+    result = Optim.optimize(objective, collect(tunable_pas), LBFGS(); autodiff = :forward)
+    result
 end
 
 function hybridparams_optimize!()
