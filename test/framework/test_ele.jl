@@ -29,6 +29,7 @@ solver = DeepFlex.ODESolver()
 #     p=[sys.sf_surf_base_sys.Df => Df, sys.sf_surf_base_sys.Tmax => Tmax, sys.sf_surf_base_sys.Tmin => Tmin],
 #     u0=[sys.sf_surf_base_sys.snowwater => 0.0])
 # ModelingToolkit.MTKParameters
-@btime results = ele(input, pas, solver=solver)
+results = ele(input, pas, solver=solver)
+vcat(results.u...)
 
 # DeepFlex.@simpleflux([:temp, :lday], "pet", Symbol[])

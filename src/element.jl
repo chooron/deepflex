@@ -88,7 +88,8 @@ function (ele::HydroElement{true})(
         prob = setup_input(ele, input=fluxes[ele_input_names], time=input[:time])
         new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states)
         solved_states = solver(new_prob, get_state_names(ele.dfuncs))
-        fluxes = merge_ca(input, solved_states)[:param]
+        # fluxes = merge_ca(input, solved_states)[:param]
+        return vcat(solved_states.u...)
     end
     for func in ele.funcs
         fluxes = merge_ca(fluxes, func(fluxes, params))[:param]

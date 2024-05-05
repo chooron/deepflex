@@ -75,7 +75,7 @@ function param_grad_optim(
     end
 
     function objective(x::AbstractVector{T}, p) where {T}
-        loss_func(T.(target[target_name]), predict_func(x, p)[target_name])
+        loss_func(T.(target[target_name]), predict_func(x, p)) # vcat(results.u...)
     end
 
     # build optim problem

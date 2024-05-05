@@ -21,7 +21,7 @@ end
 
 function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
     # namedtuple([output_names], [max.(T(0.0), output)])
-    namedtuple([output_names], [output])
+    ComponentVector(namedtuple([output_names], [output]))
 end
 
 function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}

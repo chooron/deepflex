@@ -23,8 +23,9 @@ function (solver::ODESolver)(
     else
         @error "ode failed to solve"
     end
-    solved_u = hcat(sol.u...)
-    ComponentVector(namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)]))
+    # solved_u = hcat(sol.u...)
+    # ComponentVector(namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)]))
+    sol
 end
 
 
