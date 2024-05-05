@@ -57,3 +57,8 @@ function (node::HydroNode)(
     end
     (flow=sum(output_list),)
 end
+
+# function setup_input!(node::HydroNode; input::ComponentVector)
+#     for ele in node.
+
+# end

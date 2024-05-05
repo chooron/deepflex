@@ -1,7 +1,7 @@
 """
 HydroElement
 """
-struct HydroElement{mtk} <: AbstractElement
+mutable struct HydroElement{mtk} <: AbstractElement
     #* component名称
     name::Symbol
     #* fluxes and dfluxes
@@ -88,33 +88,14 @@ function (ele::HydroElement{true})(
         prob = setup_input(ele, input=fluxes[ele_input_names], time=input[:time])
         new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states)
         solved_states = solver(new_prob, get_state_names(ele.dfuncs))
-        fluxes = ComponentVector(input; solved_states...)
+        fluxes = merge_ca(input, solved_states)[:param]
     end
     for func in ele.funcs
-        fluxes = ComponentVector(fluxes; func(fluxes, params)...)
+        fluxes = merge_ca(fluxes, func(fluxes, params))[:param]
     end
     fluxes
 end
 
-function (ele::HydroElement{false})(
-    input::NamedTuple,
-    pas::ComponentVector;
-    solver::AbstractSolver=ODESolver()
-)
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    fluxes = input
-    if length(ele.dfuncs) > 0
-        init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
-        ele_input_names = get_input_names(ele.funcs, ele.dfuncs)
-        prob = build_prob(ele, input=input[ele_input_names], time=input[:time], params=params, init_states=init_states)
-        solved_states = solver(prob, get_state_names(ele.dfuncs))
-        fluxes = merge(input, solved_states)
-    end
-    for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, params))
-    end
-    fluxes
-end
 
 function build_prob(
     ele::HydroElement{false};
@@ -146,7 +127,7 @@ function (elements::AbstractVector{<:HydroElement})(
     fluxes = input
     for ele in elements
         tmp_fluxes = ele(fluxes, pas, solver=solver)
-        fluxes = ComponentVector(fluxes; tmp_fluxes...)
+        fluxes = merge_ca(fluxes, tmp_fluxes)[:param]
     end
     fluxes
 end
@@ -160,9 +141,10 @@ function get_sol_u0(ele::HydroElement, input0::NamedTuple, params::ComponentVect
     input
 end
 
+
 function setup_input(
     ele::HydroElement;
-    input::AbstractVector,
+    input::ComponentVector,
     time::AbstractVector
 )
     #* 构建data的插值系统
@@ -181,19 +163,20 @@ end
 function setup_prob(
     ele::HydroElement,
     prob::ODEProblem;
-    input::AbstractVector,
     params::ComponentVector,
     init_states::ComponentVector,
+    kwargs...
 )
     ele_input_names = get_input_names(ele.funcs, ele.dfuncs)
     #* setup init states
     u0 = [getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states) if nm in get_state_names(ele.dfuncs)]
     for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
-        sol_0 = get_sol_u0(ele, namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names]),
+        sol_0 = get_sol_u0(ele, namedtuple(ele_input_names, [kwargs[:input][nm][1] for nm in ele_input_names]),
             params, namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)]))
         func_nn_sys = getproperty(ele.sys, func.param_names)
         u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(get_input_names(func))])
     end
+    # u0var = ModelingToolkit.varmap_to_vars(u0, unknowns(ele.sys))
     #* setup parameters
     p = Pair[]
     for nm in ModelingToolkit.parameters(ele.sys)
@@ -205,7 +188,7 @@ function setup_prob(
         end
     end
     p = [getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)] for nm in ModelingToolkit.parameters(ele.sys)]
+    # pvar = ModelingToolkit.MTKParameters(sys, p, u0var)
     new_prob = remake(prob, p=p, u0=u0)
-    # println(new_prob.f)
     new_prob
 end

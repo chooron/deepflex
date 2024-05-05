@@ -8,7 +8,7 @@ using NamedTupleTools
 using DataFrames
 include("../../src/DeepFlex.jl")
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=false)
+model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
@@ -21,6 +21,6 @@ unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 unit_input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 unit_init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 
-input = (exphydro=unit_input,)
+input = ComponentVector(exphydro=unit_input,)
 pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 @btime results = model(input, pas)

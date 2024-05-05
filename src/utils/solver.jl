@@ -1,6 +1,6 @@
 @kwdef struct ODESolver <: AbstractSolver
     alg::OrdinaryDiffEqAlgorithm = Tsit5()
-    sensealg = ForwardDiffSensitivity()
+    sensealg = InterpolatingAdjoint()
     reltol = 1e-3
     abstol = 1e-3
     saveat = 1.0
@@ -16,7 +16,7 @@ function (solver::ODESolver)(
         saveat=solver.saveat,
         reltol=solver.reltol,
         abstol=solver.abstol,
-        sensealg=solver.sensealg
+        # sensealg=solver.sensealg
     )
     if SciMLBase.successful_retcode(sol)
         @info "ode solved successfully"

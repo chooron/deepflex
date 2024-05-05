@@ -26,6 +26,7 @@ function param_box_optim(
     maxiters = get(kwargs, :maxiters, 10)
 
     tunable_pas_axes = getaxes(tunable_pas)
+    setup_input!(component, input, time)
 
     predict_func(x, p) = begin
         tunable_pas_type = eltype(x)
@@ -89,33 +90,44 @@ function param_grad_optimv2(
     component::AbstractComponent;
     tunable_pas::AbstractVector,
     const_pas::AbstractVector,
-    input::NamedTuple,
-    target::NamedTuple,
+    input::ComponentVector,
+    target::ComponentVector,
     kwargs...,
 )
     """
-    using Optim.jl for optimization, which has the same problem in param_grad_optim
+    using ModelingToolkit.jl to build the OptimizationProblem
     """
     # 获取需要优化的参数名称
+    solve_alg = get(kwargs, :solve_alg, Adam())
+    adtype = get(kwargs, :adtype, Optimization.AutoForwardDiff())  # AutoForwardDiff and AutoFiniteDiff AutoZygote
     target_name = get(kwargs, :target_name, :flow)
     loss_func = get(kwargs, :loss_func, mse)
-
+    callback_func = get(kwargs, :callback_func, default_callback_func)
+    maxiters = get(kwargs, :maxiters, 10)
 
     tunable_pas_axes = getaxes(tunable_pas)
+    const_pas_axes = getaxes(const_pas)
+
+    @variables xs[1:length(tunable_pas)]
+    @parameters ps[1:length(const_pas)] = collect(const_pas)
 
     # 内部构造一个function
-    function predict_func(x::AbstractVector{T}) where {T}
-        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
+    function predict_func(x::AbstractVector{T}, p::AbstractVector{T}) where {T}
+        tmp_tunable_pas = ComponentVector([x...], tunable_pas_axes)
+        tmp_const_pas = ComponentVector([p...], const_pas_axes)
+        tmp_pas = merge_ca(tmp_tunable_pas, tmp_const_pas)[:param]
         output = component(input, tmp_pas)
-        println(eltype(output[target_name]))
         output
     end
 
-    objective(x) = loss_func(target[target_name], predict_func(x)[target_name])
+    loss = loss_func(target[target_name], predict_func(xs, ps)[target_name])
 
-    result = Optim.optimize(objective, collect(tunable_pas), LBFGS(); autodiff=:forward)
-    result
+    @mtkbuild sys = OptimizationSystem(loss, xs, ps)
+
+    x0 = [xs[idx] => tunable_pas[idx] for idx in length(tunable_pas)]
+    prob = OptimizationProblem(sys, x0, grad=true) # 
+    sol = solve(prob, Adam())
+    ComponentVector(sol.u, tunable_pas_axes)
 end
 
 function hybridparams_optimize!()

@@ -32,13 +32,13 @@ function Soil(; name::Symbol, mtk::Bool=true)
     # 神经网络的定义是在模型之内，需要提取到模型的参数
     et_ann = Lux.Chain(
         Lux.Dense(3 => 16, Lux.tanh),
-        Lux.Dense(16 => 16, Lux.leakyrelu),
+        # Lux.Dense(16 => 16, Lux.leakyrelu),
         Lux.Dense(16 => 1, Lux.leakyrelu)
     )
 
     q_ann = Lux.Chain(
         Lux.Dense(2 => 16, Lux.tanh),
-        Lux.Dense(16 => 16, Lux.leakyrelu),
+        # Lux.Dense(16 => 16, Lux.leakyrelu),
         Lux.Dense(16 => 1, Lux.leakyrelu)
     )
 

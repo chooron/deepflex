@@ -77,7 +77,6 @@ get_refs = getu(model_true, [model_true.y])
 x0 = reduce(vcat, getindex.((default_values(sys),), tunable_parameters(sys)))
 
 function loss(x, (prob, sol_ref, get_vars, get_refs))
-    println(eltype(x))
     new_p = SciMLStructures.replace(Tunable(), prob.p, x)
     new_prob = remake(prob, p = new_p, u0 = eltype(x).(prob.u0))
     ts = sol_ref.t
@@ -98,7 +97,7 @@ cb = (opt_state, loss) -> begin
     return false
 end
 
-of = OptimizationFunction{true}(loss, AutoForwardDiff())
+of = OptimizationFunction{true}(loss, AutoFiniteDiff())
 op = OptimizationProblem(of, x0, (prob, sol_ref, get_vars, get_refs))
 @btime res = solve(op, Adam(5e-3); maxiters = 100, callback = cb)
 

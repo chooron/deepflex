@@ -20,16 +20,16 @@ file_path = "data/cache/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
-input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
-output = (flow=df[ts, "Flow"],)
+input = ComponentVector(m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
+output = ComponentVector(flow=df[ts, "Flow"],)
 
 mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
 mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
 mean_temp, std_temp = mean(df[ts, "Temp"]), std(df[ts, "Temp"])
 mean_prcp, std_prcp = mean(df[ts, "Prcp"]), std(df[ts, "Prcp"])
 
-et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
-q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu)) # Lux.Dense(16, 16, Lux.leakyrelu), 
+q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu))  # Lux.Dense(16, 16, Lux.leakyrelu), 
 et_ann_p = LuxCore.initialparameters(StableRNG(42), et_ann)
 q_ann_p = LuxCore.initialparameters(StableRNG(42), q_ann)
 
@@ -53,6 +53,7 @@ best_pas = DeepFlex.param_grad_optim(
     const_pas=const_pas,
     input=input,
     target=output,
+    adtype=Optimization.AutoFiniteDiff()
 )
 
 total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
