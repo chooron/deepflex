@@ -52,7 +52,7 @@ end
 """
 Inner Route Function in Exphydro
 """
-function Zone(; name::Symbol, mtk::Bool=true)
+function Zone(; name::Symbol)
 
     funcs = [
         DeepFlex.FlowFlux([:baseflow, :surfaceflow])
@@ -61,11 +61,10 @@ function Zone(; name::Symbol, mtk::Bool=true)
     DeepFlex.HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
-        mtk=mtk,
     )
 end
 
-function Route(; name::Symbol, mtk::Bool=true)
+function Route(; name::Symbol)
 
     funcs = [
         DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
@@ -74,21 +73,23 @@ function Route(; name::Symbol, mtk::Bool=true)
     DeepFlex.HydroElement(
         name,
         funcs=funcs,
-        mtk=mtk,
     )
 end
 
-function Node(; name::Symbol, mtk::Bool=true)
-    unit = [
+function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    units = [
         Surface(name=name, mtk=mtk),
         Soil(name=name, mtk=mtk),
-        Zone(name=name, mtk=mtk),
-        Route(name=name, mtk=mtk),
+        Zone(name=name),
     ]
+
+    routes = Route(name=name)
 
     DeepFlex.HydroNode(
         name,
-        units=unit,
+        units=namedtuple([name], [units]),
+        routes=namedtuple([name], [routes]),
+        step=step,
     )
 end
 

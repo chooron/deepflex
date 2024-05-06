@@ -16,16 +16,16 @@ function (solver::ODESolver)(
         saveat=solver.saveat,
         reltol=solver.reltol,
         abstol=solver.abstol,
-        # sensealg=solver.sensealg
+        sensealg=solver.sensealg
     )
     if SciMLBase.successful_retcode(sol)
-        @info "ode solved successfully"
+        solved_u = hcat(sol.u...)
+        namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
     else
         @error "ode failed to solve"
+        false
     end
-    # solved_u = hcat(sol.u...)
-    # ComponentVector(namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)]))
-    sol
+
 end
 
 

@@ -23,7 +23,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
-pas = ComponentVector(exphydro=(unit=(params=unit_params, initstates=unit_init_states), route=(params=ComponentVector(),), weight=1.0))
+pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 
 model = DeepFlex.ExpHydro.Node(name=:exphydro)
 

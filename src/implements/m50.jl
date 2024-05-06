@@ -1,6 +1,7 @@
 @reexport module M50
 
 using ..DeepFlex
+using ..DeepFlex.NamedTupleTools
 import ..DeepFlex: Lux
 
 """
@@ -88,14 +89,19 @@ end
 Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
 """
 
-function Node(; name::Symbol, mtk::Bool=true)
-    elements = [
+function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    units = [
         Surface(name=name,mtk=mtk),
         Soil(name=name,mtk=mtk)
     ]
+
+    routes = Route(name=name)
+
     DeepFlex.HydroNode(
         name,
-        units=elements
+        units=namedtuple([name], [units]),
+        routes=namedtuple([name], [routes]),
+        step=step,
     )
 end
 

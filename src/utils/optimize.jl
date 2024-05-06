@@ -50,8 +50,8 @@ function param_grad_optim(
     component::AbstractComponent;
     tunable_pas::AbstractVector,
     const_pas::AbstractVector,
-    input::ComponentVector,
-    target::ComponentVector,
+    input::NamedTuple,
+    target::NamedTuple,
     kwargs...,
 )
     """
@@ -70,12 +70,12 @@ function param_grad_optim(
     # build predict function
     function predict_func(x::AbstractVector{T}, p) where {T}
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        tmp_pas = merge_ca(tmp_tunable_pas, T.(const_pas))[:param]
-        component(T.(input), tmp_pas)
+        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
+        component(input, tmp_pas)
     end
 
     function objective(x::AbstractVector{T}, p) where {T}
-        loss_func(T.(target[target_name]), predict_func(x, p)) # vcat(results.u...)
+        loss_func(target[target_name], predict_func(x, p)[target_name]) # vcat(results.u...)
     end
 
     # build optim problem

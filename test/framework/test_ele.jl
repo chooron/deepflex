@@ -19,7 +19,7 @@ file_path = "data/camels/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:100
-input = ComponentVector(time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
+input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = DeepFlex.ODESolver()
 # sys = DeepFlex.setup_input(ele, input=input, time=ts)
 # prob = ODEProblem(sys, [], (1, 10000), [])
@@ -29,7 +29,8 @@ solver = DeepFlex.ODESolver()
 #     p=[sys.sf_surf_base_sys.Df => Df, sys.sf_surf_base_sys.Tmax => Tmax, sys.sf_surf_base_sys.Tmin => Tmin],
 #     u0=[sys.sf_surf_base_sys.snowwater => 0.0])
 # ModelingToolkit.MTKParameters
-results = ele(input, pas, solver=solver)
-vcat(results.u...)
+@btime solved_states = DeepFlex.solve_prob(ele, input=input, pas=pas, solver=solver)
+input = merge(input ,solved_states)
+@btime results = ele(input, pas)
 
 # DeepFlex.@simpleflux([:temp, :lday], "pet", Symbol[])

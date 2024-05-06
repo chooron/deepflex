@@ -20,7 +20,7 @@ const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, 
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true)
+model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -32,8 +32,8 @@ temp_vec = df[1:1000, "tmean(C)"]
 flow_vec = df[1:1000, "flow(mm)"]
 
 # parameters optimization
-input = ComponentVector(exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
-output = ComponentVector(flow=flow_vec,)
+input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
+output = (flow=flow_vec,)
 
 best_pas = DeepFlex.param_grad_optim(
     model,
