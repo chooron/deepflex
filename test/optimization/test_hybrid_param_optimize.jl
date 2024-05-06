@@ -10,7 +10,7 @@ using Lux
 using StableRNGs
 
 # test exphydro model
-include("../../src/DeepFlex.jl")
+# include("../../src/DeepFlex.jl")
 
 # base param names
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
@@ -20,8 +20,8 @@ file_path = "data/cache/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
-input = ComponentVector(m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
-output = ComponentVector(flow=df[ts, "Flow"],)
+input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
+output = (flow=df[ts, "Flow"],)
 
 mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
 mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
@@ -45,7 +45,7 @@ const_pas = ComponentVector(m50=(params=ComponentVector(
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.M50.Node(name=:m50, mtk=true)
+model = DeepFlex.M50.Node(name=:m50, mtk=false)
 
 best_pas = DeepFlex.param_grad_optim(
     model,
@@ -53,8 +53,8 @@ best_pas = DeepFlex.param_grad_optim(
     const_pas=const_pas,
     input=input,
     target=output,
-    adtype=Optimization.AutoFiniteDiff()
+    adtype=Optimization.AutoZygote()
 )
 
-total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
-result = model(input, total_params, step=false)
+# total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
+# result = model(input, total_params, step=false)

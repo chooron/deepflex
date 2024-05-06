@@ -11,7 +11,7 @@ using OrdinaryDiffEq
 using ModelingToolkit
 include("../../src/DeepFlex.jl")
 
-model = DeepFlex.M50.Node(name=:m50, mtk=false)
+model = DeepFlex.M50.Node(name=:m50, mtk=true)
 # base param names
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
@@ -28,8 +28,8 @@ mean_prcp, std_prcp = mean(df[ts, "Prcp"]), std(df[ts, "Prcp"])
 
 input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
 
-et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
-q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 16, Lux.leakyrelu), Lux.Dense(16, 1, Lux.leakyrelu))
+et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu))
+q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu))
 et_ann_p = LuxCore.initialparameters(StableRNG(42), et_ann)
 q_ann_p = LuxCore.initialparameters(StableRNG(42), q_ann)
 
@@ -48,3 +48,10 @@ solver = DeepFlex.ODESolver(alg=Rosenbrock23())
 # new_prob = DeepFlex.setup_prob(model.elements[2], prob, input=input[model.elements[2].input_names], params=params, init_states=initstates)
 # solved_state = solver(new_prob, model.elements[2].state_names)
 results = model(input, pas, solver=solver)
+
+# q_ann = Lux.Chain(
+#     Lux.Dense(2 => 16, Lux.tanh),
+#     # Lux.Dense(16 => 16, Lux.leakyrelu),
+#     Lux.Dense(16 => 1, Lux.leakyrelu)
+# )
+# func = (x, p) -> LuxCore.stateless_apply(q_ann, x, p)
