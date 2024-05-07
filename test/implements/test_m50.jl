@@ -11,7 +11,7 @@ using OrdinaryDiffEq
 using ModelingToolkit
 include("../../src/DeepFlex.jl")
 
-model = DeepFlex.M50.Node(name=:m50, mtk=true)
+model = DeepFlex.M50.Node(name=:m50, mtk=false)
 # base param names
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
@@ -43,11 +43,11 @@ params = ComponentVector(
 initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 pas = ComponentVector(m50=(params=params, initstates=initstates, weight=1.0),)
 
-solver = DeepFlex.ODESolver(alg=Rosenbrock23())
+solver = DeepFlex.ODESolver(alg=Rosenbrock23()) # 
 # prob = DeepFlex.setup_input(model.elements[2], input=input[model.elements[2].input_names], time=ts)
 # new_prob = DeepFlex.setup_prob(model.elements[2], prob, input=input[model.elements[2].input_names], params=params, init_states=initstates)
 # solved_state = solver(new_prob, model.elements[2].state_names)
-results = model(input, pas, solver=solver)
+@btime results = model(input, pas, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),

@@ -5,7 +5,7 @@ using ..DeepFlex.NamedTupleTools
 """
 SoilWaterReservoir in GR4J
 """
-function Surface(; name::Symbol)
+function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
         DeepFlex.RainfallFlux([:prcp, :pet]),
         DeepFlex.SimpleFlux([:prcp, :pet], :pet,
@@ -16,14 +16,15 @@ function Surface(; name::Symbol)
 
     DeepFlex.HydroElement(
         Symbol(name, :_surf_),
-        funcs=funcs
+        funcs=funcs,
+        mtk=mtk
     )
 end
 
 """
 SoilWaterReservoir in GR4J
 """
-function Soil(; name::Symbol)
+function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         DeepFlex.SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
@@ -42,21 +43,18 @@ function Soil(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
-function Zone(; name::Symbol)
+function Zone(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         DeepFlex.RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
         DeepFlex.SimpleFlux([:routingstore], :routedflow,
             param_names=[:x3, :γ],
-            func=(i, p, sf) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),
-        DeepFlex.SimpleFlux([:routedflow, :recharge, :fastflow], :flow,
-            param_names=Symbol[],
-            func=(i, p, sf) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
-    ]
+            func=(i, p, sf) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),]
 
     dfuncs = [
         DeepFlex.DifferFlux([:slowflow, :recharge], [:routedflow], :routingstore),
@@ -65,7 +63,8 @@ function Zone(; name::Symbol)
     DeepFlex.HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
@@ -75,27 +74,33 @@ function Route(; name::Symbol)
     funcs = [
         DeepFlex.LagFlux(:slowflow, :slowflow, lag_func=DeepFlex.uh_1_half, param_names=:x4),
         DeepFlex.LagFlux(:fastflow, :fastflow, lag_func=DeepFlex.uh_2_full, param_names=:x4),
+        DeepFlex.SimpleFlux([:routedflow, :recharge, :fastflow], :flow, param_names=Symbol[],
+            func=(i, p, sf) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
     ]
 
     DeepFlex.HydroElement(
         Symbol(name, :_route_),
-        funcs=funcs
+        funcs=funcs,
+        mtk=false
     )
 end
 
 
-function Node(; name::Symbol)
+function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
-    unit = [
-        Surface(name=name),
-        Soil(name=name),
-        Route(name=name),
-        Zone(name=name),
+    units = [
+        Surface(name=name, mtk=mtk),
+        Soil(name=name, mtk=mtk),
+        Zone(name=name, mtk=mtk),
     ]
+
+    routes = Route(name=name)
 
     DeepFlex.HydroNode(
         name,
-        units=unit,
+        units=namedtuple([name], [units]),
+        routes=namedtuple([name], [routes]),
+        step=step,
     )
 end
 end

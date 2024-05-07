@@ -123,7 +123,7 @@ function callback_func(p, l)
 end
 
 
-cost_function = Optimization.OptimizationFunction(loss_func, Optimization.AutoForwardDiff()) # AutoReverseDiff
+cost_function = Optimization.OptimizationFunction(loss_func, Optimization.AutoZygote()) # AutoReverseDiff, AutoZygote
 optprob = Optimization.OptimizationProblem(
     cost_function,
     params_list,

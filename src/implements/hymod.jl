@@ -1,83 +1,105 @@
+@reexport module HyMOD
+
+using ..DeepFlex
+using ..DeepFlex.NamedTupleTools
+
 """
 SnowWaterReservoir in HyMOD
 """
-function HyMOD_SurfElement(; name::Symbol)
+function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        RainfallFlux([:prcp, :pet]),
-        SimpleFlux([:prcp, :pet], :pet,
+        DeepFlex.RainfallFlux([:prcp, :pet]),
+        DeepFlex.SimpleFlux([:prcp, :pet], :pet,
             param_names=Symbol[],
             func=(i, p, sf) -> @.(sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
-        InfiltrationFlux([:rainfall])
+        DeepFlex.InfiltrationFlux([:rainfall])
     ]
 
-    HydroElement(
+    DeepFlex.HydroElement(
         name=name,
-        funcs=funcs
+        funcs=funcs,
+        mtk=mtk,
     )
 end
 
 """
 SoilWaterReservoir in HYMOD
 """
-function HyMOD_SoilElement(; name::Symbol)
+function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
-        EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        SimpleFlux([:saturation], :fastflow, param_names=[:a],
-            func=(i, p, sf) -> @.(i[:saturation] * (1 - p[:a]))),
-        SimpleFlux([:saturation], :slowflow, param_names=[:a],
-            func=(i, p, sf) -> @.(i[:saturation] * p[:a]))
+        DeepFlex.SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
+        DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
+        DeepFlex.SimpleFlux([:saturation], :fastflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * (1 - p[:a]))),
+        DeepFlex.SimpleFlux([:saturation], :slowflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * p[:a]))
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:saturation], :Out => [:evap, :saturation]), :soilwater)
+        DeepFlex.DifferFlux([:saturation], [:evap, :saturation], :soilwater)
     ]
 
-    HydroElement(
+    DeepFlex.HydroElement(
         name=name,
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk,
     )
 end
 
 
-function HyMOD_RouteElement(; name::Symbol)
+function Zone(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        SimpleFlux([:fr1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr1]),
-        SimpleFlux([:fr2], :qf2, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr2]),
-        SimpleFlux([:fr3], :qf3, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr3]),
-        SimpleFlux([:sr], :qs, param_names=[:ks], func=(i, p, sf) -> p[:ks] .* i[:sr]),
-        SimpleFlux([:qs, :qf3], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:qs] .+ i[:qf3]),
+        DeepFlex.SimpleFlux([:fr1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr1]),
+        DeepFlex.SimpleFlux([:fr2], :qf2, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr2]),
+        DeepFlex.SimpleFlux([:fr3], :qf3, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr3]),
+        DeepFlex.SimpleFlux([:sr], :qs, param_names=[:ks], func=(i, p, sf) -> p[:ks] .* i[:sr]),
+        DeepFlex.SimpleFlux([:qs, :qf3], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:qs] .+ i[:qf3]),
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:fastflow], :Out => [:qf1]), :fr1),
-        DifferFlux(Dict(:In => [:qf1], :Out => [:qf2]), :fr2),
-        DifferFlux(Dict(:In => [:qf2], :Out => [:qf3]), :fr3),
-        DifferFlux(Dict(:In => [:slowflow], :Out => [:qs]), :sr),
+        DeepFlex.DifferFlux([:fastflow], [:qf1], :fr1),
+        DeepFlex.DifferFlux([:qf1], [:qf2], :fr2),
+        DeepFlex.DifferFlux([:qf2], [:qf3], :fr3),
+        DeepFlex.DifferFlux([:slowflow], [:qs], :sr),
     ]
 
-    HydroElement(
+    DeepFlex.HydroElement(
         name=name,
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk,
     )
 end
 
-function HyMOD_Unit(; name::Symbol)
-    elements = [
-        HyMOD_SurfElement(name=name),
-        HyMOD_SoilElement(name=name),
+function Route(; name::Symbol, mtk::Bool=true)
+
+    funcs = [
+        DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
     ]
-    HydroUnit(name, elements=elements)
+
+    DeepFlex.HydroElement(
+        Symbol(name, :_route_),
+        funcs=funcs,
+        mtk=mtk
+    )
 end
 
-function HyMOD_Node(; name::Symbol)
-    HydroNode(
+function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    units = [
+        Surface(name=name,mtk=mtk),
+        Soil(name=name,mtk=mtk),
+        Zone(name=name,mtk=mtk),
+    ]
+
+    routes = Route(name=name)
+
+    DeepFlex.HydroNode(
         name,
-        unit=HyMOD_Unit(name=name),
-        route=HyMOD_RouteElement(name=name)
+        units=namedtuple([name], [units]),
+        routes=namedtuple([name], [routes]),
+        step=step,
     )
+end
+
 end
