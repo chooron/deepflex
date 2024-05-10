@@ -74,3 +74,11 @@
   2. Fastflow和Slowflow, 如GR4J
   3. Surfaceflow, Interflow, Baseflow三层
 - 模型输入需要统一，比如Infiltration，Pet
+
+### State Element的特性（或者是需求）
+
+influxes, outfluxes, statefluxes
+
+state elmement 有时候会有需求，即添加input flux和output flux从而灵活改变state flux的计算结果，
+
+但是这种可能会引入一些难以命名的变量(m50)

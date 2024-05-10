@@ -1,5 +1,5 @@
 #* name utils for flux
-function get_input_names(func::AbstractFlux)
+function get_input_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
     if eltype(func.input_names) isa Pair
         input_names = [v for (_, v) in func.input_names]
     elseif func.input_names isa Vector
@@ -10,7 +10,7 @@ function get_input_names(func::AbstractFlux)
     input_names
 end
 
-function get_output_names(func::AbstractFlux)
+function get_output_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
     if func.output_names isa Vector
         output_names = func.output_names
     else
@@ -26,6 +26,26 @@ function get_param_names(func::AbstractFlux)
         param_names = [func.param_names]
     end
     param_names
+end
+
+function get_input_names(func::AbstractStateFlux)
+    vcat(func.influx_names, func.outflux_names)
+end
+
+function get_output_names(func::AbstractStateFlux)
+    func.state_names
+end
+
+function get_input_names(func::AbstractLagFlux)
+    func.flux_name
+end
+
+function get_output_names(func::AbstractLagFlux)
+    func.flux_name
+end
+
+function get_param_names(func::AbstractLagFlux)
+    func.lag_time
 end
 
 function get_func_io_names(funcs::Vector{<:AbstractFlux})

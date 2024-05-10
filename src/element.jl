@@ -1,12 +1,14 @@
 """
 HydroElement
 """
-mutable struct HydroElement{mtk} <: AbstractElement
+struct HydroElement{mtk} <: AbstractElement
     #* component名称
     name::Symbol
     #* fluxes and dfluxes
     funcs::Vector
     dfuncs::Vector
+    #* fluxes graph
+    topology::SimpleDiGraph
     #* mtk related
     varinfo::NamedTuple
     paraminfo::NamedTuple
@@ -18,11 +20,13 @@ mutable struct HydroElement{mtk} <: AbstractElement
         dfuncs::Vector=SimpleFlux[],
         mtk::Bool=true
     )
+        topology = build_compute_topology(funcs)
         if !mtk # length(dfuncs) == 0 | 
             return new{mtk}(
                 name,
                 funcs,
                 dfuncs,
+                topology,
                 NamedTuple(),
                 NamedTuple(),
                 nothing
@@ -40,6 +44,7 @@ mutable struct HydroElement{mtk} <: AbstractElement
                 name,
                 funcs,
                 dfuncs,
+                topology,
                 varinfo,
                 paraminfo,
                 sys
@@ -54,13 +59,24 @@ function (ele::HydroElement)(
     pas::ComponentVector;
 )
     params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
+    #* 构建各个输出变量对应的计算函数
+    func_ntp = namedtuple(
+        [get_output_names(func)... for func in ele.funcs],
+        [repeat(func, length(get_output_names(func)))... for func in ele.funcs]
+    )
+    ele_output_names = get_func_io_names(ele.funcs)[2]
     fluxes = input
-    for func in ele.funcs
-        fluxes = merge(fluxes, func(fluxes, params))
+    # todo 这里修改为网络计算
+    for flux_idx in topological_sort(ele.topology)
+        tmp_flux_name = ele_output_names[flux_idx]
+        if !(tmp_flux_name in keys(fluxes))
+            tmp_func = func_ntp[tmp_flux_name]
+            tmp_output = tmp_func(fluxes, params)
+            fluxes = merge(fluxes, tmp_output)
+        end
     end
     fluxes
 end
-
 
 function (elements::AbstractVector{<:HydroElement})(
     input::NamedTuple,
@@ -76,6 +92,36 @@ function (elements::AbstractVector{<:HydroElement})(
         fluxes = merge(fluxes, ele(fluxes, pas))
     end
     fluxes
+end
+
+function add_influx!(
+    ele::HydroElement{true};
+    func_ntp::NamedTuple,
+)
+    for key in keys(func_ntp)
+        for func in func_ntp[key]
+            push!(ele.funcs, func)
+        end
+        dfunc = first(filter!(dfn -> dfn.output_names == key, ele.dfuncs))
+        for func in func_ntp[key]
+            dfunc.influx_names = vcat(dfunc.influx_names, get_output_names(func))
+        end
+    end
+end
+
+function add_outflux!(
+    ele::HydroElement{true};
+    func_ntp::NamedTuple,
+)
+    for key in keys(func_ntp)
+        for func in func_ntp[key]
+            push!(ele.funcs, func)
+        end
+        dfunc = first(filter!(dfn -> dfn.output_names == key, ele.dfuncs))
+        for func in func_ntp[key]
+            dfunc.outflux_names = vcat(dfunc.outflux_names, get_output_names(func))
+        end
+    end
 end
 
 function setup_input(
@@ -101,13 +147,13 @@ function setup_prob(
     prob::ODEProblem;
     params::ComponentVector,
     init_states::ComponentVector,
-    kwargs...
+    kw...
 )
     ele_input_names = get_input_names(ele.funcs, ele.dfuncs)
     #* setup init states
     u0 = [getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states) if nm in get_state_names(ele.dfuncs)]
     for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
-        input0 = namedtuple(ele_input_names, [kwargs[:input][nm][1] for nm in ele_input_names])
+        input0 = namedtuple(ele_input_names, [kw[:input][nm][1] for nm in ele_input_names])
         init_states = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
         sol_0 = merge(input0, init_states)
         for func in ele.funcs

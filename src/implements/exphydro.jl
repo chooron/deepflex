@@ -16,7 +16,7 @@ function Surface(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:snowfall], [:melt], :snowwater),
+        DeepFlex.StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
     DeepFlex.HydroElement(
@@ -38,7 +38,7 @@ function Soil(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
+        DeepFlex.StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
     DeepFlex.HydroElement(
@@ -67,7 +67,7 @@ end
 function Route(; name::Symbol)
 
     funcs = [
-        DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+        DeepFlex.SimpleFlux(:flow, :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
     ]
 
     DeepFlex.HydroElement(
@@ -77,7 +77,7 @@ function Route(; name::Symbol)
 end
 
 function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    units = [
+    layers = [
         Surface(name=name, mtk=mtk),
         Soil(name=name, mtk=mtk),
         Zone(name=name),
@@ -87,7 +87,7 @@ function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
     DeepFlex.HydroNode(
         name,
-        units=namedtuple([name], [units]),
+        layers=namedtuple([name], [layers]),
         routes=namedtuple([name], [routes]),
         step=step,
     )

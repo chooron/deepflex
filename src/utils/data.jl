@@ -19,24 +19,24 @@ function extract_params(params::NamedTuple, param_names::Vector{Symbol})
     params
 end
 
-function process_output(output_names::Symbol, output::Union{T,Vector{T}}) where {T<:Number}
+function process_output(output::Union{T,Vector{T}}, output_names::Symbol) where {T<:Number}
     # namedtuple([output_names], [max.(T(0.0), output)])
     namedtuple([output_names], [output])
 end
 
-function process_output(output_names::Vector{Symbol}, output::Union{Vector{T},Vector{Vector{T}}}) where {T<:Number}
+function process_output(output::Union{Vector{T},Vector{Vector{T}}}, output_names::Vector{Symbol}) where {T<:Number}
     # namedtuple(output_names, [max.(T(0.0), o) for o in output])
     namedtuple(output_names, output)
 end
 
-function process_output(output_names::Symbol, output::Matrix{T}) where {T<:Number}
+function process_output(output::Matrix{T}, output_names::Symbol) where {T<:Number}
     tmp_output = vec(output)
     tmp_output = length(tmp_output) > 1 ? [tmp_output] : tmp_output
     # namedtuple([output_names], [max.(T(0.0), output)])
     namedtuple([output_names], tmp_output)
 end
 
-function process_output(output_names::Vector{Symbol}, output::Matrix{T}) where {T<:Number}
+function process_output(output::Matrix{T}, output_names::Vector{Symbol}) where {T<:Number}
     # namedtuple(output_names, [max.(T(0.0), o) for o in output])
     output_list = []
     for idx in length(output_names)

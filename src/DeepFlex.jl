@@ -55,7 +55,12 @@ abstract type AbstractSolver end
 abstract type AbstractOptimizer end
 
 abstract type AbstractFlux end
-abstract type AbstractNNFlux <: AbstractFlux end
+abstract type AbstractSimpleFlux <: AbstractFlux end
+abstract type AbstractNeuralFlux <: AbstractFlux end
+abstract type AbstractStateFlux <: AbstractFlux end
+abstract type AbstractLagFlux <: AbstractFlux end
+
+
 abstract type AbstractReach end
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
@@ -109,7 +114,5 @@ include("implements/exphydro.jl")
 include("implements/m50.jl")
 include("implements/gr4j.jl")
 include("implements/hymod.jl")
-# include("implements/hbv.jl")
-# include("implements/hymod.jl")
-# include("implements/neuralode.jl")
+include("implements/hbv.jl")
 end

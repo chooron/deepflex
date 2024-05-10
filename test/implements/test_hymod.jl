@@ -10,30 +10,29 @@ using Interpolations
 # test gr4j model
 include("../../src/DeepFlex.jl")
 
-seed = 42
-Random.seed!(42)
-P = zeros(100)
-E = zeros(100)
-P[1:10] = rand(0.0:0.01:10.0, 10)
-P[26:30] = rand(0.0:0.01:20.0, 5)
-P[41:60] = rand(0.0:0.01:5.0, 20)
-P[81:83] = rand(30.0:0.01:50.0, 3)
+file_path = "data/hymod/LA011201_forcings.csv"
+data = CSV.File(file_path);
+df = DataFrame(data);
+# time = 1:10000
+prcp_vec = df[!, "precip"]
+et_vec = df[!, "pet"]
 
 # build model
 s_max, b, a, kf, ks = 10, 5, 0.5, 0.5, 0.5
-params = (Smax=s_max, b=b, a=a, kf=kf, ks=ks)
-init_states = (soilwater=0.0, fastrouting1=1.0, fastrouting2=1.0,
-    fastrouting3=1.0, slowrouting=1.0
+unit_params = ComponentVector(Smax=s_max, b=b, a=a, kf=kf, ks=ks)
+init_states = ComponentVector(soilwater=0.0, fr1=1.0, fr2=1.0,
+    fr3=1.0, sr=1.0
 )
+ps = ComponentVector(hymod=(params=unit_params, initstates=init_states, weight=1.0))
 
-model = DeepFlex.HyMOD(name=:hymod)
+model = DeepFlex.HyMOD.Node(name=:hymod, mtk=true)
 
-input = (prcp=P, pet=E,time=1:length(E))
-output = model(input, params, init_states)
+input = (hymod=(prcp=prcp_vec, pet=et_vec,time=1:length(et_vec)),)
+output = model(input, ps)
+# output_df = DataFrames(output)
 
 # plot result
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-x = range(1, 100, length=100)
-lines!(ax, x, output[:flow], color=:blue)
+lines!(ax, 1:length(et_vec), output[:flow], color=:blue)
 fig

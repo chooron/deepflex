@@ -16,7 +16,7 @@ function Surface(; name::Symbol, mtk::Bool=true)
     ]
 
     DeepFlex.HydroElement(
-        name=name,
+        Symbol(name, :_surface_),
         funcs=funcs,
         mtk=mtk,
     )
@@ -35,11 +35,11 @@ function Soil(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:saturation], [:evap, :saturation], :soilwater)
+        DeepFlex.DifferFlux([:infiltration], [:evap, :saturation], :soilwater)
     ]
 
     DeepFlex.HydroElement(
-        name=name,
+        Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
         mtk=mtk,
@@ -65,7 +65,7 @@ function Zone(; name::Symbol, mtk::Bool=true)
     ]
 
     DeepFlex.HydroElement(
-        name=name,
+        Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
         mtk=mtk,

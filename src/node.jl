@@ -2,8 +2,8 @@ struct HydroNode{step} <: AbstractComponent
     name::Symbol
     #* 子单元名称
     subnames::Vector{Symbol}
-    #* 单元
-    units::Vector{Vector{<:AbstractElement}}
+    #* 垂向计算层
+    layers::Vector{Vector{<:AbstractElement}}
     #* 坡地产流模块
     routes::Vector{<:AbstractElement}
     #* 节点对应的面积
@@ -11,17 +11,17 @@ struct HydroNode{step} <: AbstractComponent
     #* 根据mtk生成的system
     sys::Union{Nothing,Vector{ODESystem}}
 
-    function HydroNode(name; units::NamedTuple, routes::NamedTuple, area::Number=100.0, step::Bool=true)
-        unit_names = keys(units)
+    function HydroNode(name; layers::NamedTuple, routes::NamedTuple, area::Number=100.0, step::Bool=true)
+        unit_names = keys(layers)
         if step
             sys_list = nothing
         else
-            sys_list = [build_node_system(units[nm], name=nm) for nm in unit_names]
+            sys_list = [build_node_system(layers[nm], name=nm) for nm in unit_names]
         end
         new{step}(
             name,
-            collect(keys(units)),
-            collect(units),
+            collect(keys(layers)),
+            collect(layers),
             collect(routes),
             area,
             sys_list
@@ -38,7 +38,7 @@ function (node::HydroNode{true})(
     output_list = []
     for (idx, nm) in enumerate(node.subnames)
         tmp_input = input[nm]
-        tmp_unit_ouput = node.units[idx](tmp_input, pas[nm], solver=solver)
+        tmp_unit_ouput = node.layers[idx](tmp_input, pas[nm], solver=solver)
         tmp_route_output = node.routes[idx](tmp_unit_ouput, pas[nm])
         push!(output_list, tmp_route_output[:flow] .* pas[nm][:weight])
     end
@@ -53,11 +53,11 @@ function (node::HydroNode{false})(
     output_list = []
     for (idx, nm) in enumerate(node.subnames)
         tmp_input = input[nm]
-        prob = setup_input(node.units[idx], node.sys[idx], input=tmp_input, name=nm)
-        new_prob = setup_prob(node.units[idx], node.sys[idx], prob, params=pas[nm][:params], init_states=pas[nm][:initstates])
-        solved_states = solver(new_prob, get_ele_state_names(node.units[idx]))
+        prob = setup_input(node.layers[idx], node.sys[idx], input=tmp_input, name=nm)
+        new_prob = setup_prob(node.layers[idx], node.sys[idx], prob, params=pas[nm][:params], init_states=pas[nm][:initstates])
+        solved_states = solver(new_prob, get_ele_state_names(node.layers[idx]))
         tmp_input = merge(tmp_input, solved_states)
-        tmp_unit_ouput = node.units[idx](tmp_input, pas[nm], solver=solver)
+        tmp_unit_ouput = node.layers[idx](tmp_input, pas[nm], solver=solver)
         tmp_route_output = node.routes[idx](tmp_unit_ouput, pas[nm])
         push!(output_list, tmp_route_output[:flow] .* pas[nm][:weight])
     end
@@ -87,17 +87,17 @@ function build_node_system(
 end
 
 function setup_input(
-    units::AbstractVector{HydroElement{true}},
+    layers::AbstractVector{HydroElement{true}},
     sys::ODESystem;
     input::NamedTuple,
     name::Symbol,
 )
     #* 首先构建data的插值系统
     eqs = Equation[]
-    node_varinfo = merge([ele.varinfo for ele in units]...)
-    unit_input_names = get_ele_io_names(units)[1]
+    node_varinfo = merge([ele.varinfo for ele in layers]...)
+    unit_input_names = get_ele_io_names(layers)[1]
     itp_sys = build_itp_system(NamedTupleTools.select(input, unit_input_names), input[:time], node_varinfo, name=name)
-    for ele in units
+    for ele in layers
         for nm in filter(nm -> nm in get_input_names(ele.funcs, ele.dfuncs), keys(input))
             push!(eqs, getproperty(getproperty(sys, ele.sys.name), nm) ~ getproperty(itp_sys, nm))
         end
@@ -109,7 +109,7 @@ function setup_input(
 end
 
 function setup_prob(
-    units::AbstractVector{HydroElement{true}},
+    layers::AbstractVector{HydroElement{true}},
     sys::ODESystem,
     prob::ODEProblem;
     params::ComponentVector,
@@ -119,7 +119,7 @@ function setup_prob(
     u0 = Pair[]
     #* setup parameters
     p = Pair[]
-    for ele in units
+    for ele in layers
         tmp_ele_sys = getproperty(sys, ele.sys.name)
         for nm in filter(nm -> nm in get_state_names(ele.dfuncs), keys(init_states))
             push!(u0, getproperty(tmp_ele_sys, Symbol(nm)) => init_states[Symbol(nm)])

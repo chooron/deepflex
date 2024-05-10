@@ -138,7 +138,7 @@ function hybridparams_optimize!()
 end
 
 function nn_param_optim(
-    nn::AbstractNNFlux;
+    nn::AbstractNeuralFlux;
     input::NamedTuple,
     target::NamedTuple,
     init_params::NamedTuple,
