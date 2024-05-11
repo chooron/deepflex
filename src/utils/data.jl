@@ -19,6 +19,11 @@ function extract_params(params::NamedTuple, param_names::Vector{Symbol})
     params
 end
 
+function extract_params(params::Vector, param_names::Vector{Symbol})
+    @assert length(param_names) == 0
+    NamedTuple()
+end
+
 function process_output(output::Union{T,Vector{T}}, output_names::Symbol) where {T<:Number}
     # namedtuple([output_names], [max.(T(0.0), output)])
     namedtuple([output_names], [output])

@@ -58,20 +58,19 @@ function (ele::HydroElement)(
     input::NamedTuple,
     pas::ComponentVector;
 )
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
     #* 构建各个输出变量对应的计算函数
     func_ntp = namedtuple(
-        [get_output_names(func)... for func in ele.funcs],
-        [repeat(func, length(get_output_names(func)))... for func in ele.funcs]
+        vcat([get_output_names(func) for func in ele.funcs]...),
+        vcat([repeat([func], length(get_output_names(func))) for func in ele.funcs]...)
     )
-    ele_output_names = get_func_io_names(ele.funcs)[2]
+    ele_var_names = unique(vcat(get_func_io_names(ele.funcs)...))
     fluxes = input
     # todo 这里修改为网络计算
     for flux_idx in topological_sort(ele.topology)
-        tmp_flux_name = ele_output_names[flux_idx]
+        tmp_flux_name = ele_var_names[flux_idx]
         if !(tmp_flux_name in keys(fluxes))
             tmp_func = func_ntp[tmp_flux_name]
-            tmp_output = tmp_func(fluxes, params)
+            tmp_output = tmp_func(fluxes, pas[:params])
             fluxes = merge(fluxes, tmp_output)
         end
     end
@@ -134,7 +133,7 @@ function setup_input(
     compose_sys = compose(ODESystem(itp_eqs, t; name=Symbol(ele.name, :comp_sys)), ele.sys)
     sys = structural_simplify(compose_sys)
     build_u0 = Pair[]
-    for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
+    for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
         func_nn_sys = getproperty(ele.sys, func.param_names)
         push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(eltype(eltype(input)), length(get_input_names(func))))
     end
@@ -152,7 +151,7 @@ function setup_prob(
     ele_input_names = get_input_names(ele.funcs, ele.dfuncs)
     #* setup init states
     u0 = [getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states) if nm in get_state_names(ele.dfuncs)]
-    for func in filter(func -> func isa AbstractNNFlux, ele.funcs)
+    for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
         input0 = namedtuple(ele_input_names, [kw[:input][nm][1] for nm in ele_input_names])
         init_states = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
         sol_0 = merge(input0, init_states)
@@ -211,7 +210,7 @@ function solve_prob(
         for func in ele.funcs
             tmp_fluxes = merge(tmp_fluxes, func(tmp_fluxes, params))
         end
-        du[:] = [dfunc(tmp_fluxes, params)[dfunc.output_names] for dfunc in ele.dfuncs]
+        du[:] = [dfunc(tmp_fluxes, params)[first(get_output_names(dfunc))] for dfunc in ele.dfuncs]
     end
     prob = ODEProblem(singel_ele_ode_func!, collect(init_states[get_state_names(ele.dfuncs)]), (input[:time][1], input[:time][end]))
     solved_states = solver(prob, get_state_names(ele.dfuncs))

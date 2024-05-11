@@ -3,7 +3,7 @@ Simple flux
 """
 struct SimpleFlux <: AbstractSimpleFlux
     # attribute
-    input_names::Union{Symbol,Vector{Symbol},Vector{Pair}}
+    input_names::Union{Symbol,Vector{Symbol}}
     output_names::Union{Symbol,Vector{Symbol}}
     param_names::Vector{Symbol}
     # function 
@@ -12,7 +12,7 @@ struct SimpleFlux <: AbstractSimpleFlux
     smooth_func::Function
 
     function SimpleFlux(
-        input_names::Union{Symbol,Vector{Symbol},Vector{Pair}},
+        input_names::Union{Symbol,Vector{Symbol}},
         output_names::Union{Symbol,Vector{Symbol}};
         param_names::Vector{Symbol},
         func::Function,
@@ -36,7 +36,7 @@ StdNormFlux(
     input_names,
     output_names,
     param_names=param_names,
-    func=(i::NamedTuple, p::NamedTuple, kwargs...) ->
+    func=(i::NamedTuple, p::NamedTuple; kw...) ->
         @.((i[input_names] - p[param_names[1]]) / p[param_names[2]])
 )
 
@@ -48,7 +48,18 @@ MinMaxNormFlux(
     input_names,
     output_names,
     param_names=param_names,
-    func=(i::NamedTuple, p::NamedTuple, kwargs...) ->
+    func=(i::NamedTuple, p::NamedTuple; kw...) ->
+        @.((i[input_names] - p[param_names[2]]) / (p[param_names[1]] - p[param_names[2]]))
+)
+
+TranparentFlux(
+    old_names::Union{Symbol, Vector{Symbol}},
+    new_names::Union{Symbol, Vector{Symbol}},
+) = SimpleFlux(
+    old_names,
+    new_names,
+    param_names=Symbol[],
+    func=(i::NamedTuple, p::NamedTuple; kw...) ->
         @.((i[input_names] - p[param_names[2]]) / (p[param_names[1]] - p[param_names[2]]))
 )
 
@@ -56,29 +67,30 @@ function (flux::AbstractSimpleFlux)(input::Union{ComponentVector,NamedTuple}, pa
     tmp_input = extract_input(input, get_input_names(flux))
     tmp_params = extract_params(params, get_param_names(flux))
     tmp_output = flux.func(tmp_input, tmp_params, smooth_func=flux.smooth_func)
-    process_output(tmp_output, get_output_names(flux))
+    tmp_output_names = get_output_names(flux)
+    process_output(tmp_output, ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
 mutable struct StateFlux <: AbstractStateFlux
     influx_names::Vector{Symbol}
     outflux_names::Vector{Symbol}
     state_names::Symbol
-    params_names::Vector{Symbol}
+    param_names::Vector{Symbol}
     func::Function
 
     function StateFlux(
         influx_names::Vector{Symbol},
         outflux_names::Vector{Symbol},
         state_names::Symbol;
-        params_names::Vector{Symbol}=Symbol[],
-        func::Function=(i::NamedTuple, p::NamedTuple; kwargs...) ->
-            sum([i[nm] for nm in kwargs[:influx_names]]) - sum([i[nm] for nm in kwargs[:outflux_names]])
+        param_names::Vector{Symbol}=Symbol[],
+        func::Function=(i::NamedTuple, p::NamedTuple; kw...) ->
+            sum([i[nm] for nm in kw[:influx_names]]) - sum([i[nm] for nm in kw[:outflux_names]])
     )
         return new(
             influx_names,
             outflux_names,
             state_names,
-            params_names,
+            param_names,
             func
         )
     end
@@ -88,7 +100,8 @@ function (flux::AbstractStateFlux)(input::Union{ComponentVector,NamedTuple}, par
     tmp_input = extract_input(input, get_input_names(flux))
     tmp_params = extract_params(params, get_param_names(flux))
     tmp_output = flux.func(tmp_input, tmp_params, influx_names=flux.influx_names, outflux_names=flux.outflux_names)
-    process_output(tmp_output, get_output_names(flux))
+    tmp_output_names = get_output_names(flux)
+    process_output(tmp_output, ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
 struct LagFlux <: AbstractLagFlux
@@ -142,7 +155,8 @@ function (flux::LagFlux)(input::Union{ComponentVector,NamedTuple}, params::Union
     tmp_input = extract_input(input, get_input_names(flux))
     tmp_params = extract_params(params, get_param_names(flux))
     lag_weight = solve_lag_weights(flux, input=tmp_input, params=tmp_params)
-    process_output(lag_weight .* tmp_input[get_input_names(flux)], get_output_names(flux))
+    tmp_output_names = get_output_names(flux)
+    process_output(lag_weight .* tmp_input[get_input_names(flux)], ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
 struct NeuralFlux <: AbstractNeuralFlux
@@ -170,17 +184,3 @@ function (flux::NeuralFlux)(input::Union{ComponentVector,NamedTuple}, params::Un
     y_pred = flux.func(x, params[flux.param_names])
     process_output(y_pred, get_output_names(flux))
 end
-
-# macro simpleflux(input_names, output_names, param_names)
-#     func_nm = Symbol(output_names, :_func)
-#     println(func_nm)
-#     quote
-#         simple_flux = SimpleFlux(
-#             $(esc(input_names)),
-#             $(esc(output_names)),
-#             param_names=$(esc(param_names)),
-#             func=$(func_nm),
-#         )
-#         simple_flux
-#     end
-# end

@@ -6,11 +6,20 @@ using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
 using DataFrames
-include("../../src/DeepFlex.jl")
+using DeepFlex
+
+function build_layer(name)
+    layers = [
+        DeepFlex.ExpHydro.Surface(name=name),
+        DeepFlex.ExpHydro.Soil(name=name),
+        DeepFlex.ExpHydro.Zone(name=name),
+    ]
+    layers
+end
 
 model = DeepFlex.HydroNode(
     :exphydro_node,
-    units=[DeepFlex.ExpHydro.Unit(name=:exphydro1), DeepFlex.ExpHydro.Unit(name=:exphydro2)],
+    layers=namedtuple([:exphydro1, :exphydro2], [build_layer(:exphydro1), build_layer(:exphydro2)]),
     routes=namedtuple([:exphydro1, :exphydro2],
         [DeepFlex.ExpHydro.Route(name=:exphydro1), DeepFlex.ExpHydro.Route(name=:exphydro2)])
 )
@@ -27,8 +36,8 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 input = (exphydro1=unit_input, exphydro2=unit_input)
 ps = ComponentVector(
-    exphydro1=(unit=(params=unit_params, initstates=unit_init_states), route=(params=ComponentVector(),), weight=0.5),
-    exphydro2=(unit=(params=unit_params, initstates=unit_init_states), route=(params=ComponentVector(),), weight=0.5)
+    exphydro1=(params=unit_params, initstates=unit_init_states, weight=0.5),
+    exphydro2=(params=unit_params, initstates=unit_init_states, weight=0.5)
 )
 
-results = model(input, ps, step=false) # 分开计算和同时计算消耗的资源差不多
+results = model(input, ps) # 分开计算和同时计算消耗的资源差不多

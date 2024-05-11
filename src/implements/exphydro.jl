@@ -55,7 +55,7 @@ Inner Route Function in Exphydro
 function Zone(; name::Symbol)
 
     funcs = [
-        DeepFlex.FlowFlux([:baseflow, :surfaceflow])
+        DeepFlex.FlowFlux([:baseflow, :surfaceflow], :totalflow)
     ]
 
     DeepFlex.HydroElement(
@@ -67,7 +67,7 @@ end
 function Route(; name::Symbol)
 
     funcs = [
-        DeepFlex.SimpleFlux(:flow, :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+        DeepFlex.SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]
 
     DeepFlex.HydroElement(

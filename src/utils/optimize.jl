@@ -26,13 +26,12 @@ function param_box_optim(
     maxiters = get(kwargs, :maxiters, 10)
 
     tunable_pas_axes = getaxes(tunable_pas)
-    setup_input!(component, input, time)
 
     predict_func(x, p) = begin
         tunable_pas_type = eltype(x)
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         const_pas = tunable_pas_type.(const_pas)
-        tmp_pas = merge_ca(tmp_tunable_pas, const_pas)[:param]
+        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
         component(input, tmp_pas)
     end
 

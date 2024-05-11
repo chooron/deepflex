@@ -1,15 +1,13 @@
 function build_compute_topology(fluxes::AbstractVector{<:AbstractFlux})
     # 构建函数之间的计算图
-    input_names, output_names = get_func_io_names(fluxes)
-    input_names_ntp = namedtuple(input_names, collect(1:length(input_names)))
-    output_names_ntp = namedtuple(output_names, collect(1:length(output_names)))
-
-    topology = SimpleDiGraph(length(nodes))
+    var_names = unique(vcat(get_func_io_names(fluxes)...))
+    var_names_ntp = namedtuple(var_names, collect(1:length(var_names))) 
+    topology = SimpleDiGraph(length(var_names))
     for flux in fluxes
         tmp_input_names, tmp_output_names = get_input_names(flux), get_output_names(flux)
         for ipnm in tmp_input_names
             for opnm in tmp_output_names
-                add_edge!(topology, input_names_ntp[ipnm], output_names_ntp[opnm])
+                add_edge!(topology, var_names_ntp[ipnm], var_names_ntp[opnm])
             end
         end
     end

@@ -17,7 +17,7 @@ function Surface(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:snowfall], [:melt], :snowwater),
+        DeepFlex.StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
     DeepFlex.HydroElement(
@@ -53,15 +53,15 @@ function Soil(; name::Symbol, mtk::Bool=true)
         DeepFlex.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
         # Q ANN
         DeepFlex.NeuralFlux([:norm_slw, :norm_prcp], :flow, param_names=:qnn, chain=q_ann),
+        # 一些变量转为用于状态计算的形式
+        DeepFlex.SimpleFlux([:soilwater, :lday, :evap], :real_evap, param_names=Symbol[],
+            func=(i, p; kw...) -> @.(i[:soilwater] * i[:lday] * i[:evap])),
+        DeepFlex.SimpleFlux([:soilwater, :flow], :real_flow, param_names=Symbol[],
+            func=(i, p; kw...) -> kw[:smoooth_func](i[:soilwater]) * exp(i[:flow])),
     ]
 
     dfuncs = [
-        DeepFlex.SimpleFlux([:soilwater, :infiltration, :lday, :evap, :flow], :soilwater,
-            param_names=Symbol[],
-            func=(i, p, sf) -> @.(i[:infiltration] -
-                                  sf(i[:soilwater]) * i[:lday] * exp(i[:evap]) -
-                                  sf(i[:soilwater]) * exp(i[:flow]))
-        )
+        DeepFlex.StateFlux([:infiltration], [:real_evap, :real_flow], :soilwater)
     ]
 
     DeepFlex.HydroElement(
@@ -91,43 +91,19 @@ Implement for [Improving hydrologic models for predictions and process understan
 
 function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
     units = [
-        Surface(name=name,mtk=mtk),
-        Soil(name=name,mtk=mtk)
+        Surface(name=name, mtk=mtk),
+        Soil(name=name, mtk=mtk)
     ]
 
     routes = Route(name=name)
 
     DeepFlex.HydroNode(
         name,
-        units=namedtuple([name], [units]),
+        layers=namedtuple([name], [units]),
         routes=namedtuple([name], [routes]),
         step=step,
     )
 end
 
-
-
-
-# function M100(; name::Symbol, parameters::ComponentVector{T}, init_states::ComponentVector{T}) where {T<:Number}
-#     elements = [
-#         LinearNN(
-#             [:SnowWater, :SoilWater, :Temp, :Prcp],
-#             [:Snowfall, :Rainfall, :Melt, :Evap, :Flow],
-#             hnamed_size=32,
-#             hnamed_layer=1
-#         ),
-#         SnowWater_ExpHydro_ODE(
-#             name=:sr,
-#             parameters=parameters,
-#             init_states=init_states[[:SnowWater]]
-#         ),
-#         SoilWater_M50_ODE(
-#             name=:wr,
-#             parameters=parameters,
-#             init_states=init_states[[:SoilWater]]
-#         )
-#     ]
-#     build_unit(name=name, elements=elements)
-# end
 
 end

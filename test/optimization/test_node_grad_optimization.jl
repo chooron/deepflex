@@ -7,9 +7,10 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
+using DeepFlex
 
 # test exphydro model
-include("../../src/DeepFlex.jl")
+# include("../../src/DeepFlex.jl")
 
 # predefine the parameters
 # init_parameter = [0.0, 100.0, 0.01, 20, 1.0, 1.0, -1.0]
@@ -44,5 +45,5 @@ best_pas = DeepFlex.param_grad_optim(
     adtype=Optimization.AutoForwardDiff()
 )
 
-total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
+total_params = ComponentVector(merge_recursive(NamedTuple(best_pas), NamedTuple(const_pas)))
 result = model(input, total_params)

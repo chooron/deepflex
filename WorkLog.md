@@ -14,8 +14,8 @@
 - [ ] lagflux如何改造成mtk.jl
   - [ ] lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变
 - [X] mtk.jl貌似只能支持一对一输入输出(已解决)
-- [ ] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
-- [ ] 当前需要找出ODEProblem在用ForwardDifferetial求解时存在的问题，需要构建一个demo来重现这个问题，猜测这个问题应该是可调参数与不可调参数引起的问题
+- [X] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
+- [X] 当前需要找出ODEProblem在用ForwardDifferetial求解时存在的问题，需要构建一个demo来重现这个问题，猜测这个问题应该是可调参数与不可调参数引起的问题
 
 # 工作计划
 
@@ -42,14 +42,15 @@
 - [X] superflexpy中unit是否具有存在意义, unit简单来说就是多个element的组合,可以考虑直接用elements list替代
 - [X] 将input_names, output_names等信息通过函数调度，不作为模型存储的属性
 - [X] Node将取消坡面汇流功能,将坡面汇流功能直接写在elements中
-- [ ] 参数信息的提取，可能需要进一步改进
-
-# 一些结论
-
-* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型
+- [X] 参数信息的提取，可能需要进一步改进
+- [X] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray
+- [X] 增加flux的图计算功能，保证即使flux顺序是混乱的也能够得到结果，并提供element增加出入通量的能力
+- [ ] 构建node时提供构建信息
 
 # 关键功能和实现技术
 
+* [X] 基于julia多重分派的名称驱动代码风格，根据名称调用对应的flux
+  * [X] 该项目是以命名驱动为核心，但是在一些情况中创建一些并没有实际含义的变量
 * [X] Component基本计算实现, 涉及从某计算模块至整个流域汇流网络的计算
   * [X] 常微分方程求解(ModelingToolkit.jl, DifferentialEquations.jl)
   * [X] 网络拓扑计算(Graphs.jl)
@@ -58,6 +59,6 @@
 * [ ] 参数动态模拟估计，Time-vary parameter estimation
 * [X] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
 
-# 即将需要做的东西
+# 一些结论
 
-- [X] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray
+* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型

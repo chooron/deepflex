@@ -115,4 +115,8 @@ include("implements/m50.jl")
 include("implements/gr4j.jl")
 include("implements/hymod.jl")
 include("implements/hbv.jl")
+
+# export
+export SimpleFlux
+
 end

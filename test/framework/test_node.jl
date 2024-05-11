@@ -6,7 +6,7 @@ using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
 using DataFrames
-include("../../src/DeepFlex.jl")
+using DeepFlex
 
 model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
 

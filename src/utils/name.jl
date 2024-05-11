@@ -33,19 +33,19 @@ function get_input_names(func::AbstractStateFlux)
 end
 
 function get_output_names(func::AbstractStateFlux)
-    func.state_names
+    [func.state_names]
 end
 
 function get_input_names(func::AbstractLagFlux)
-    func.flux_name
+    [func.flux_name]
 end
 
 function get_output_names(func::AbstractLagFlux)
-    func.flux_name
+    [func.flux_name]
 end
 
 function get_param_names(func::AbstractLagFlux)
-    func.lag_time
+    [func.lag_time]
 end
 
 function get_func_io_names(funcs::Vector{<:AbstractFlux})

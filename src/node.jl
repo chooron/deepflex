@@ -4,7 +4,7 @@ struct HydroNode{step} <: AbstractComponent
     subnames::Vector{Symbol}
     #* 垂向计算层
     layers::Vector{Vector{<:AbstractElement}}
-    #* 坡地产流模块
+    #* 横向计算层(坡地产流模块)
     routes::Vector{<:AbstractElement}
     #* 节点对应的面积
     area::Number

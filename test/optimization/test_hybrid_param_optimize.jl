@@ -8,6 +8,7 @@ using BenchmarkTools
 using NamedTupleTools
 using Lux
 using StableRNGs
+using DeepFlex
 
 # test exphydro model
 # include("../../src/DeepFlex.jl")
