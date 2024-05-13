@@ -1,5 +1,5 @@
 # DeepFlex.jl
-julia implement of superflexpy
+hydrology frameword built by Julia
 
 ## install command
 ```
