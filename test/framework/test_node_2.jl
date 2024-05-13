@@ -6,22 +6,22 @@ using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
 using DataFrames
-using DeepFlex
+using LumpedHydro
 
 function build_layer(name)
     layers = [
-        DeepFlex.ExpHydro.Surface(name=name),
-        DeepFlex.ExpHydro.Soil(name=name),
-        DeepFlex.ExpHydro.Zone(name=name),
+        LumpedHydro.ExpHydro.Surface(name=name),
+        LumpedHydro.ExpHydro.Soil(name=name),
+        LumpedHydro.ExpHydro.Zone(name=name),
     ]
     layers
 end
 
-model = DeepFlex.HydroNode(
+model = LumpedHydro.HydroNode(
     :exphydro_node,
     layers=namedtuple([:exphydro1, :exphydro2], [build_layer(:exphydro1), build_layer(:exphydro2)]),
     routes=namedtuple([:exphydro1, :exphydro2],
-        [DeepFlex.ExpHydro.Route(name=:exphydro1), DeepFlex.ExpHydro.Route(name=:exphydro2)])
+        [LumpedHydro.ExpHydro.Route(name=:exphydro1), LumpedHydro.ExpHydro.Route(name=:exphydro2)])
 )
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 

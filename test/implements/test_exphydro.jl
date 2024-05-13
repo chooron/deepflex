@@ -6,7 +6,7 @@ using BenchmarkTools
 using ComponentArrays
 
 # test exphydro model
-include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -25,7 +25,7 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro,mtk=false)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro,mtk=false)
 
 input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
 result = model(input, pas);

@@ -94,7 +94,7 @@ function (elements::AbstractVector{<:HydroElement})(
 end
 
 function add_influx!(
-    ele::HydroElement{true};
+    ele::HydroElement;
     func_ntp::NamedTuple,
 )
     for key in keys(func_ntp)
@@ -109,7 +109,7 @@ function add_influx!(
 end
 
 function add_outflux!(
-    ele::HydroElement{true};
+    ele::HydroElement;
     func_ntp::NamedTuple,
 )
     for key in keys(func_ntp)
@@ -121,6 +121,22 @@ function add_outflux!(
             dfunc.outflux_names = vcat(dfunc.outflux_names, get_output_names(func))
         end
     end
+end
+
+function build_compute_topology(fluxes::AbstractVector{<:AbstractFlux})
+    # 构建函数之间的计算图
+    var_names = unique(vcat(get_func_io_names(fluxes)...))
+    var_names_ntp = namedtuple(var_names, collect(1:length(var_names))) 
+    topology = SimpleDiGraph(length(var_names))
+    for flux in fluxes
+        tmp_input_names, tmp_output_names = get_input_names(flux), get_output_names(flux)
+        for ipnm in tmp_input_names
+            for opnm in tmp_output_names
+                add_edge!(topology, var_names_ntp[ipnm], var_names_ntp[opnm])
+            end
+        end
+    end
+    topology
 end
 
 function setup_input(

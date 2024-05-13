@@ -7,7 +7,7 @@ function Model(; name::Symbol, mtk::Bool=true)
         Lux.Dense(16 => 4, Lux.leakyrelu)
     )
 
-    DeepFlex.NeuralFlux([:SnowWater, :SoilWater, :Temp, :Prcp],
+    LumpedHydro.NeuralFlux([:SnowWater, :SoilWater, :Temp, :Prcp],
         [:Snowfall, :Rainfall, :Melt, :Evap, :Flow],
         param_names=:etnn, chain=ann
     )

@@ -11,7 +11,7 @@ using OrdinaryDiffEq
 using ComponentArrays
 
 # test gr4j model
-include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 # load data
 file_path = "data/gr4j/sample.csv"
@@ -29,8 +29,8 @@ route_params = (x4=x4,)
 init_states = (soilwater=0.6 * 320.11, routingstore=0.70 * 69.63)
 pas = ComponentVector(gr4j=(params=unit_params, initstates=init_states, weight=1.0))
 
-model = DeepFlex.GR4J.Node(name=:gr4j, step=true, mtk=false)
-solver = DeepFlex.ODESolver(alg=Tsit5())
+model = LumpedHydro.GR4J.Node(name=:gr4j, step=true, mtk=false)
+solver = LumpedHydro.ODESolver(alg=Tsit5())
 input = (gr4j=(prcp=prcp_vec, pet=et_vec, time=1:1:length(prcp_vec)),)
 result = model(input, pas, solver=solver);
 result_df = DataFrame(result)

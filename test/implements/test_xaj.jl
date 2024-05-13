@@ -7,7 +7,7 @@ using CairoMakie: Axis
 using Interpolations
 
 # test gr4j model
-include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 seed = 42
 Random.seed!(42)
@@ -30,14 +30,14 @@ init_states = ComponentVector(
     InterRouting=5.0, BaseRouting=5.0
 )
 
-model = DeepFlex.XAJ(
+model = LumpedHydro.XAJ(
     name="xaj",
     parameters=parameters,
     init_states=init_states
 )
 
 input = ComponentVector(Prcp=P, Pet=E)
-output = DeepFlex.get_output(model, input=input, step=true)
+output = LumpedHydro.get_output(model, input=input, step=true)
 
 # plot result
 fig = Figure(size=(400, 300))

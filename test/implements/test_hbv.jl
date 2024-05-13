@@ -8,7 +8,7 @@ using CairoMakie: Axis
 using Interpolations
 
 # test gr4j model
-include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 seed = 42
 Random.seed!(42)
@@ -29,7 +29,7 @@ tt, tti, cfr, cfmax, ttm, whc = 0, 4, 0.5, 10, 0, 0.5
 cflux, fc, lp, k0, k1, α, β, c = 2.0, 500, 0.5, 0.5, 0.5, 2, 5, 10
 maxbas = 5
 
-solver = DeepFlex.ODESolver(dt=1, saveat=1:1:length(P))
+solver = LumpedHydro.ODESolver(dt=1, saveat=1:1:length(P))
 
 parameters = ComponentVector(
     tt=tt, tti=tti, cfr=cfr, cfmax=cfmax, ttm=ttm, whc=whc,
@@ -43,7 +43,7 @@ init_states = ComponentVector(
     LowerZone=5.0,
 )
 
-model = DeepFlex.HBV(
+model = LumpedHydro.HBV(
     name="hbv",
     parameters=parameters,
     init_states=init_states,
@@ -51,7 +51,7 @@ model = DeepFlex.HBV(
 )
 
 input = ComponentVector(Prcp=P, Pet=E, Temp=T)
-output = DeepFlex.get_output(model, input=input, step=true)
+output = LumpedHydro.get_output(model, input=input, step=true)
 
 # plot result
 fig = Figure(size=(400, 300))

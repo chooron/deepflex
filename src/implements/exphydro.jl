@@ -1,25 +1,25 @@
 @reexport module ExpHydro
 
-using ..DeepFlex
-using ..DeepFlex.NamedTupleTools
+using ..LumpedHydro
+using ..LumpedHydro.NamedTupleTools
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        DeepFlex.PetFlux([:temp, :lday]),
-        DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        DeepFlex.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.InfiltrationFlux([:rainfall, :melt])
+        LumpedHydro.PetFlux([:temp, :lday]),
+        LumpedHydro.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        LumpedHydro.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        LumpedHydro.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        LumpedHydro.InfiltrationFlux([:rainfall, :melt])
     ]
 
     dfuncs = [
-        DeepFlex.StateFlux([:snowfall], [:melt], :snowwater),
+        LumpedHydro.StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -32,16 +32,16 @@ SoilWaterReservoir in Exp-Hydro
 """
 function Soil(; name::Symbol, mtk::Bool=true)
     funcs = [
-        DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        DeepFlex.BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
-        DeepFlex.SurfaceflowFlux([:soilwater], param_names=[:Smax]),
+        LumpedHydro.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
+        LumpedHydro.BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
+        LumpedHydro.SurfaceflowFlux([:soilwater], param_names=[:Smax]),
     ]
 
     dfuncs = [
-        DeepFlex.StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
+        LumpedHydro.StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -55,10 +55,10 @@ Inner Route Function in Exphydro
 function Zone(; name::Symbol)
 
     funcs = [
-        DeepFlex.FlowFlux([:baseflow, :surfaceflow], :totalflow)
+        LumpedHydro.FlowFlux([:baseflow, :surfaceflow], :totalflow)
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
     )
@@ -67,10 +67,10 @@ end
 function Route(; name::Symbol)
 
     funcs = [
-        DeepFlex.SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
+        LumpedHydro.SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         name,
         funcs=funcs,
     )
@@ -85,7 +85,7 @@ function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
     routes = Route(name=name)
 
-    DeepFlex.HydroNode(
+    LumpedHydro.HydroNode(
         name,
         layers=namedtuple([name], [layers]),
         routes=namedtuple([name], [routes]),

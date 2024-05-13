@@ -1,4 +1,5 @@
-#* used for flux calculate
+##* used for flux calculate
+
 function extract_input(input::Union{ComponentVector,NamedTuple}, input_names::Symbol)
     namedtuple([input_names], [input[input_names]])
 end

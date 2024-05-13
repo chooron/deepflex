@@ -1,21 +1,21 @@
 @reexport module HyMOD
 
-using ..DeepFlex
-using ..DeepFlex.NamedTupleTools
+using ..LumpedHydro
+using ..LumpedHydro.NamedTupleTools
 
 """
 SnowWaterReservoir in HyMOD
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        DeepFlex.RainfallFlux([:prcp, :pet]),
-        DeepFlex.SimpleFlux([:prcp, :pet], :pet,
+        LumpedHydro.RainfallFlux([:prcp, :pet]),
+        LumpedHydro.SimpleFlux([:prcp, :pet], :pet,
             param_names=Symbol[],
             func=(i, p, sf) -> @.(sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
-        DeepFlex.InfiltrationFlux([:rainfall])
+        LumpedHydro.InfiltrationFlux([:rainfall])
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_surface_),
         funcs=funcs,
         mtk=mtk,
@@ -28,17 +28,17 @@ SoilWaterReservoir in HYMOD
 function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
-        DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        DeepFlex.SimpleFlux([:saturation], :fastflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * (1 - p[:a]))),
-        DeepFlex.SimpleFlux([:saturation], :slowflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * p[:a]))
+        LumpedHydro.SaturationFlux([:soilwater, :infiltration], param_names=[:Smax, :b]),
+        LumpedHydro.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
+        LumpedHydro.SimpleFlux([:saturation], :fastflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * (1 - p[:a]))),
+        LumpedHydro.SimpleFlux([:saturation], :slowflow, param_names=[:a], func=(i, p, sf) -> @.(i[:saturation] * p[:a]))
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:infiltration], [:evap, :saturation], :soilwater)
+        LumpedHydro.DifferFlux([:infiltration], [:evap, :saturation], :soilwater)
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -50,21 +50,21 @@ end
 function Zone(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.SimpleFlux([:fr1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr1]),
-        DeepFlex.SimpleFlux([:fr2], :qf2, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr2]),
-        DeepFlex.SimpleFlux([:fr3], :qf3, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr3]),
-        DeepFlex.SimpleFlux([:sr], :qs, param_names=[:ks], func=(i, p, sf) -> p[:ks] .* i[:sr]),
-        DeepFlex.SimpleFlux([:qs, :qf3], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:qs] .+ i[:qf3]),
+        LumpedHydro.SimpleFlux([:fr1], :qf1, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr1]),
+        LumpedHydro.SimpleFlux([:fr2], :qf2, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr2]),
+        LumpedHydro.SimpleFlux([:fr3], :qf3, param_names=[:kf], func=(i, p, sf) -> p[:kf] .* i[:fr3]),
+        LumpedHydro.SimpleFlux([:sr], :qs, param_names=[:ks], func=(i, p, sf) -> p[:ks] .* i[:sr]),
+        LumpedHydro.SimpleFlux([:qs, :qf3], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:qs] .+ i[:qf3]),
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:fastflow], [:qf1], :fr1),
-        DeepFlex.DifferFlux([:qf1], [:qf2], :fr2),
-        DeepFlex.DifferFlux([:qf2], [:qf3], :fr3),
-        DeepFlex.DifferFlux([:slowflow], [:qs], :sr),
+        LumpedHydro.DifferFlux([:fastflow], [:qf1], :fr1),
+        LumpedHydro.DifferFlux([:qf1], [:qf2], :fr2),
+        LumpedHydro.DifferFlux([:qf2], [:qf3], :fr3),
+        LumpedHydro.DifferFlux([:slowflow], [:qs], :sr),
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -75,10 +75,10 @@ end
 function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+        LumpedHydro.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_route_),
         funcs=funcs,
         mtk=mtk
@@ -94,7 +94,7 @@ function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
     routes = Route(name=name)
 
-    DeepFlex.HydroNode(
+    LumpedHydro.HydroNode(
         name,
         units=namedtuple([name], [units]),
         routes=namedtuple([name], [routes]),

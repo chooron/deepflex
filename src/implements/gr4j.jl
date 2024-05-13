@@ -1,20 +1,20 @@
 @reexport module GR4J
 
-using ..DeepFlex
-using ..DeepFlex.NamedTupleTools
+using ..LumpedHydro
+using ..LumpedHydro.NamedTupleTools
 """
 SoilWaterReservoir in GR4J
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        DeepFlex.RainfallFlux([:prcp, :pet]),
-        DeepFlex.SimpleFlux([:prcp, :pet], :pet,
+        LumpedHydro.RainfallFlux([:prcp, :pet]),
+        LumpedHydro.SimpleFlux([:prcp, :pet], :pet,
             param_names=Symbol[],
             func=(i, p; kw...) -> @.(get(kw, :smooth_func, step_func)(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
-        DeepFlex.InfiltrationFlux([:rainfall])
+        LumpedHydro.InfiltrationFlux([:rainfall])
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
         mtk=mtk
@@ -27,20 +27,20 @@ SoilWaterReservoir in GR4J
 function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
-        DeepFlex.EvapFlux([:soilwater, :pet], param_names=[:x1]),
-        DeepFlex.PercolationFlux([:soilwater], param_names=[:x1]),
-        DeepFlex.SimpleFlux([:infiltration, :percolation, :saturation], :tempflow,
+        LumpedHydro.SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
+        LumpedHydro.EvapFlux([:soilwater, :pet], param_names=[:x1]),
+        LumpedHydro.PercolationFlux([:soilwater], param_names=[:x1]),
+        LumpedHydro.SimpleFlux([:infiltration, :percolation, :saturation], :tempflow,
             param_names=Symbol[], func=(i, p; kw...) -> @.(i[:infiltration] - i[:saturation] + i[:percolation])),
-        DeepFlex.SimpleFlux([:tempflow], [:slowflow, :fastflow],
+        LumpedHydro.SimpleFlux([:tempflow], [:slowflow, :fastflow],
             param_names=Symbol[], func=(i, p; kw...) -> [i[:tempflow] .* 0.9, i[:tempflow] .* 0.1]),
     ]
 
     dfuncs = [
-        DeepFlex.DifferFlux([:saturation], [:evap, :percolation], :soilwater)
+        LumpedHydro.DifferFlux([:saturation], [:evap, :percolation], :soilwater)
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -51,17 +51,17 @@ end
 function Zone(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
-        DeepFlex.SimpleFlux([:routingstore], :routedflow,
+        LumpedHydro.RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
+        LumpedHydro.SimpleFlux([:routingstore], :routedflow,
             param_names=[:x3, :γ],
             func=(i, p; kw...) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),]
 
 
     dfuncs = [
-        DeepFlex.StateFlux([:slowflow, :recharge], [:routedflow], :routingstore),
+        LumpedHydro.StateFlux([:slowflow, :recharge], [:routedflow], :routingstore),
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -73,13 +73,13 @@ end
 function Route(; name::Symbol)
 
     funcs = [
-        DeepFlex.LagFlux(:slowflow, lag_func=DeepFlex.uh_1_half, lag_time=:x4),
-        DeepFlex.LagFlux(:fastflow, lag_func=DeepFlex.uh_2_full, lag_time=:x4),
-        DeepFlex.SimpleFlux([:routedflow, :recharge, :fastflow], :flow, param_names=Symbol[],
+        LumpedHydro.LagFlux(:slowflow, lag_func=LumpedHydro.uh_1_half, lag_time=:x4),
+        LumpedHydro.LagFlux(:fastflow, lag_func=LumpedHydro.uh_2_full, lag_time=:x4),
+        LumpedHydro.SimpleFlux([:routedflow, :recharge, :fastflow], :flow, param_names=Symbol[],
             func=(i, p; kw...) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_route_),
         funcs=funcs,
         mtk=false
@@ -97,7 +97,7 @@ function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
     routes = Route(name=name)
 
-    DeepFlex.HydroNode(
+    LumpedHydro.HydroNode(
         name,
         units=namedtuple([name], [units]),
         routes=namedtuple([name], [routes]),

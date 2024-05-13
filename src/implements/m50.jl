@@ -1,26 +1,26 @@
 @reexport module M50
 
-using ..DeepFlex
-using ..DeepFlex.NamedTupleTools
-import ..DeepFlex: Lux
+using ..LumpedHydro
+using ..LumpedHydro.NamedTupleTools
+import ..LumpedHydro: Lux
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        DeepFlex.PetFlux([:temp, :lday]),
-        DeepFlex.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        DeepFlex.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        DeepFlex.InfiltrationFlux([:rainfall, :melt])
+        LumpedHydro.PetFlux([:temp, :lday]),
+        LumpedHydro.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        LumpedHydro.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        LumpedHydro.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        LumpedHydro.InfiltrationFlux([:rainfall, :melt])
     ]
 
     dfuncs = [
-        DeepFlex.StateFlux([:snowfall], [:melt], :snowwater),
+        LumpedHydro.StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -45,26 +45,26 @@ function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         # normalize
-        DeepFlex.StdNormFlux(:snowwater, :norm_snw),
-        DeepFlex.StdNormFlux(:soilwater, :norm_slw),
-        DeepFlex.StdNormFlux(:temp, :norm_temp),
-        DeepFlex.StdNormFlux(:prcp, :norm_prcp),
+        LumpedHydro.StdNormFlux(:snowwater, :norm_snw),
+        LumpedHydro.StdNormFlux(:soilwater, :norm_slw),
+        LumpedHydro.StdNormFlux(:temp, :norm_temp),
+        LumpedHydro.StdNormFlux(:prcp, :norm_prcp),
         # ET ANN
-        DeepFlex.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
+        LumpedHydro.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
         # Q ANN
-        DeepFlex.NeuralFlux([:norm_slw, :norm_prcp], :flow, param_names=:qnn, chain=q_ann),
+        LumpedHydro.NeuralFlux([:norm_slw, :norm_prcp], :flow, param_names=:qnn, chain=q_ann),
         # 一些变量转为用于状态计算的形式
-        DeepFlex.SimpleFlux([:soilwater, :lday, :evap], :real_evap, param_names=Symbol[],
+        LumpedHydro.SimpleFlux([:soilwater, :lday, :evap], :real_evap, param_names=Symbol[],
             func=(i, p; kw...) -> @.(i[:soilwater] * i[:lday] * i[:evap])),
-        DeepFlex.SimpleFlux([:soilwater, :flow], :real_flow, param_names=Symbol[],
+        LumpedHydro.SimpleFlux([:soilwater, :flow], :real_flow, param_names=Symbol[],
             func=(i, p; kw...) -> kw[:smoooth_func](i[:soilwater]) * exp(i[:flow])),
     ]
 
     dfuncs = [
-        DeepFlex.StateFlux([:infiltration], [:real_evap, :real_flow], :soilwater)
+        LumpedHydro.StateFlux([:infiltration], [:real_evap, :real_flow], :soilwater)
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -75,10 +75,10 @@ end
 function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        DeepFlex.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+        LumpedHydro.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
     ]
 
-    DeepFlex.HydroElement(
+    LumpedHydro.HydroElement(
         Symbol(name, :_route_),
         funcs=funcs,
         mtk=mtk
@@ -97,7 +97,7 @@ function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
 
     routes = Route(name=name)
 
-    DeepFlex.HydroNode(
+    LumpedHydro.HydroNode(
         name,
         layers=namedtuple([name], [units]),
         routes=namedtuple([name], [routes]),

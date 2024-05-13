@@ -1,4 +1,4 @@
-name = "DeepFlex"
+name = "LumpedHydro"
 uuid = "0b298ff5-3dd4-4fe7-848b-d22450ef51c7"
 authors = ["jingx <50790703+chooron@users.noreply.github.com>"]
 version = "0.1.0"

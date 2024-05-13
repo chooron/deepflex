@@ -8,7 +8,7 @@ using CairoMakie: Axis
 using Interpolations
 
 # test gr4j model
-include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 file_path = "data/hymod/LA011201_forcings.csv"
 data = CSV.File(file_path);
@@ -25,7 +25,7 @@ init_states = ComponentVector(soilwater=0.0, fr1=1.0, fr2=1.0,
 )
 ps = ComponentVector(hymod=(params=unit_params, initstates=init_states, weight=1.0))
 
-model = DeepFlex.HyMOD.Node(name=:hymod, mtk=true)
+model = LumpedHydro.HyMOD.Node(name=:hymod, mtk=true)
 
 input = (hymod=(prcp=prcp_vec, pet=et_vec,time=1:length(et_vec)),)
 output = model(input, ps)

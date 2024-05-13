@@ -1,4 +1,4 @@
-# DeepFlex.jl 设计思路
+# LumpedHydro.jl 设计思路
 
 ## 这个包的目标是什么？
 
@@ -51,7 +51,7 @@
 
 ## Unit的特性
 
-- unit将分为三个基础层:surface,soil,route
+- unit将分为三个基础层:~~surface,soil,route~~ snow，surface,  soil, free water, route
 - surface层可以对应于,深度学习模型的input层,其中可能就是简单的信息传输,也可能会存在融雪模块需要ode计算
 - soil层可以包含多个element层,通常土壤的element都会认为时非线性水库,通常需要ode模块求解
 - route层由于lagflux的限制,无法参与其他element进行联合计算,同样部分route层也会涉及ode计算
