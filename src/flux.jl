@@ -28,7 +28,7 @@ struct SimpleFlux <: AbstractSimpleFlux
     end
 end
 
-StdNormFlux(
+StdMeanNormFlux(
     input_names::Symbol,
     output_names::Symbol=Symbol(:norm_, input_names);
     param_names::Vector{Symbol}=[Symbol(:mean_, input_names), Symbol(:std_, input_names)]
@@ -53,8 +53,8 @@ MinMaxNormFlux(
 )
 
 TranparentFlux(
-    old_names::Union{Symbol, Vector{Symbol}},
-    new_names::Union{Symbol, Vector{Symbol}},
+    old_names::Union{Symbol,Vector{Symbol}},
+    new_names::Union{Symbol,Vector{Symbol}},
 ) = SimpleFlux(
     old_names,
     new_names,
@@ -184,3 +184,5 @@ function (flux::NeuralFlux)(input::Union{ComponentVector,NamedTuple}, params::Un
     y_pred = flux.func(x, params[flux.param_names])
     process_output(y_pred, get_output_names(flux))
 end
+
+export SimpleFlux, StateFlux, LagFlux, NeuralFlux, StdMeanNormFlux, MinMaxNormFlux, TranparentFlux

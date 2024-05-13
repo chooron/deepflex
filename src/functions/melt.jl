@@ -29,3 +29,5 @@ function melt_func(
     sf = get(kw, :smooth_func, step_func)
     @.(sf(i[:temp] - p[:ttm]) * (i[:temp] - p[:ttm]) * p[:cfmax])
 end
+
+export MeltFlux, melt_func

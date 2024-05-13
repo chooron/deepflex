@@ -53,6 +53,10 @@ struct HydroElement{mtk} <: AbstractElement
     end
 end
 
+const SurfaceType = :surface
+const SoilType = :soil
+const FreeWaterType = :freewater
+
 # 求解并计算
 function (ele::HydroElement)(
     input::NamedTuple,
@@ -77,23 +81,8 @@ function (ele::HydroElement)(
     fluxes
 end
 
-function (elements::AbstractVector{<:HydroElement})(
-    input::NamedTuple,
-    pas::ComponentVector;
-    solver::AbstractSolver=ODESolver()
-)
-    fluxes = input
-    for ele in elements
-        if length(ele.dfuncs) > 0
-            solve_states = solve_prob(ele, input=fluxes, pas=pas, solver=solver)
-            fluxes = merge(fluxes, solve_states)
-        end
-        fluxes = merge(fluxes, ele(fluxes, pas))
-    end
-    fluxes
-end
 
-function add_influx!(
+function add_inputflux!(
     ele::HydroElement;
     func_ntp::NamedTuple,
 )
@@ -108,7 +97,7 @@ function add_influx!(
     end
 end
 
-function add_outflux!(
+function add_outputflux!(
     ele::HydroElement;
     func_ntp::NamedTuple,
 )
@@ -121,22 +110,6 @@ function add_outflux!(
             dfunc.outflux_names = vcat(dfunc.outflux_names, get_output_names(func))
         end
     end
-end
-
-function build_compute_topology(fluxes::AbstractVector{<:AbstractFlux})
-    # 构建函数之间的计算图
-    var_names = unique(vcat(get_func_io_names(fluxes)...))
-    var_names_ntp = namedtuple(var_names, collect(1:length(var_names))) 
-    topology = SimpleDiGraph(length(var_names))
-    for flux in fluxes
-        tmp_input_names, tmp_output_names = get_input_names(flux), get_output_names(flux)
-        for ipnm in tmp_input_names
-            for opnm in tmp_output_names
-                add_edge!(topology, var_names_ntp[ipnm], var_names_ntp[opnm])
-            end
-        end
-    end
-    topology
 end
 
 function setup_input(
@@ -232,3 +205,5 @@ function solve_prob(
     solved_states = solver(prob, get_state_names(ele.dfuncs))
     solved_states
 end
+
+export HydroElement, add_inputflux!, add_outputflux!, setup_input, solve_prob

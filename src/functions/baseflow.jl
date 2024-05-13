@@ -30,3 +30,5 @@ function baseflow_func(
     @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))
 end
 
+export BaseflowFlux, baseflow_func
+

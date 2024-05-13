@@ -72,10 +72,20 @@ function Soil(; name::Symbol, mtk::Bool=true)
     )
 end
 
+function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    HydroUnit(
+        name,
+        surface=Surface(name=name, mtk=mtk),
+        soil=Soil(name=name, mtk=mtk),
+        freewater=FreeWater(name=name),
+        step=step,
+    )
+end
+
 function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        LumpedHydro.SimpleFlux([:flow], :flow, param_names=Symbol[], func=(i, p, sf) -> i[:flow])
+        LumpedHydro.SimpleFlux(:flow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:flow])
     ]
 
     LumpedHydro.HydroElement(
@@ -90,18 +100,10 @@ Implement for [Improving hydrologic models for predictions and process understan
 """
 
 function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    units = [
-        Surface(name=name, mtk=mtk),
-        Soil(name=name, mtk=mtk)
-    ]
-
-    routes = Route(name=name)
-
-    LumpedHydro.HydroNode(
+    HydroNode(
         name,
-        layers=namedtuple([name], [units]),
-        routes=namedtuple([name], [routes]),
-        step=step,
+        units=[Unit(name=name, mtk=mtk, step=step)],
+        routes=[Route(name=name)],
     )
 end
 

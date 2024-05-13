@@ -38,3 +38,5 @@ function infiltration_func(
 )
     i[:rainfall]
 end
+
+export InfiltrationFlux, infiltration_func

@@ -50,3 +50,5 @@ function evap_func(
     @.(sf(i[:soilwater] - p[:lp] * p[:fc]) * i[:pet] +
        sf(p[:lp] * p[:fc] - i[:soilwater]) * i[:pet] * i[:soilwater] / (p[:lp] * p[:fc]))
 end
+
+export EvapFlux, evap_func

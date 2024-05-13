@@ -32,3 +32,5 @@ function snowfall_func(
     @.(sf(tmp_t1 - i[:temp]) * i[:prcp] +
        sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (tmp_t2 - i[:temp]) / p[:tti])
 end
+
+export SnowfallFlux, snowfall_func

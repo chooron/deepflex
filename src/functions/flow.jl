@@ -34,3 +34,5 @@ function flow_func(
 )
     @.(i[:surfaceflow] + i[:baseflow] + i[:interflow])
 end
+
+export FlowFlux, flow_func

@@ -1,6 +1,7 @@
 module LumpedHydro
 ## External packages
 # common packages
+using TOML
 using Statistics
 using Random
 using ComponentArrays
@@ -10,6 +11,9 @@ using StableRNGs
 
 # run time stats
 using BenchmarkTools
+
+# Multitreading and parallel computing
+using Base.Threads
 
 # ModelingToolkit building
 using ModelingToolkit
@@ -61,7 +65,7 @@ abstract type AbstractLagFlux <: AbstractFlux end
 abstract type AbstractElement <: AbstractComponent end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractUnit <: AbstractComponent end
-#* 负责单元的坡面汇流和洪水演进计算
+#* 负责单元的内部汇流计算
 abstract type AbstractNode <: AbstractComponent end
 
 # work for lux nn
@@ -71,7 +75,6 @@ Base.length(::Symbol) = 1
 # const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 # const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
-include("utils/graph.jl")
 include("utils/lossfunc.jl")
 include("utils/data.jl")
 include("utils/mtk.jl")
@@ -79,9 +82,11 @@ include("utils/optimize.jl")
 include("utils/solver.jl")
 include("utils/smoother.jl")
 include("utils/name.jl")
+include("utils/graph.jl")
 # framework build
 include("flux.jl")
 include("element.jl")
+include("unit.jl")
 include("node.jl")
 # Implement Flux
 include("functions/baseflow.jl")
@@ -105,7 +110,16 @@ include("implements/gr4j.jl")
 include("implements/hymod.jl")
 include("implements/hbv.jl")
 
-# export
-export SimpleFlux
+# export abstract structs
+export AbstractComponent, AbstractSolver, AbstractOptimizer,
+    AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractLagFlux,
+    AbstractElement, AbstractUnit, AbstractNode
+
+# export hydro component
+export HydroElement, HydroUnit, HydroNode
+
+
+# export model
+export ExpHydro, M50, GR4J, HyMOD
 
 end

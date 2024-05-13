@@ -7,7 +7,7 @@ using BenchmarkTools
 using NamedTupleTools
 using LumpedHydro
 
-ele = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=true)
+unit = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=true)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
@@ -22,4 +22,4 @@ input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts,
 solver = LumpedHydro.ODESolver()
 solved_states = LumpedHydro.solve_prob(ele, input=input, pas=pas, solver=solver)
 input = merge(input ,solved_states)
-@btime results = ele(input, pas)
+@btime results = unit(input, pas)

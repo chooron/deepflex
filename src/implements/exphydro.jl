@@ -1,26 +1,25 @@
 @reexport module ExpHydro
 
-using ..LumpedHydro
-using ..LumpedHydro.NamedTupleTools
+using LumpedHydro
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        LumpedHydro.PetFlux([:temp, :lday]),
-        LumpedHydro.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        LumpedHydro.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        LumpedHydro.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        LumpedHydro.InfiltrationFlux([:rainfall, :melt])
+        PetFlux([:temp, :lday]),
+        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        InfiltrationFlux([:rainfall, :melt])
     ]
 
     dfuncs = [
-        LumpedHydro.StateFlux([:snowfall], [:melt], :snowwater),
+        StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
-    LumpedHydro.HydroElement(
-        Symbol(name, :_surf_),
+    HydroElement(
+        Symbol(name, :_surface_),
         funcs=funcs,
         dfuncs=dfuncs,
         mtk=mtk,
@@ -32,16 +31,16 @@ SoilWaterReservoir in Exp-Hydro
 """
 function Soil(; name::Symbol, mtk::Bool=true)
     funcs = [
-        LumpedHydro.EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        LumpedHydro.BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
-        LumpedHydro.SurfaceflowFlux([:soilwater], param_names=[:Smax]),
+        EvapFlux([:soilwater, :pet], param_names=[:Smax]),
+        BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
+        SurfaceflowFlux([:soilwater], param_names=[:Smax]),
     ]
 
     dfuncs = [
-        LumpedHydro.StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
+        StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
-    LumpedHydro.HydroElement(
+    HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -52,44 +51,46 @@ end
 """
 Inner Route Function in Exphydro
 """
-function Zone(; name::Symbol)
+function FreeWater(; name::Symbol)
 
     funcs = [
-        LumpedHydro.FlowFlux([:baseflow, :surfaceflow], :totalflow)
+        FlowFlux([:baseflow, :surfaceflow], :totalflow)
     ]
 
-    LumpedHydro.HydroElement(
+    HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
+        mtk=false
+    )
+end
+
+function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    HydroUnit(
+        name,
+        surface=Surface(name=name, mtk=mtk),
+        soil=Soil(name=name, mtk=mtk),
+        freewater=FreeWater(name=name),
+        step=step,
     )
 end
 
 function Route(; name::Symbol)
-
+    
     funcs = [
-        LumpedHydro.SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
+        SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]
 
-    LumpedHydro.HydroElement(
+    HydroElement(
         name,
         funcs=funcs,
     )
 end
 
 function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    layers = [
-        Surface(name=name, mtk=mtk),
-        Soil(name=name, mtk=mtk),
-        Zone(name=name),
-    ]
-
-    routes = Route(name=name)
-
-    LumpedHydro.HydroNode(
+    HydroNode(
         name,
-        layers=namedtuple([name], [layers]),
-        routes=namedtuple([name], [routes]),
-        step=step,
+        units=[Unit(name=name, mtk=mtk, step=step)],
+        routes=[Route(name=name)],
     )
 end
 

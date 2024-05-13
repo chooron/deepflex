@@ -28,3 +28,5 @@ function surfaceflow_func(
 )
     @.(i[:surfacerunoff] + p[:Aim] * i[:prcp])
 end
+
+export SurfaceflowFlux, surfaceflow_func

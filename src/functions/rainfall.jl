@@ -49,3 +49,5 @@ function rainfall_func(
     @.(sf(i[:temp] - tmp_t2) * i[:prcp] +
        sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (i[:temp] - tmp_t1) / p[:tti])
 end
+
+export RainfallFlux, rainfall_func

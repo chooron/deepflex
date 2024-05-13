@@ -27,3 +27,5 @@ function recharge_func(
 )
     @.((i[:infiltration]) * (i[:soilwater] / p[:fc])^p[:β])
 end
+
+export RechargeFlux, recharge_func

@@ -34,3 +34,5 @@ function pet_func(
     Ho = ((Gsc * Rav) * 86400) / 1e6
     (0.0023 * Ho * (tmax - tmin)^0.5 * (tavg + 17.8))
 end
+
+export PetFlux, pet_func

@@ -19,3 +19,5 @@ function percolation_func(
 )
     @.((p[:x1]^(-4)) / 4 * ((4 / 9)^(4)) * (i[:soilwater]^5))
 end
+
+export PercolationFlux, percolation_func
