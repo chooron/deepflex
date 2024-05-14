@@ -5,7 +5,6 @@ using DataFrames
 using CairoMakie
 using ComponentArrays
 using CairoMakie: Axis
-using Interpolations
 
 # test gr4j model
 include("../../src/LumpedHydro.jl")
@@ -29,33 +28,28 @@ tt, tti, cfr, cfmax, ttm, whc = 0, 4, 0.5, 10, 0, 0.5
 cflux, fc, lp, k0, k1, α, β, c = 2.0, 500, 0.5, 0.5, 0.5, 2, 5, 10
 maxbas = 5
 
-solver = LumpedHydro.ODESolver(dt=1, saveat=1:1:length(P))
-
-parameters = ComponentVector(
+unit_params = ComponentVector(
     tt=tt, tti=tti, cfr=cfr, cfmax=cfmax, ttm=ttm, whc=whc,
     cflux=cflux, fc=fc, lp=lp, k0=k0, k1=k1, α=α, β=β, c=c, maxbas=maxbas
 )
 init_states = ComponentVector(
-    SnowWater=0.0,
-    LiquidWater=0.0,
-    SoilWater=10.0,
-    UpperZone=5.0,
-    LowerZone=5.0,
+    snowwater=0.0,
+    liquidwater=0.0,
+    soilwater=10.0,
+    upperzone=5.0,
+    lowerzone=5.0,
 )
 
-model = LumpedHydro.HBV(
-    name="hbv",
-    parameters=parameters,
-    init_states=init_states,
-    solver=solver
-)
+ps = ComponentVector(hbv=(params=unit_params, initstates=init_states, weight=1.0))
 
-input = ComponentVector(Prcp=P, Pet=E, Temp=T)
-output = LumpedHydro.get_output(model, input=input, step=true)
+model = LumpedHydro.HBV.Node(name=:hbv, mtk=true, step=true);
+LumpedHydro.get_param_names(model.units[1].surface[1])
+input = (hbv=(prcp=P, pet=E, temp=T, time=1:length(T)),)
+output = model(input, ps)
 
 # plot result
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 x = range(1, 100, length=100)
-lines!(ax, x, output[:Flow], color=:blue)
+lines!(ax, x, output[:flow], color=:blue)
 fig

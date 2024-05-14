@@ -129,13 +129,6 @@ function param_grad_optimv2(
     ComponentVector(sol.u, tunable_pas_axes)
 end
 
-function hybridparams_optimize!()
-    """
-    混合参数(包括模型超参数和模型内部权重)优化
-    """
-
-end
-
 function nn_param_optim(
     nn::AbstractNeuralFlux;
     input::NamedTuple,

@@ -40,6 +40,7 @@ StdMeanNormFlux(
         @.((i[input_names] - p[param_names[1]]) / p[param_names[2]])
 )
 
+
 MinMaxNormFlux(
     input_names::Symbol,
     output_names::Symbol=Symbol(:norm_, input_names);
@@ -53,14 +54,23 @@ MinMaxNormFlux(
 )
 
 TranparentFlux(
-    old_names::Union{Symbol,Vector{Symbol}},
-    new_names::Union{Symbol,Vector{Symbol}},
+    old_names::Symbol,
+    new_names::Symbol,
 ) = SimpleFlux(
     old_names,
     new_names,
     param_names=Symbol[],
-    func=(i::NamedTuple, p::NamedTuple; kw...) ->
-        @.((i[input_names] - p[param_names[2]]) / (p[param_names[1]] - p[param_names[2]]))
+    func=(i::NamedTuple, p::NamedTuple; kw...) -> i[old_names]
+)
+
+TranparentFlux(
+    old_names::Vector{Symbol},
+    new_names::Vector{Symbol},
+) = SimpleFlux(
+    old_names,
+    new_names,
+    param_names=Symbol[],
+    func=(i::NamedTuple, p::NamedTuple; kw...) -> [i[nm] for nm in old_names]
 )
 
 function (flux::AbstractSimpleFlux)(input::Union{ComponentVector,NamedTuple}, params::Union{ComponentVector,NamedTuple})
@@ -107,7 +117,8 @@ end
 struct LagFlux <: AbstractLagFlux
     # * 这里设计成只针对一个变量的Flux
     # attribute
-    flux_name::Symbol
+    input_names::Symbol
+    output_names::Symbol
     # lag time name
     lag_time::Symbol
     # function
@@ -115,13 +126,15 @@ struct LagFlux <: AbstractLagFlux
     smooth_func::Function
 
     function LagFlux(
-        flux_name::Symbol;
+        input_names::Symbol,
+        output_names::Symbol;
         lag_time::Symbol,
         lag_func::Function,
         smooth_func::Function=step_func,
     )
         new(
-            flux_name,
+            input_names,
+            output_names,
             lag_time,
             lag_func,
             smooth_func
@@ -137,13 +150,13 @@ function solve_lag_weights(flux::LagFlux; input::NamedTuple, params::Union{Compo
         tmp_u[end] = 0
         du[1:end] = tmp_u
     end
-    lag_time = params[flux.param_names]
+    lag_time = params[first(get_param_names(flux))]
     delta_t = 1.0
     ts = 1:(ceil(lag_time / delta_t)|>Int)
     #* 将weight作为param输入到prob中
     lag_weights = [flux.lag_func(t, lag_time, smooth_func=flux.smooth_func) for t in ts]
     lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
-    prob = DiscreteProblem(discrete_prob!, zeros(eltype(input), length(ts)), (1.0, length(input)), lag_weights)
+    prob = DiscreteProblem(discrete_prob!, zeros(eltype(eltype(input)), length(ts)), (1.0, length(input)), lag_weights)
     #* 求解这个问题
     sol = solve(prob, FunctionMap())
     sol_u = hcat((sol.u)...)
@@ -156,7 +169,8 @@ function (flux::LagFlux)(input::Union{ComponentVector,NamedTuple}, params::Union
     tmp_params = extract_params(params, get_param_names(flux))
     lag_weight = solve_lag_weights(flux, input=tmp_input, params=tmp_params)
     tmp_output_names = get_output_names(flux)
-    process_output(lag_weight .* tmp_input[get_input_names(flux)], ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
+    process_output(lag_weight .* tmp_input[first(get_input_names(flux))],
+        ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
 struct NeuralFlux <: AbstractNeuralFlux

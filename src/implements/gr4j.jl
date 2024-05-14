@@ -1,17 +1,14 @@
 @reexport module GR4J
 
-using LumpedHydro
+using ..LumpedHydro
 
 """
 SoilWaterReservoir in GR4J
 """
 function Surface(; name::Symbol, mtk::Bool=true)
-    
+
     funcs = [
         RainfallFlux([:prcp, :pet]),
-        SimpleFlux([:prcp, :pet], :pet,
-            param_names=Symbol[],
-            func=(i, p; kw...) -> @.(get(kw, :smooth_func, step_func)(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))),
         InfiltrationFlux([:rainfall])
     ]
 
@@ -29,7 +26,7 @@ function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
-        EvapFlux([:soilwater, :pet], param_names=[:x1]),
+        EvapFlux([:soilwater, :prcp, :pet], param_names=[:x1]),
         PercolationFlux([:soilwater], param_names=[:x1]),
         SimpleFlux([:infiltration, :percolation, :saturation], :tempflow,
             param_names=Symbol[], func=(i, p; kw...) -> @.(i[:infiltration] - i[:saturation] + i[:percolation])),
@@ -73,9 +70,7 @@ end
 function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroUnit(
         name,
-        surface=Surface(name=name, mtk=mtk),
-        soil=Soil(name=name, mtk=mtk),
-        freewater=FreeWater(name=name),
+        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk), FreeWater(name=name, mtk=mtk)],
         step=step,
     )
 end
@@ -83,14 +78,14 @@ end
 function Route(; name::Symbol)
 
     funcs = [
-        LagFlux(:slowflow, lag_func=uh_1_half, lag_time=:x4),
-        LagFlux(:fastflow, lag_func=uh_2_full, lag_time=:x4),
-        SimpleFlux([:routedflow, :recharge, :fastflow], :flow, param_names=Symbol[],
-            func=(i, p; kw...) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
+        LagFlux(:slowflow, :slowflow_lag, lag_func=LumpedHydro.uh_1_half, lag_time=:x4),
+        LagFlux(:fastflow, :fastflow_lag, lag_func=LumpedHydro.uh_2_full, lag_time=:x4),
+        SimpleFlux([:routedflow, :recharge, :fastflow_lag], :flow, param_names=Symbol[],
+            func=(i, p; kw...) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow_lag]))
     ]
 
     HydroElement(
-        Symbol(name, :_route_),
+        name,
         funcs=funcs,
         mtk=false
     )

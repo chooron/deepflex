@@ -10,7 +10,7 @@ using ModelingToolkit
 @variables A[1:10, 1:10]
 
 # test exphydro model
-# include("../../src/DeepFlex.jl")
+# include("../../src/LumpedHydro.jl")
 
 # load data
 file_path = "data/camels/01013500.csv"
@@ -33,8 +33,8 @@ ps = Lux.initialparameters(rng,lux_model)
 ps
 # todo 后续需要将lux的参数嵌入至mtk中
 # initial_params(lux_model)
-lux_func = DeepFlex.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
-# @btime DeepFlex.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)
+lux_func = LumpedHydro.LuxNNFlux([:prcp, :temp, :lday], [:flow], lux_model=lux_model)
+# @btime LumpedHydro.nn_param_optim(lux_func, input=inputs, target=outputs, init_params=lux_func.init_params)
 using DiffEqFlux
 
 ann = FastChain(FastDense(1,32,tanh), FastDense(32,32,tanh), FastDense(32,1))

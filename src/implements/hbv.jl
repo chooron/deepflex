@@ -1,90 +1,109 @@
+@reexport module HBV
+
+using ..LumpedHydro
 """
 SnowWaterReservoir in HyMOD
 """
-function HBV_SurfElement(; name::Symbol)
+function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
         SnowfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
         SimpleFlux([:temp], :refreeze, param_names=[:cfr, :cfmax, :ttm],
-            func=(i, p, sf) -> @.(sf(p[:ttm] - i[:temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:temp]))),
+            func=(i, p; kw...) -> begin
+                sf = kw[:smooth_func]
+                @.(sf(p[:ttm] - i[:temp]) * p[:cfr] * p[:cfmax] * (p[:ttm] - i[:temp]))
+            end),
         MeltFlux([:temp], param_names=[:cfmax, :ttm]),
         RainfallFlux([:prcp, :temp], param_names=[:tt, :tti]),
         InfiltrationFlux([:snowwater, :liquidwater, :rainfall, :melt], param_names=[:whc]),
     ]
 
     dfuncs = [
-        DifferFlux(Dict(:In => [:snowfall, :refreeze], :Out => [:melt]), :snowwater),
-        DifferFlux(Dict(:In => [:rainfall, :melt], :Out => [:refreeze, :infiltration]), :liquidwater),
+        StateFlux([:snowfall, :refreeze], [:melt], :snowwater),
+        StateFlux([:rainfall, :melt], [:refreeze, :infiltration], :liquidwater),
     ]
 
     HydroElement(
-        name=name,
+        Symbol(name, :_surf_),
         funcs=funcs,
-        dfuncs=dfuncs
+        dfuncs=dfuncs,
+        mtk=mtk
     )
 end
 
-function HBV_SoilElement(; name::Symbol)
+function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         SimpleFlux([:soilwater], :capillary, param_names=[:cflux, :fc],
-            func=(i, p, sf) -> @.(p[:cflux] * (1 - i[:soilwater] / p[:fc]))),
+            func=(i, p; kw...) -> @.(p[:cflux] * (1 - i[:soilwater] / p[:fc]))),
         EvapFlux([:soilwater, :pet], param_names=[:lp, :fc]),
         RechargeFlux([:soilwater, :infiltration], param_names=[:fc, :β]),
     ]
 
-
     dfuncs = [
-        DifferFlux(Dict(:In => [:infiltration, :capillary], :Out => [:evap, :recharge]), :soilwater),
+        StateFlux([:infiltration, :capillary], [:evap, :recharge], :soilwater),
     ]
 
     HydroElement(
-        name=name,
-        funcs=funcs,
-        dfuncs=dfuncs
-    )
-end
-
-function HBV_RouteElement(; name::Symbol)
-
-    funcs = [
-        RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
-        SimpleFlux([:routingstore], :routedflow,
-            param_names=[:x3, :γ],
-            func=(i, p, sf) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),
-        SimpleFlux([:routedflow, :recharge, :fastflow], :flow,
-            param_names=Symbol[],
-            func=(i, p, sf) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow]))
-    ]
-
-    dfuncs = [
-        DifferFlux(Dict(:In => [:slowflow, :recharge], :Out => [:routedflow]), :routingstore),
-    ]
-
-    lfuncs = [
-        LagFlux(:slowflow, :slowflow, lag_func=uh_1_half, param_names=:x4),
-        LagFlux(:fastflow, :fastflow, lag_func=uh_2_full, param_names=:x4),
-    ]
-
-    HydroElement(
-        name=name,
+        Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
-        lfuncs=lfuncs
+        mtk=mtk
     )
 end
 
-function HBV_Unit(; name::Symbol)
-    elements = [
-        HyMOD_SurfElement(name=name),
-        HyMOD_SoilElement(name=name),
+function FreeWater(; name::Symbol, mtk::Bool=true)
+
+    funcs = [
+        SimpleFlux([:upperzone], [:q0], param_names=[:k0, :α],
+            func=(i, p; kw...) -> @.(p[:k0] .* (i[:upperzone]^(1 + p[:α])))),
+        SimpleFlux([:lowerzone], [:q1], param_names=[:k1],
+            func=(i, p; kw...) -> @.(p[:k1] .* i[:lowerzone])),
+        SimpleFlux(Symbol[], :percolation, param_names=[:c],
+            func=(i, p; kw...) -> p[:c]),
+        SimpleFlux([:q0, :q1], :totalflow, param_names=Symbol[],
+            func=(i, p; kw...) -> @.(i[:q0] + i[:q1]))
     ]
-    HydroUnit(name, elements=elements)
+
+    dfuncs = [
+        StateFlux([:recharge], [:capillary, :q0, :percolation], :upperzone),
+        StateFlux([:percolation], [:q1], :lowerzone),
+    ]
+
+    HydroElement(
+        Symbol(name, :_zone_),
+        funcs=funcs,
+        dfuncs=dfuncs,
+        mtk=mtk
+    )
 end
 
-function HBV_Node(; name::Symbol)
+function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    HydroUnit(
+        name,
+        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk), FreeWater(name=name, mtk=mtk)],
+        step=step,
+    )
+end
+
+function Route(; name::Symbol)
+
+    funcs = [
+        LagFlux(:totalflow, :flow, lag_func=LumpedHydro.uh_4_full, lag_time=:maxbas),
+    ]
+
+    HydroElement(
+        name,
+        funcs=funcs,
+        mtk=false
+    )
+end
+
+function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroNode(
         name,
-        unit=HBV_Unit(name=name),
-        route=HBV_RouteElement(name=name)
+        units=[Unit(name=name, mtk=mtk, step=step)],
+        routes=[Route(name=name)],
     )
+end
+
 end

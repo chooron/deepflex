@@ -12,7 +12,7 @@ model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
-file_path = "data/camels/01013500.csv"
+file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
@@ -21,8 +21,6 @@ unit_params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=
 unit_init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 unit_input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"], time=ts)
 
-# prob = LumpedHydro.setup_input(model, input=unit_input, time=ts)
-# new_prob = LumpedHydro.setup_prob(model, prob, params=unit_params, init_states=unit_init_states)
 unit_init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 
 input = (exphydro=unit_input,)

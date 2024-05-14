@@ -8,27 +8,17 @@ using NamedTupleTools
 using DataFrames
 using LumpedHydro
 
-function build_layer(name)
-    layers = [
-        LumpedHydro.ExpHydro.Surface(name=name),
-        LumpedHydro.ExpHydro.Soil(name=name),
-        LumpedHydro.ExpHydro.Zone(name=name),
-    ]
-    layers
-end
-
 model = LumpedHydro.HydroNode(
     :exphydro_node,
-    layers=namedtuple([:exphydro1, :exphydro2], [build_layer(:exphydro1), build_layer(:exphydro2)]),
-    routes=namedtuple([:exphydro1, :exphydro2],
-        [LumpedHydro.ExpHydro.Route(name=:exphydro1), LumpedHydro.ExpHydro.Route(name=:exphydro2)])
+    units=[LumpedHydro.ExpHydro.Unit(name=:exphydro1, mtk=true, step=false), LumpedHydro.ExpHydro.Unit(name=:exphydro2, mtk=true, step=false)],
+    routes=[LumpedHydro.ExpHydro.Route(name=:exphydro1), LumpedHydro.ExpHydro.Route(name=:exphydro2)]
 )
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
-file_path = "data/camels/01013500.csv"
+file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:100
+ts = 1:10000
 
 unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 unit_input = (time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])

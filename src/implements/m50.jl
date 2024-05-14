@@ -1,7 +1,7 @@
 @reexport module M50
 
 using ..LumpedHydro
-using ..LumpedHydro.NamedTupleTools
+using ..NamedTupleTools
 import ..LumpedHydro: Lux
 
 """
@@ -9,18 +9,18 @@ SoilWaterReservoir in Exp-Hydro
 """
 function Surface(; name::Symbol, mtk::Bool=true)
     funcs = [
-        LumpedHydro.PetFlux([:temp, :lday]),
-        LumpedHydro.SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        LumpedHydro.MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        LumpedHydro.RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        LumpedHydro.InfiltrationFlux([:rainfall, :melt])
+        PetFlux([:temp, :lday]),
+        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+        InfiltrationFlux([:rainfall, :melt])
     ]
 
     dfuncs = [
-        LumpedHydro.StateFlux([:snowfall], [:melt], :snowwater),
+        StateFlux([:snowfall], [:melt], :snowwater),
     ]
 
-    LumpedHydro.HydroElement(
+    HydroElement(
         Symbol(name, :_surf_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -45,26 +45,29 @@ function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         # normalize
-        LumpedHydro.StdNormFlux(:snowwater, :norm_snw),
-        LumpedHydro.StdNormFlux(:soilwater, :norm_slw),
-        LumpedHydro.StdNormFlux(:temp, :norm_temp),
-        LumpedHydro.StdNormFlux(:prcp, :norm_prcp),
+        StdMeanNormFlux(:snowwater, :norm_snw),
+        StdMeanNormFlux(:soilwater, :norm_slw),
+        StdMeanNormFlux(:temp, :norm_temp),
+        StdMeanNormFlux(:prcp, :norm_prcp),
         # ET ANN
-        LumpedHydro.NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
+        NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
         # Q ANN
-        LumpedHydro.NeuralFlux([:norm_slw, :norm_prcp], :flow, param_names=:qnn, chain=q_ann),
+        NeuralFlux([:norm_slw, :norm_prcp], :totalflow, param_names=:qnn, chain=q_ann),
         # 一些变量转为用于状态计算的形式
-        LumpedHydro.SimpleFlux([:soilwater, :lday, :evap], :real_evap, param_names=Symbol[],
+        SimpleFlux([:soilwater, :lday, :evap], :realevap, param_names=Symbol[],
             func=(i, p; kw...) -> @.(i[:soilwater] * i[:lday] * i[:evap])),
-        LumpedHydro.SimpleFlux([:soilwater, :flow], :real_flow, param_names=Symbol[],
-            func=(i, p; kw...) -> kw[:smoooth_func](i[:soilwater]) * exp(i[:flow])),
+        SimpleFlux([:soilwater, :totalflow], :realflow, param_names=Symbol[],
+            func=(i, p; kw...) -> begin
+                sf = kw[:smooth_func]
+                @.(sf(i[:soilwater]) * exp(i[:totalflow]))
+            end),
     ]
 
     dfuncs = [
-        LumpedHydro.StateFlux([:infiltration], [:real_evap, :real_flow], :soilwater)
+        StateFlux([:infiltration], [:realevap, :realflow], :soilwater)
     ]
 
-    LumpedHydro.HydroElement(
+    HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -75,9 +78,7 @@ end
 function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroUnit(
         name,
-        surface=Surface(name=name, mtk=mtk),
-        soil=Soil(name=name, mtk=mtk),
-        freewater=FreeWater(name=name),
+        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk)],
         step=step,
     )
 end
@@ -85,11 +86,11 @@ end
 function Route(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        LumpedHydro.SimpleFlux(:flow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:flow])
+        SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]
 
-    LumpedHydro.HydroElement(
-        Symbol(name, :_route_),
+    HydroElement(
+        name,
         funcs=funcs,
         mtk=mtk
     )

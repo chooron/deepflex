@@ -23,11 +23,13 @@ function evap_func(
 end
 
 function evap_func(
-    i::namedtuple(:soilwater, :pet),
+    i::namedtuple(:soilwater, :prcp, :pet),
     p::namedtuple(:x1);
     kw...
 )
-    @.(i[:pet] * (2 * i[:soilwater] / p[:x1] - (i[:soilwater] / p[:x1])^2))
+    sf = get(kw, :smooth_func, step_func)
+    tmp_pet = @.(sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp]))
+    @.(tmp_pet * (2 * i[:soilwater] / p[:x1] - (i[:soilwater] / p[:x1])^2))
 end
 
 function evap_func(

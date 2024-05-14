@@ -7,10 +7,10 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
-using DeepFlex
+using LumpedHydro
 
 # test exphydro model
-# include("../../src/DeepFlex.jl")
+# include("../../src/LumpedHydro.jl")
 
 # predefine the parameters
 # init_parameter = [0.0, 100.0, 0.01, 20, 1.0, 1.0, -1.0]
@@ -21,22 +21,23 @@ const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, 
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
 
 # load data
-file_path = "data/camels/01013500.csv"
+file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-lday_vec = df[1:1000, "dayl(day)"]
-prcp_vec = df[1:1000, "prcp(mm/day)"]
-temp_vec = df[1:1000, "tmean(C)"]
-flow_vec = df[1:1000, "flow(mm)"]
+ts = 1:10000
+lday_vec = df[ts, "dayl(day)"]
+prcp_vec = df[ts, "prcp(mm/day)"]
+temp_vec = df[ts, "tmean(C)"]
+flow_vec = df[ts, "flow(mm)"]
 
 # parameters optimization
 input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
 output = (flow=flow_vec,)
 
-best_pas = DeepFlex.param_grad_optim(
+best_pas = LumpedHydro.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,

@@ -47,6 +47,8 @@
 - [X] 模型输入包括输入和参数,其中输入类型为NamedTuple,而参数为ComponentArray
 - [X] 增加flux的图计算功能，保证即使flux顺序是混乱的也能够得到结果，并提供element增加出入通量的能力
 - [ ] 构建node时提供构建信息
+- [ ] HBV计算结果有问题
+- [ ] M50无法实现在mtk下计算，以及step=false下计算
 
 # 关键功能和实现技术
 

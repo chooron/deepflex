@@ -5,7 +5,8 @@ using DataFrames
 using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
-using LumpedHydro
+# using LumpedHydro
+
 
 ele = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=true)
 

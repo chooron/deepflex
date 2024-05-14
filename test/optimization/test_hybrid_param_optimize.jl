@@ -8,19 +8,19 @@ using BenchmarkTools
 using NamedTupleTools
 using Lux
 using StableRNGs
-using DeepFlex
+# using LumpedHydro
 
 # test exphydro model
-# include("../../src/DeepFlex.jl")
+include("../../src/LumpedHydro.jl")
 
 # base param names
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
 # input data
-file_path = "data/cache/01013500.csv"
+file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:10000
+ts = 1:100
 input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
 output = (flow=df[ts, "Flow"],)
 
@@ -46,16 +46,16 @@ const_pas = ComponentVector(m50=(params=ComponentVector(
 
 params_axes = getaxes(tunable_pas)
 
-model = DeepFlex.M50.Node(name=:m50, mtk=false)
+model = LumpedHydro.M50.Node(name=:m50, mtk=true)
 
-best_pas = DeepFlex.param_grad_optim(
+best_pas = LumpedHydro.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
     input=input,
     target=output,
-    adtype=Optimization.AutoZygote()
+    adtype=Optimization.AutoForwardDiff()
 )
 
-# total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
+# total_params = LumpedHydro.merge_ca(best_pas, const_pas)[:param]
 # result = model(input, total_params, step=false)

@@ -6,7 +6,7 @@ using ComponentArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
-using DeepFlex
+using LumpedHydro
 # test exphydro model
 
 
@@ -25,10 +25,10 @@ ub_list = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
 tunable_param_lb = ComponentVector(lb_list, getaxes(tunable_pas))
 tunable_param_ub = ComponentVector(ub_list, getaxes(tunable_pas))
 
-model = DeepFlex.ExpHydro.Node(name=:exphydro)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro)
 
 # load data
-file_path = "data/camels/01013500.csv"
+file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 lday_vec = df[1:1000, "dayl(day)"]
@@ -40,7 +40,7 @@ flow_vec = df[1:1000, "flow(mm)"]
 input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
 output = (flow=flow_vec,)
 
-best_pas = DeepFlex.param_box_optim(
+best_pas = LumpedHydro.param_box_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,

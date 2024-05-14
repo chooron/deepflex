@@ -3,56 +3,47 @@ mutable struct HydroUnit{step} <: AbstractUnit
     name::Symbol
     ##* 一个基础单元必须包括的计算层
     #* 地表水层Surface, 典型Element包括降雪模块，截流模块，蒸发模块，下渗模块等
-    surface::Vector{<:AbstractElement}
     #* 壤中水层Soil，典型Element包括土壤水分模块，产流计算模块等
-    soil::Vector{<:AbstractElement}
     #* 自由水层FreeWater，典型Element包括地下水，地表水，壤中流等
-    freewater::Vector{<:AbstractElement}
+    elements::Vector{<:AbstractElement}
     #* 针对多个elements的计算图
     topology::Union{Nothing,SimpleDiGraph}
     ##* 根据mtk生成的system
     system::Union{Nothing,ODESystem}
 
     function HydroUnit(name;
-        surface::Union{AbstractElement,Vector{<:AbstractElement}},
-        soil::Union{AbstractElement,Vector{<:AbstractElement}},
-        freewater::Union{AbstractElement,Vector{<:AbstractElement}},
+        elements::Vector{<:AbstractElement},
         step::Bool=true)
+
+        topology = build_compute_topology(elements)
+
         if step
-            topology = build_compute_topology(vcat(surface, soil, freewater))
-            sys = nothing
+            system = nothing
         else
-            topology = nothing
-            sys = build_unit_system(vcat(surface, soil, freewater), name=name)
+            system = build_unit_system(elements, name=name)
         end
+
         new{step}(
             name,
-            surface,
-            soil,
-            freewater,
+            elements,
             topology,
-            sys
+            system
         )
     end
 end
 
 function update_attr!(unit::HydroUnit{true})
-    unit.topology = build_compute_topology(vcat(unit.surface, unit.soil, unit.freewater))
+    unit.topology = build_compute_topology(unit.elements)
 end
 
 function update_attr!(unit::HydroUnit{false})
-    unit.system = build_unit_system(vcat(surface, soil, freewater), name=unit.name)
+    unit.system = build_unit_system(unit.elements, name=unit.name)
 end
+
 
 function add_elements!(unit::HydroUnit; elements::Vector{<:AbstractElement})
     for ele in elements
-        if ele.etype == SurfaceType
-            push!(unit.surface, ele)
-        elseif ele.etype == SoilType
-            push!(unit.soil, ele)
-        elseif ele.etype == FreeWaterType
-            push!(unit.freewater, ele)
-        end
+        push!(unit.elements, ele)
     end
     update_attr!(unit)
 end
@@ -69,12 +60,12 @@ function (elements::AbstractVector{<:HydroElement})(
     solver::AbstractSolver=ODESolver()
 )
     #* 构建elements map信息
-    ele_output_and_state_names(ele) = vcat(get_output_names(ele.funcs), get_state_names(ele.dfuncs))
+    ele_output_and_state_names(ele) = vcat(get_output_names(ele), get_state_names(ele))
     elements_ntp = namedtuple(
         vcat([ele_output_and_state_names(ele) for ele in elements]...),
         vcat([repeat([ele], length(ele_output_and_state_names(ele))) for ele in elements]...)
     )
-    elements_var_names = unique(vcat(get_ele_io_names(elements)..., get_ele_state_names(elements)))
+    elements_var_names = unique(vcat(get_input_output_names(elements)..., get_state_names(elements)))
 
     #* 针对多个element的网络计算
     fluxes = input
@@ -99,11 +90,8 @@ function (unit::HydroUnit{true})(
     solver::AbstractSolver=ODESolver()
 )
     fluxes = input
-    for (elements, topology) in zip(get_all_elements(unit), get_all_topologys(unit))
-        tmp_fluxes = elements(fluxes, pas, topology=topology, solver=solver)
-        fluxes = merge(fluxes, tmp_fluxes)
-    end
-    fluxes
+    tmp_fluxes = unit.elements(fluxes, pas, topology=unit.topology, solver=solver)
+    merge(fluxes, tmp_fluxes)
 end
 
 function (unit::HydroUnit{false})(
@@ -112,31 +100,24 @@ function (unit::HydroUnit{false})(
     solver::AbstractSolver=ODESolver()
 )
     fluxes = input
-    all_elements = get_all_elements(unit)
-    prob = setup_input(all_elements, unit.system, input=fluxes, name=name)
-    new_prob = setup_prob(all_elements, unit.system, prob, params=pas[:params], init_states=pas[:initstates])
-    solved_states = solver(new_prob, get_ele_state_names(all_elements))
+    prob = setup_input(unit, input=fluxes, name=unit.name)
+    new_prob = setup_prob(unit, prob, params=pas[:params], init_states=pas[:initstates])
+    solved_states = solver(new_prob, get_state_names(unit.elements))
     fluxes = merge(fluxes, solved_states)
-    for ele in all_elements
-        fluxes = merge(fluxes, ele(fluxes, pas))
-    end
+    fluxes = unit.elements(fluxes, pas, topology=unit.topology, solver=solver)
     fluxes
 end
 
 function build_unit_system(
-    elements::AbstractVector{HydroElement{true}};
+    elements::AbstractVector{<:HydroElement};
     name::Symbol,
 )
     eqs = []
-    elements = elements
     #* 这里是遍历两次这个elements，就是通过对比两两数组的共同flux名称，然后将名称相同的名称构建方程
     for tmp_ele1 in elements
         #* 连接element之间的变量
         for tmp_ele2 in filter(ele -> ele.name != tmp_ele1.name, elements)
-            share_var_names = intersect(
-                vcat(get_var_names(tmp_ele1.funcs, tmp_ele1.dfuncs)...),
-                vcat(get_var_names(tmp_ele2.funcs, tmp_ele2.dfuncs)...)
-            )
+            share_var_names = intersect(vcat(get_var_names(tmp_ele1)...), vcat(get_var_names(tmp_ele2)...))
             for nm in share_var_names
                 push!(eqs, getproperty(tmp_ele1.sys, nm) ~ getproperty(tmp_ele2.sys, nm))
             end
@@ -146,45 +127,67 @@ function build_unit_system(
 end
 
 function setup_input(
-    elements::AbstractVector{HydroElement{true}},
-    sys::ODESystem;
+    unit::HydroUnit;
     input::NamedTuple,
     name::Symbol,
 )
     #* 首先构建data的插值系统
     eqs = Equation[]
-    node_varinfo = merge([ele.varinfo for ele in elements]...)
-    unit_input_names = get_ele_io_names(elements)[1]
-    itp_sys = build_itp_system(NamedTupleTools.select(input, unit_input_names), input[:time], node_varinfo, name=name)
-    for ele in elements
-        for nm in filter(nm -> nm in get_input_names(ele.funcs, ele.dfuncs), keys(input))
-            push!(eqs, getproperty(getproperty(sys, ele.sys.name), nm) ~ getproperty(itp_sys, nm))
+    elements_varinfo = merge([ele.varinfo for ele in unit.elements]...)
+    unit_input_names = get_input_names(unit)
+    itp_sys = build_itp_system(NamedTupleTools.select(input, unit_input_names), input[:time], elements_varinfo, name=name)
+    build_u0 = Pair[]
+    for ele in unit.elements
+        for nm in filter(nm -> nm in get_input_names(ele), keys(input))
+            push!(eqs, getproperty(getproperty(unit.system, ele.sys.name), nm) ~ getproperty(itp_sys, nm))
+        end
+        for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
+            func_nn_sys = getproperty(ele.sys, func.param_names)
+            # push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(get_input_names(func))))
+            for i in 1:length(get_input_names(ele))
+                # todo 添加实际初始数据
+                push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => )
+            end
         end
     end
-    compose_sys = compose(ODESystem(eqs, t; name=Symbol(name, :_comp_sys)), sys, itp_sys)
-    sys = structural_simplify(compose_sys)
-    prob = ODEProblem(sys, Pair[], (input[:time][1], input[:time][end]), [], warn_initialize_determined=true)
+    compose_sys = compose(ODESystem(eqs, t; name=Symbol(name, :_comp_sys)), unit.system, itp_sys)
+    build_sys = structural_simplify(compose_sys)
+    prob = ODEProblem(build_sys, build_u0, (input[:time][1], input[:time][end]), [], warn_initialize_determined=true)
     prob
 end
 
 function setup_prob(
-    elements::AbstractVector{HydroElement{true}},
-    sys::ODESystem,
+    unit::HydroUnit,
     prob::ODEProblem;
     params::ComponentVector,
     init_states::ComponentVector,
+    kw...
 )
     #* setup init states
     u0 = Pair[]
     #* setup parameters
     p = Pair[]
-    for ele in elements
-        tmp_ele_sys = getproperty(sys, ele.sys.name)
+    for ele in unit.elements
+        tmp_ele_sys = getproperty(unit.system, ele.sys.name)
         for nm in filter(nm -> nm in get_state_names(ele.dfuncs), keys(init_states))
             push!(u0, getproperty(tmp_ele_sys, Symbol(nm)) => init_states[Symbol(nm)])
+            for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
+                sol_0 = get_sol_0(ele, input=kw[:input], params=params, init_states=init_states)
+                func_nn_sys = getproperty(ele.sys, func.param_names)
+                for (idx, nm) in enumerate(get_input_names(func))
+                    push!(u0, getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm])
+                end
+                # u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(get_input_names(func))])
+                # u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u) => [sol_0[nm] for nm in get_input_names(func)]])
+            end
         end
         for nm in ModelingToolkit.parameters(ele.sys)
-            push!(p, getproperty(tmp_ele_sys, Symbol(nm)) => params[Symbol(nm)])
+            if contains(string(nm), "₊")
+                tmp_nn = split(string(nm), "₊")[1]
+                push!(p, getproperty(getproperty(tmp_ele_sys, Symbol(tmp_nn)), :p) => Vector(params[Symbol(tmp_nn)]))
+            else
+                push!(p, getproperty(tmp_ele_sys, Symbol(nm)) => params[Symbol(nm)])
+            end
         end
     end
     new_prob = remake(prob, p=p, u0=u0)

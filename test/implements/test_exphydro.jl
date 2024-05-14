@@ -4,12 +4,11 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
-
+# using LumpedHydro
 # test exphydro model
 include("../../src/LumpedHydro.jl")
-
 # load data
-file_path = "data/camels/01013500.csv"
+file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = 1:10000
@@ -25,15 +24,15 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 
-model = LumpedHydro.ExpHydro.Node(name=:exphydro,mtk=false)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro,mtk=true,step=false)
 
 input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
 result = model(input, pas);
 result_df = DataFrame(result)
 
-# # plot result
-# fig = Figure(size=(400, 300))
-# ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-# lines!(ax, time, flow_vec, color=:red)
-# lines!(ax, time, result_df[!, :flow], color=:blue)
-# fig
+# plot result
+fig = Figure(size=(400, 300))
+ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+lines!(ax, ts, flow_vec, color=:red)
+lines!(ax, ts, result_df[!, :flow], color=:blue)
+fig

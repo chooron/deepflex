@@ -1,6 +1,6 @@
 @reexport module ExpHydro
 
-using LumpedHydro
+using ..LumpedHydro
 
 """
 SoilWaterReservoir in Exp-Hydro
@@ -51,7 +51,7 @@ end
 """
 Inner Route Function in Exphydro
 """
-function FreeWater(; name::Symbol)
+function FreeWater(; name::Symbol, mtk=true)
 
     funcs = [
         FlowFlux([:baseflow, :surfaceflow], :totalflow)
@@ -60,16 +60,14 @@ function FreeWater(; name::Symbol)
     HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
-        mtk=false
+        mtk=mtk
     )
 end
 
 function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroUnit(
         name,
-        surface=Surface(name=name, mtk=mtk),
-        soil=Soil(name=name, mtk=mtk),
-        freewater=FreeWater(name=name),
+        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk), FreeWater(name=name, mtk=mtk)],
         step=step,
     )
 end

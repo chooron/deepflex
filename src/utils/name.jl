@@ -37,18 +37,18 @@ function get_output_names(func::AbstractStateFlux)
 end
 
 function get_input_names(func::AbstractLagFlux)
-    [func.flux_name]
+    [func.input_names]
 end
 
 function get_output_names(func::AbstractLagFlux)
-    [func.flux_name]
+    [func.output_names]
 end
 
 function get_param_names(func::AbstractLagFlux)
     [func.lag_time]
 end
 
-function get_func_io_names(funcs::Vector{<:AbstractFlux})
+function get_input_output_names(funcs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     for func in funcs
@@ -64,7 +64,7 @@ function get_func_io_names(funcs::Vector{<:AbstractFlux})
     input_names, output_names
 end
 
-function get_dfunc_io_names(dfuncs::Vector{<:AbstractFlux})
+function get_input_state_names(dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
 
@@ -76,8 +76,8 @@ function get_dfunc_io_names(dfuncs::Vector{<:AbstractFlux})
 end
 
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
-    input_names1, output_names = get_func_io_names(funcs)
-    input_names2, state_names = get_dfunc_io_names(dfuncs)
+    input_names1, output_names = get_input_output_names(funcs)
+    input_names2, state_names = get_input_state_names(dfuncs)
     # 避免一些中间变量混淆为输入要素
     setdiff!(input_names2, output_names)
     # 合并两种func的输入要素
@@ -85,15 +85,6 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     setdiff!(input_names, state_names)
     input_names, output_names, state_names
 end
-
-get_input_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux}) = get_var_names(funcs, dfuncs)[1]
-
-get_input_names(funcs::Vector{<:AbstractFlux}) = get_func_io_names(funcs)[1]
-
-get_output_names(funcs::Vector{<:AbstractFlux}) = get_func_io_names(funcs)[2]
-
-get_state_names(dfuncs::Vector{<:AbstractFlux}) = get_dfunc_io_names(dfuncs)[2]
-
 
 function get_param_names(funcs::Vector{<:AbstractFlux})
     param_names = Vector{Symbol}()
@@ -103,26 +94,53 @@ function get_param_names(funcs::Vector{<:AbstractFlux})
     param_names
 end
 
-#* name utils for elements
-function get_ele_io_names(elements::Vector{<:AbstractElement})
+get_input_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux}) = get_var_names(funcs, dfuncs)[1]
+
+get_input_names(funcs::Vector{<:AbstractFlux}) = get_input_output_names(funcs)[1]
+
+get_output_names(funcs::Vector{<:AbstractFlux}) = get_input_output_names(funcs)[2]
+
+get_state_names(dfuncs::Vector{<:AbstractFlux}) = get_input_state_names(dfuncs)[2]
+
+#* elements name utils
+get_var_names(ele::AbstractElement) = get_var_names(ele.funcs, ele.dfuncs)
+
+get_input_names(ele::AbstractElement) = get_var_names(ele)[1]
+
+get_output_names(ele::AbstractElement) = get_var_names(ele)[2]
+
+get_state_names(ele::AbstractElement) = get_state_names(ele.dfuncs)
+
+get_param_names(ele::AbstractElement) = get_param_names(vcat(ele.funcs, ele.dfuncs))
+
+function get_input_output_names(elements::Vector{<:AbstractElement})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
+    state_names = Vector{Symbol}()
     for ele in elements
-        union!(input_names, setdiff(get_input_names(ele.funcs, ele.dfuncs), output_names))
-        union!(output_names, get_output_names(ele.funcs))
+        tmp_input_names, tmp_output_names, tmp_state_names = get_var_names(ele.funcs, ele.dfuncs)
+        tmp_input_names = setdiff(tmp_input_names, output_names)
+        tmp_input_names = setdiff(tmp_input_names, state_names)
+        union!(input_names, tmp_input_names)
+        union!(output_names, tmp_output_names)
+        union!(state_names, tmp_state_names)
     end
-    input_names, output_names
+    input_names, output_names, state_names
 end
 
-function get_ele_param_names(elements::Vector{<:AbstractElement})
+get_input_names(elements::Vector{<:AbstractElement}) = get_input_output_names(elements)[1]
+
+get_output_names(elements::Vector{<:AbstractElement}) = get_input_output_names(elements)[2]
+
+function get_param_names(elements::Vector{<:AbstractElement})
     param_names = Vector{Symbol}()
     for ele in elements
-        union!(param_names, get_param_names(vcat(ele.funcs, ele.dfuncs)))
+        union!(param_names, get_param_names(ele))
     end
     param_names
 end
 
-function get_ele_state_names(elements::Vector{<:AbstractElement})
+function get_state_names(elements::Vector{<:AbstractElement})
     state_names = Vector{Symbol}()
     for ele in elements
         union!(state_names, get_state_names(ele.dfuncs))
@@ -130,30 +148,49 @@ function get_ele_state_names(elements::Vector{<:AbstractElement})
     state_names
 end
 
+#* unit name utils
+get_input_output_names(unit::AbstractUnit) = get_input_output_names(unit.elements)
+
+get_input_names(unit::AbstractUnit) = get_input_names(unit.elements)
+
+get_output_names(unit::AbstractUnit) = get_output_names(unit.elements)
+
+get_param_names(unit::AbstractUnit) = get_param_names(unit.elements)
+
+get_state_names(unit::AbstractUnit) = get_state_names(unit.elements)
+
+
 #* name utils for elements
-function get_ele_io_names(units::NamedTuple)
+function get_input_output_names(node::AbstractNode)
     input_names_list = []
     output_names_list = []
-    for unit in keys(units)
-        ele_input_names, ele_output_names = get_ele_io_names(unit)
+    for subname in node.subnames
+        tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
+        ele_input_names, ele_output_names = get_input_output_names(tmp_elements)
         push!(input_names_list, ele_input_names)
         push!(output_names_list, ele_output_names)
     end
-    namedtuple(keys(units), input_names_list), namedtuple(keys(units), output_names_list)
+    namedtuple(node.subnames, input_names_list), namedtuple(node.subnames, output_names_list)
 end
 
-function get_ele_param_names(units::NamedTuple)
+get_input_names(node::AbstractNode) = get_input_output_names(node)[1]
+
+get_output_names(node::AbstractNode) = get_input_output_names(node)[2]
+
+function get_param_names(node::AbstractNode)
     param_tuple_list = []
-    for nm in keys(units)
-        push!(param_tuple_list, (unit=get_param_names(units[nm]), route=get_param_names([route])))
+    for subname in node.subnames
+        tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
+        push!(param_tuple_list, get_param_names(tmp_elements))
     end
-    param_tuple_list
+    namedtuple(node.subnames, param_tuple_list)
 end
 
-function get_ele_state_names(units::NamedTuple)
+function get_state_names(node::AbstractNode)
     state_tuple_list = []
-    for nm in keys(units)
-        push!(state_tuple_list, (unit=get_state_names(units[nm]), route=get_state_names([route])))
+    for subname in node.subnames
+        tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
+        push!(state_tuple_list, get_state_names(tmp_elements))
     end
-    state_tuple_list
+    namedtuple(node.subnames, state_tuple_list)
 end
