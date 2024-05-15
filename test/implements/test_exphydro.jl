@@ -4,9 +4,9 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
-# using LumpedHydro
+using LumpedHydro
 # test exphydro model
-include("../../src/LumpedHydro.jl")
+
 # load data
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);

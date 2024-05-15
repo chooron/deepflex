@@ -11,7 +11,7 @@ using OrdinaryDiffEq
 using ModelingToolkit
 # using LumpedHydro
 include("../../src/LumpedHydro.jl")
-model = LumpedHydro.M50.Node(name=:m50, mtk=true, step=true)
+model = LumpedHydro.M50.Node(name=:m50, mtk=true, step=false)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names
@@ -49,7 +49,7 @@ solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
 # prob = LumpedHydro.setup_input(model.elements[2], input=input[model.elements[2].input_names], time=ts)
 # new_prob = LumpedHydro.setup_prob(model.elements[2], prob, input=input[model.elements[2].input_names], params=params, init_states=initstates)
 # solved_state = solver(new_prob, model.elements[2].state_names)
-@btime results = model(input, pas, solver=solver)
+results = model(input, pas, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),

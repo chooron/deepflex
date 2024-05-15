@@ -101,7 +101,7 @@ function (unit::HydroUnit{false})(
 )
     fluxes = input
     prob = setup_input(unit, input=fluxes, name=unit.name)
-    new_prob = setup_prob(unit, prob, params=pas[:params], init_states=pas[:initstates])
+    new_prob = setup_prob(unit, prob, input=fluxes, params=pas[:params], init_states=pas[:initstates])
     solved_states = solver(new_prob, get_state_names(unit.elements))
     fluxes = merge(fluxes, solved_states)
     fluxes = unit.elements(fluxes, pas, topology=unit.topology, solver=solver)
@@ -138,16 +138,13 @@ function setup_input(
     itp_sys = build_itp_system(NamedTupleTools.select(input, unit_input_names), input[:time], elements_varinfo, name=name)
     build_u0 = Pair[]
     for ele in unit.elements
+        tmp_ele_sys = getproperty(unit.system, ele.sys.name)
         for nm in filter(nm -> nm in get_input_names(ele), keys(input))
-            push!(eqs, getproperty(getproperty(unit.system, ele.sys.name), nm) ~ getproperty(itp_sys, nm))
+            push!(eqs, getproperty(tmp_ele_sys, nm) ~ getproperty(itp_sys, nm))
         end
         for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
-            func_nn_sys = getproperty(ele.sys, func.param_names)
-            # push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(get_input_names(func))))
-            for i in 1:length(get_input_names(ele))
-                # todo 添加实际初始数据
-                push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => )
-            end
+            func_nn_sys = getproperty(tmp_ele_sys, func.param_names)
+            push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(get_input_names(func))))
         end
     end
     compose_sys = compose(ODESystem(eqs, t; name=Symbol(name, :_comp_sys)), unit.system, itp_sys)
@@ -173,15 +170,11 @@ function setup_prob(
             push!(u0, getproperty(tmp_ele_sys, Symbol(nm)) => init_states[Symbol(nm)])
             for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
                 sol_0 = get_sol_0(ele, input=kw[:input], params=params, init_states=init_states)
-                func_nn_sys = getproperty(ele.sys, func.param_names)
-                for (idx, nm) in enumerate(get_input_names(func))
-                    push!(u0, getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm])
-                end
-                # u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(get_input_names(func))])
-                # u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u) => [sol_0[nm] for nm in get_input_names(func)]])
+                func_nn_sys = getproperty(tmp_ele_sys, func.param_names)
+                u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(get_input_names(func))])
             end
         end
-        for nm in ModelingToolkit.parameters(ele.sys)
+        for nm in ModelingToolkit.parameters(tmp_ele_sys)
             if contains(string(nm), "₊")
                 tmp_nn = split(string(nm), "₊")[1]
                 push!(p, getproperty(getproperty(tmp_ele_sys, Symbol(tmp_nn)), :p) => Vector(params[Symbol(tmp_nn)]))

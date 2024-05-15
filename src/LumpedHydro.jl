@@ -120,6 +120,6 @@ export HydroElement, HydroUnit, HydroNode
 
 
 # export model
-export ExpHydro, M50, GR4J, HyMOD
+export ExpHydro, M50, GR4J, HyMOD, HBV
 
 end
