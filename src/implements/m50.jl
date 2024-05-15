@@ -50,9 +50,9 @@ function Soil(; name::Symbol, mtk::Bool=true)
         StdMeanNormFlux(:temp, :norm_temp),
         StdMeanNormFlux(:prcp, :norm_prcp),
         # ET ANN
-        NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann),
+        NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, chain_name=:etnn, chain=et_ann),
         # Q ANN
-        NeuralFlux([:norm_slw, :norm_prcp], :totalflow, param_names=:qnn, chain=q_ann),
+        NeuralFlux([:norm_slw, :norm_prcp], :totalflow, chain_name=:qnn, chain=q_ann),
         # 一些变量转为用于状态计算的形式
         SimpleFlux([:soilwater, :lday, :evap], :realevap, param_names=Symbol[],
             func=(i, p; kw...) -> @.(i[:soilwater] * i[:lday] * i[:evap])),

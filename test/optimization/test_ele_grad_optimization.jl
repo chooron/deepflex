@@ -7,9 +7,9 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
+using LumpedHydro
 
 # # test exphydro model
-include("../../src/LumpedHydro.jl")
 
 # predefine the parameters
 # init_parameter = [0.0, 100.0, 0.01, 20, 1.0, 1.0, -1.0]

@@ -9,7 +9,7 @@ using BenchmarkTools
 using ModelingToolkit
 using OrdinaryDiffEq
 using ComponentArrays
-# using LumpedHydro
+using LumpedHydro
 
 # test gr4j model
 

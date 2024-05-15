@@ -24,6 +24,7 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
 
+LumpedHydro.HydroNode()
 model = LumpedHydro.ExpHydro.Node(name=:exphydro,mtk=true,step=false)
 
 input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)

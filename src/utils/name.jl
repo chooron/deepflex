@@ -1,8 +1,6 @@
 #* name utils for flux
 function get_input_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
-    if eltype(func.input_names) isa Pair
-        input_names = [v for (_, v) in func.input_names]
-    elseif func.input_names isa Vector
+    if func.input_names isa Vector
         input_names = func.input_names
     else
         input_names = [func.input_names]
@@ -26,6 +24,22 @@ function get_param_names(func::AbstractFlux)
         param_names = [func.param_names]
     end
     param_names
+end
+
+function get_param_names(func::AbstractNeuralFlux)
+    [func.chain_name]
+end
+
+function extract_neuralflux_ntp(funcs::Vector{<:AbstractFlux})
+    nn_flux_list = filter(flux -> flux isa AbstractNeuralFlux, funcs)
+    nfunc_ntp = NamedTuple()
+    if length(nn_flux_list) > 0
+        nfunc_ntp = namedtuple(
+            [flux.chain_name for flux in nn_flux_list],
+            [get_input_names(flux) for flux in nn_flux_list]
+        )
+    end
+    nfunc_ntp
 end
 
 function get_input_names(func::AbstractStateFlux)

@@ -8,6 +8,7 @@ using ComponentArrays
 using NamedTupleTools
 using Reexport
 using StableRNGs
+using DocStringExtensions
 
 # run time stats
 using BenchmarkTools

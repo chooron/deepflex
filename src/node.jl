@@ -1,12 +1,31 @@
+"""
+$(TYPEDEF)
+A basic hydrological calculation node can represent a complete conceptual hydrological model including vertical and horizontal calculations,
+ can contain different vertical calculation units, and can calculate distributed and semi-distributed hydrological models in scope.
+# Fields
+$(FIELDS)
+# Example
+```
+using LumpedHydro
+using LumpedHydro.ExpHydro
+
+model = LumpedHydro.HydroNode(
+    :exphydro_node,
+    units=[LumpedHydro.ExpHydro.Unit(name=:exphydro1, mtk=true, step=false), LumpedHydro.ExpHydro.Unit(name=:exphydro2, mtk=true, step=false)],
+    routes=[LumpedHydro.ExpHydro.Route(name=:exphydro1), LumpedHydro.ExpHydro.Route(name=:exphydro2)]
+)
+```
+"""
 struct HydroNode <: AbstractNode
+    "hydrological computation node name"
     name::Symbol
-    #* 子单元名称
+    "sub-hydrological computation unit names"
     subnames::Vector{Symbol}
-    #* 子单元 NamedTuple{Symbol,{HydroUnit}}
+    "sub-hydrological computation unit: (unit_name=unit, ...)"
     units::NamedTuple
-    #* RunoffRouting Module NamedTuple{Symbol,HydroElement}
+    "sub-hydrological routing element: (route_name=route, ...)"
     routes::NamedTuple
-    #* 节点对应的面积
+    "The area corresponding to the node"
     area::Number
     
     function HydroNode(name; units::Vector{<:HydroUnit}, routes::Vector{<:HydroElement}, area::Number=100.0)

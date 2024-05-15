@@ -1,14 +1,40 @@
 """
-Simple flux
+$(TYPEDEF)
+A struct representing common hydrological fluxes
+# Fields
+$(FIELDS)
+# Example
+```
+# define a common function
+function flow_func(
+    i::namedtuple(:baseflow, :surfaceflow),
+    p::NamedTuple;
+    kw...
+)
+    i[:baseflow] .+ i[:surfaceflow]
+end
+
+flow_flux = SimpleFlux(
+    [:baseflow, :surfaceflow],
+    :flow,
+    param_names=Symbol[],
+    func=flow_func
+)
+```
 """
 struct SimpleFlux <: AbstractSimpleFlux
-    # attribute
+    "input names of the simple hydrological flux"
     input_names::Union{Symbol,Vector{Symbol}}
+    "output names of the simple hydrological flux"
     output_names::Union{Symbol,Vector{Symbol}}
+    "parameter names of the simple hydrological flux"
     param_names::Vector{Symbol}
-    # function 
+    """
+    functions used to implement hydrological flux computation,
+    It requires the input format to be (i::NamedTuple, p::NamedTuple; kw....)
+    """
     func::Function
-    # step function
+    "smooth function used for flux func, where there exists ifelse condition"
     smooth_func::Function
 
     function SimpleFlux(
@@ -81,11 +107,29 @@ function (flux::AbstractSimpleFlux)(input::Union{ComponentVector,NamedTuple}, pa
     process_output(tmp_output, ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
+"""
+$(TYPEDEF)
+A variable hydrological state-like flux that is determined by input and output fluxes
+# Fields
+$(FIELDS)
+# Example
+```
+snowwater_flux = StateFlux([:snowfall], [:melt], :snowwater)
+```
+"""
 mutable struct StateFlux <: AbstractStateFlux
+    "input hydrological flux name for state flux"
     influx_names::Vector{Symbol}
+    "output hydrological flux name for state flux"
     outflux_names::Vector{Symbol}
+    "name of the state flux"
     state_names::Symbol
+    "parameter names of the state flux"
     param_names::Vector{Symbol}
+    """
+    Function used to calculate hydrological state fluxes, fixed in most cases.
+    If there is a need for modification, it is generally recommended to modify the calculation formula of the input and output flux.
+    """
     func::Function
 
     function StateFlux(
@@ -114,15 +158,26 @@ function (flux::AbstractStateFlux)(input::Union{ComponentVector,NamedTuple}, par
     process_output(tmp_output, ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
+"""
+$(TYPEDEF)
+A flux used in hydrological unit-hydrograph calculations
+# Fields
+$(FIELDS)
+# Example
+```
+slowflow_lagflux = LagFlux(:slowflow, :slowflow_lag, lag_func=LumpedHydro.uh_1_half, lag_time=:x4)
+```
+"""
 struct LagFlux <: AbstractLagFlux
-    # * 这里设计成只针对一个变量的Flux
-    # attribute
+    "input name of the hydrograph unit flux, only supports a single name"
     input_names::Symbol
+    "output name of the hydrograph unit flux, only supports a single name"
     output_names::Symbol
-    # lag time name
+    "parameter name used to represent the unit line parameter (lag time)"
     lag_time::Symbol
-    # function
+    "function used to represent hydrograph unit"
     lag_func::Function
+    "smooth function used for function"
     smooth_func::Function
 
     function LagFlux(
@@ -173,29 +228,48 @@ function (flux::LagFlux)(input::Union{ComponentVector,NamedTuple}, params::Union
         ifelse(length(tmp_output_names) > 1, tmp_output_names, first(tmp_output_names)))
 end
 
+"""
+$(TYPEDEF)
+A hydrological flux calculated via a neural network (based on `Lux.jl`)
+# Fields
+$(FIELDS)
+# Example
+```
+et_ann = Lux.Chain(
+    Lux.Dense(3 => 16, Lux.tanh),
+    Lux.Dense(16 => 1, Lux.leakyrelu)
+)
+etnn_flux = NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, param_names=:etnn, chain=et_ann)
+```
+"""
 struct NeuralFlux <: AbstractNeuralFlux
+    "input names of the neural flux"
     input_names::Vector{Symbol}
+    "output names of the neural flux"
     output_names::Union{Vector{Symbol},Symbol}
-    param_names::Symbol
+    "chain name of the chain inner the neural flux"
+    chain_name::Symbol
+    "predict function created by the chain"
     func::Function
+    "prebuild neural system created by the chain(based on `ModelingToolkitNeuralNets.jl`)"
     nn::ODESystem
 end
 
 function NeuralFlux(
     input_names::Vector{Symbol},
     output_names::Union{Symbol,Vector{Symbol}};
-    param_names::Symbol,
+    chain_name::Symbol,
     chain::Lux.AbstractExplicitLayer,
     seed::Int=42,
 )
     func = (x, p) -> LuxCore.stateless_apply(chain, x, p)
-    nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed), name=param_names)
-    NeuralFlux(input_names, output_names, param_names, func, nn)
+    nn = NeuralNetworkBlock(length(input_names), length(output_names); chain=chain, rng=StableRNG(seed), name=chain_name)
+    NeuralFlux(input_names, output_names, chain_name, func, nn)
 end
 
 function (flux::NeuralFlux)(input::Union{ComponentVector,NamedTuple}, params::Union{ComponentVector,NamedTuple})
     x = hcat([input[nm] for nm in flux.input_names]...)'
-    y_pred = flux.func(x, params[flux.param_names])
+    y_pred = flux.func(x, params[flux.chain_name])
     process_output(y_pred, get_output_names(flux))
 end
 

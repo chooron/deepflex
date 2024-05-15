@@ -1,12 +1,11 @@
 # 导入模块
-using ModelingToolkit
 using CSV
 using DataFrames
 using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
-# using LumpedHydro
 
+include("../../src/LumpedHydro.jl")
 
 ele = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=true)
 

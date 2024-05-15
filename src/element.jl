@@ -1,17 +1,63 @@
 """
-HydroElement
+$(TYPEDEF)
+The basic hydrological calculation module contains multiple hydrological fluxes,
+and can simulate the balance calculation of a physical module.
+# Fields
+$(FIELDS)
+# Example
+```
+funcs = [
+    PetFlux([:temp, :lday]),
+    SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
+    MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
+    RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
+    InfiltrationFlux([:rainfall, :melt])
+]
+
+dfuncs = [
+    StateFlux([:snowfall], [:melt], :snowwater),
+]
+
+HydroElement(
+    Symbol(name, :_surface_),
+    funcs=funcs,
+    dfuncs=dfuncs,
+    mtk=mtk,
+)
+```
 """
 struct HydroElement{mtk} <: AbstractElement
-    #* component名称
+    "hydrological computation element name"
     name::Symbol
-    #* fluxes and dfluxes
+    "common hydrological fluxes, used to provide calculation results for state fluxes"
     funcs::Vector
+    """
+    Hydrological state fluxes, 
+    combined with ordinary hydrological flux to construct ordinary differential equations
+    """
     dfuncs::Vector
-    #* fluxes graph
+    """
+    The calculation topology map constructed based on common hydrological fluxes,
+    ensures the orderly calculation of multiple hydrological fluxes.
+    """
     topology::SimpleDiGraph
-    #* mtk related
+    """
+    Modelingtoolkit.jl related variables,
+    define the variables according to the input and output names of the hydrological flux,
+    and save them as NamedTuple
+    """
     varinfo::NamedTuple
+    """
+    Modelingtoolkit.jl related variables,
+    define the parameters according to the parameter names of the hydrological flux,
+    and save them as NamedTuple
+    """
     paraminfo::NamedTuple
+    """
+    Modelingtoolkit.jl related variables,
+    This is a pre-built ODESystem based on the input hydrological flux,
+    which is used to support the construction of the ODESystem after data input.
+    """
     sys::Union{ODESystem,Nothing}
 
     function HydroElement(
@@ -21,7 +67,7 @@ struct HydroElement{mtk} <: AbstractElement
         mtk::Bool=true
     )
         topology = build_compute_topology(funcs)
-        if !mtk # length(dfuncs) == 0 | 
+        if !mtk
             return new{mtk}(
                 name,
                 funcs,
@@ -52,10 +98,6 @@ struct HydroElement{mtk} <: AbstractElement
         end
     end
 end
-
-const SurfaceType = :surface
-const SoilType = :soil
-const FreeWaterType = :freewater
 
 # 求解并计算
 function (ele::HydroElement)(
@@ -111,85 +153,33 @@ function add_outputflux!(
     end
 end
 
-function setup_input(
+function get_sol_0(
     ele::HydroElement{true};
-    input::NamedTuple,
-    time::AbstractVector
-)
-    #* 构建data的插值系统
-    itp_eqs = Equation[getproperty(ele.sys, key) ~ @itpfn(key, input[key], time) for key in keys(input)]
-    compose_sys = compose(ODESystem(itp_eqs, t; name=Symbol(ele.name, :comp_sys)), ele.sys)
-    sys = structural_simplify(compose_sys)
-    build_u0 = Pair[]
-    for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
-        func_nn_sys = getproperty(ele.sys, func.param_names)
-        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(get_input_names(func))))
-    end
-    prob = ODEProblem(sys, build_u0, (time[1], time[end]), [], warn_initialize_determined=true)
-    prob
-end
-
-function get_sol_0(ele::HydroElement{true};
     input::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector
 )
-    ele_input_names = setdiff(get_input_names(ele.funcs),keys(init_states))
+    ele_input_names = setdiff(get_input_names(ele.funcs), keys(init_states))
     input0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
     init_states_ntp = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
     sol_0 = merge(input0, init_states_ntp)
     for func in ele.funcs
         sol_0 = merge(sol_0, func(sol_0, params))
     end
-    sol_0
-end
-
-function get_mtk_initstates(
-    ele::HydroElement{true},
-    prob::ODEProblem;
-    params::ComponentVector,
-    init_states::ComponentVector,
-    kw...
-)
-    #* setup init states
-    u0 = [getproperty(ele.sys, nm) => init_states[nm] for nm in keys(init_states) if nm in get_state_names(ele)]
-    for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
-        sol_0 = get_sol_0(ele, input=kw[:input], params=params, init_states=init_states)
-        func_nn_sys = getproperty(ele.sys, func.param_names)
-        u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm] for (idx, nm) in enumerate(get_input_names(func))])
-        # u0 = vcat(u0, [getproperty(getproperty(func_nn_sys, :input), :u) => [sol_0[nm] for nm in get_input_names(func)]])
-    end
-    u0
-end
-
-function get_mtk_params(
-    ele::HydroElement{true},
-    prob::ODEProblem;
-    params::ComponentVector,
-    kw...
-)
-    #* setup init states
-    p = Pair[]
-    for nm in ModelingToolkit.parameters(ele.sys)
-        if contains(string(nm), "₊")
-            tmp_nn = split(string(nm), "₊")[1]
-            push!(p, getproperty(getproperty(ele.sys, Symbol(tmp_nn)), :p) => Vector(params[Symbol(tmp_nn)]))
-        else
-            push!(p, getproperty(ele.sys, Symbol(nm)) => params[Symbol(nm)])
-        end
-    end
-    p
+    ComponentVector(sol_0)
 end
 
 function setup_prob(
     ele::HydroElement{true},
     prob::ODEProblem;
+    input::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector,
-    kw...
+    nfunc_ntp::NamedTuple
 )
-    u0 = get_mtk_initstates(ele, prob; params=params, init_states=init_states, kw...)
-    p = get_mtk_params(ele, prob; params=params, kw...)
+    sol_0 = get_sol_0(ele, input=input, params=params, init_states=init_states)
+    u0 = get_mtk_initstates(ele.sys; sol_0=sol_0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
+    p = get_mtk_params(ele.sys; params=params)
     remake(prob, p=p, u0=u0)
 end
 
@@ -201,9 +191,13 @@ function solve_prob(
 )
     params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
     init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
+
     ele_input_names = get_input_names(ele)
-    prob = setup_input(ele, input=input[ele_input_names], time=input[:time])
-    new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states)
+    nfunc_ntp = extract_neuralflux_ntp(ele.funcs)
+
+    prob = setup_input(ele.sys, input=input[ele_input_names], time=input[:time], nfunc_ntp=nfunc_ntp, name=ele.name)
+    new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states, nfunc_ntp=nfunc_ntp)
+
     solved_states = solver(new_prob, get_state_names(ele.dfuncs))
     solved_states
 end
@@ -232,4 +226,4 @@ function solve_prob(
     solved_states
 end
 
-export HydroElement, add_inputflux!, add_outputflux!, setup_input, solve_prob
+export HydroElement, add_inputflux!, add_outputflux!, solve_prob
