@@ -1,5 +1,5 @@
 # LumpedHydro.jl
-hydrology frameword built by Julia
+hydrology framework built by Julia
 
 ## install command
 ```
