@@ -40,7 +40,7 @@ using NonlinearSolve
 
 # deep learning
 using Lux
-using Zygote
+# using Zygote
 
 # parameters Optimization
 using Optimization
