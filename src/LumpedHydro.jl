@@ -84,11 +84,20 @@ include("utils/solver.jl")
 include("utils/smoother.jl")
 include("utils/name.jl")
 include("utils/graph.jl")
+
 # framework build
 include("flux.jl")
+export SimpleFlux, StateFlux, LagFlux, NeuralFlux, StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
+
 include("element.jl")
+export HydroElement, add_inputflux!, add_outputflux!, solve_prob
+
 include("unit.jl")
+export HydroUnit, update_unit!, add_elements!, remove_elements!
+
 include("node.jl")
+export HydroNode
+
 # Implement Flux
 include("functions/baseflow.jl")
 include("functions/evap.jl")
@@ -115,10 +124,6 @@ include("implements/hbv.jl")
 export AbstractComponent, AbstractSolver, AbstractOptimizer,
     AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractLagFlux,
     AbstractElement, AbstractUnit, AbstractNode
-
-# export hydro component
-export HydroElement, HydroUnit, HydroNode
-
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV

@@ -9,9 +9,9 @@ using Lux, LuxCore
 using StableRNGs
 using OrdinaryDiffEq
 using ModelingToolkit
-# using LumpedHydro
-include("../../src/LumpedHydro.jl")
-model = LumpedHydro.M50.Node(name=:m50, mtk=true, step=false)
+using LumpedHydro
+
+model = LumpedHydro.M50.Node(name=:m50, mtk=true, step=true)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names

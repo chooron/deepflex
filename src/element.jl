@@ -43,22 +43,10 @@ struct HydroElement{mtk} <: AbstractElement
     topology::SimpleDiGraph
     """
     Modelingtoolkit.jl related variables,
-    define the variables according to the input and output names of the hydrological flux,
-    and save them as NamedTuple
-    """
-    varinfo::NamedTuple
-    """
-    Modelingtoolkit.jl related variables,
-    define the parameters according to the parameter names of the hydrological flux,
-    and save them as NamedTuple
-    """
-    paraminfo::NamedTuple
-    """
-    Modelingtoolkit.jl related variables,
     This is a pre-built ODESystem based on the input hydrological flux,
     which is used to support the construction of the ODESystem after data input.
     """
-    sys::Union{ODESystem,Nothing}
+    system::Union{ODESystem,Nothing}
 
     function HydroElement(
         name::Symbol;
@@ -73,27 +61,20 @@ struct HydroElement{mtk} <: AbstractElement
                 funcs,
                 dfuncs,
                 topology,
-                NamedTuple(),
-                NamedTuple(),
                 nothing
             )
         else
-            input_names = get_input_names(funcs, dfuncs)
-            output_names = get_output_names(funcs)
-            state_names = get_state_names(dfuncs)
+            var_names = unique(vcat(get_var_names(funcs, dfuncs)...))
             param_names = get_param_names(vcat(funcs, dfuncs))
 
-            varinfo, paraminfo = init_var_param(input_names, output_names, state_names, param_names)
-            sys = build_ele_system(funcs, dfuncs, varinfo, paraminfo, name=name)
+            system = build_ele_system(funcs, dfuncs, var_names=var_names, param_names=param_names, name=name)
 
             return new{mtk}(
                 name,
                 funcs,
                 dfuncs,
                 topology,
-                varinfo,
-                paraminfo,
-                sys
+                system
             )
         end
     end
@@ -155,31 +136,29 @@ end
 
 function get_sol_0(
     ele::HydroElement{true};
-    input::NamedTuple,
+    input0::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector
 )
-    ele_input_names = setdiff(get_input_names(ele.funcs), keys(init_states))
-    input0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
     init_states_ntp = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
     sol_0 = merge(input0, init_states_ntp)
     for func in ele.funcs
         sol_0 = merge(sol_0, func(sol_0, params))
     end
-    ComponentVector(sol_0)
+    sol_0
 end
 
 function setup_prob(
     ele::HydroElement{true},
     prob::ODEProblem;
-    input::NamedTuple,
+    input0::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector,
     nfunc_ntp::NamedTuple
 )
-    sol_0 = get_sol_0(ele, input=input, params=params, init_states=init_states)
-    u0 = get_mtk_initstates(ele.sys; sol_0=sol_0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
-    p = get_mtk_params(ele.sys; params=params)
+    sol_0 = get_sol_0(ele, input0=input0, params=params, init_states=init_states)
+    u0 = get_mtk_initstates(ele.system; sol_0=sol_0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
+    p = get_mtk_params(ele.system; params=params)
     remake(prob, p=p, u0=u0)
 end
 
@@ -193,10 +172,12 @@ function solve_prob(
     init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
 
     ele_input_names = get_input_names(ele)
+    input0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
     nfunc_ntp = extract_neuralflux_ntp(ele.funcs)
 
-    prob = setup_input(ele.sys, input=input[ele_input_names], time=input[:time], nfunc_ntp=nfunc_ntp, name=ele.name)
-    new_prob = setup_prob(ele, prob, input=input, params=params, init_states=init_states, nfunc_ntp=nfunc_ntp)
+    build_sys = setup_input(ele.system, input=input[ele_input_names], time=input[:time], name=ele.name)
+    prob = init_prob(build_sys, ele.system, nfunc_ntp=nfunc_ntp, time=input[:time])
+    new_prob = setup_prob(ele, prob, input0=input0, params=params, init_states=init_states, nfunc_ntp=nfunc_ntp)
 
     solved_states = solver(new_prob, get_state_names(ele.dfuncs))
     solved_states
@@ -225,5 +206,3 @@ function solve_prob(
     solved_states = solver(prob, get_state_names(ele))
     solved_states
 end
-
-export HydroElement, add_inputflux!, add_outputflux!, solve_prob

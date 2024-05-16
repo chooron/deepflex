@@ -54,11 +54,11 @@ mutable struct HydroUnit{step} <: AbstractUnit
     end
 end
 
-function update_attr!(unit::HydroUnit{true})
+function update_unit!(unit::HydroUnit{true})
     unit.topology = build_compute_topology(unit.elements)
 end
 
-function update_attr!(unit::HydroUnit{false})
+function update_unit!(unit::HydroUnit{false})
     unit.system = build_unit_system(unit.elements, name=unit.name)
 end
 
@@ -119,9 +119,22 @@ function (unit::HydroUnit{false})(
     pas::ComponentVector;
     solver::AbstractSolver=ODESolver()
 )
+    #* prepare problem building
     fluxes = input
-    prob = setup_input(unit, input=fluxes, name=unit.name)
-    new_prob = setup_prob(unit, prob, input=fluxes, params=pas[:params], init_states=pas[:initstates])
+    elements_systems = [getproperty(unit.system, ele.system.name) for ele in unit.elements]
+    nfunc_ntp_list = [extract_neuralflux_ntp(ele.funcs) for ele in unit.elements]
+    unit_input_names = get_input_names(unit)
+    elements_input_names = [get_input_names(ele) for ele in unit.elements]
+    #* init system and problem with the input data
+    build_sys = setup_input(
+        unit.system, elements_systems,
+        input=input, name=unit.name,
+        input_names=elements_input_names
+    )
+    prob = init_prob(build_sys, elements_systems, nfunc_ntp_list=nfunc_ntp_list, time=input[:time])
+    #* setup problem with input parameters
+    input0 = namedtuple(unit_input_names, [input[nm][1] for nm in unit_input_names])
+    new_prob = setup_prob(unit, prob, input0=input0, params=pas[:params], init_states=pas[:initstates])
     solved_states = solver(new_prob, get_state_names(unit.elements))
     fluxes = merge(fluxes, solved_states)
     fluxes = unit.elements(fluxes, pas, topology=unit.topology, solver=solver)
@@ -133,54 +146,25 @@ function build_unit_system(
     name::Symbol,
 )
     eqs = []
+    elements_input_names = get_input_names(elements)
     #* 这里是遍历两次这个elements，就是通过对比两两数组的共同flux名称，然后将名称相同的名称构建方程
     for tmp_ele1 in elements
         #* 连接element之间的变量
         for tmp_ele2 in filter(ele -> ele.name != tmp_ele1.name, elements)
+            #* 这里是为了找到element之间共享的flux但是不是作为unit输入的flux
             share_var_names = intersect(vcat(get_var_names(tmp_ele1)...), vcat(get_var_names(tmp_ele2)...))
-            for nm in share_var_names
+            for nm in setdiff(share_var_names, elements_input_names)
                 push!(eqs, getproperty(tmp_ele1.sys, nm) ~ getproperty(tmp_ele2.sys, nm))
             end
         end
     end
-    compose(ODESystem(eqs, t; name=Symbol(name, :_sys)), [ele.sys for ele in elements]...)
-end
-
-function setup_input(
-    unit::HydroUnit;
-    input::NamedTuple,
-    name::Symbol,
-)
-    #* 首先构建data的插值系统
-    eqs = Equation[]
-    elements_varinfo = merge([ele.varinfo for ele in unit.elements]...)
-    unit_input_names = get_input_names(unit)
-    itp_sys = build_itp_system(NamedTupleTools.select(input, unit_input_names), input[:time], elements_varinfo, name=name)
-    for ele in unit.elements
-        tmp_ele_sys = getproperty(unit.system, ele.sys.name)
-        for nm in filter(nm -> nm in get_input_names(ele), keys(input))
-            push!(eqs, getproperty(tmp_ele_sys, nm) ~ getproperty(itp_sys, nm))
-        end
-    end
-    compose_sys = compose(ODESystem(eqs, t; name=Symbol(name, :_comp_sys)), unit.system, itp_sys)
-    #* 设置系统初始值并构建problem
-    build_u0 = Pair[]
-    for ele in unit.elements
-        tmp_ele_sys = getproperty(unit.system, ele.sys.name)
-        for func in filter(func -> func isa AbstractNeuralFlux, ele.funcs)
-            func_nn_sys = getproperty(tmp_ele_sys, func.chain_name)
-            push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(get_input_names(func))))
-        end
-    end
-    build_sys = structural_simplify(compose_sys)
-    prob = ODEProblem(build_sys, build_u0, (input[:time][1], input[:time][end]), [], warn_initialize_determined=true)
-    prob
+    compose(ODESystem(eqs, t; name=Symbol(name, :_sys)), [ele.system for ele in elements]...)
 end
 
 function setup_prob(
     unit::HydroUnit,
     prob::ODEProblem;
-    input::NamedTuple,
+    input0::NamedTuple,
     params::ComponentVector,
     init_states::ComponentVector,
     kw...
@@ -190,10 +174,10 @@ function setup_prob(
     #* setup parameters
     p = Pair[]
     for ele in unit.elements
-        tmp_ele_sys = getproperty(unit.system, ele.sys.name)
-        tmp_sol_0 = get_sol_0(ele, input=input, params=params, init_states=init_states)
+        tmp_ele_sys = getproperty(unit.system, ele.system.name)
+        input0 = get_sol_0(ele, input0=input0, params=params, init_states=init_states)
         nfunc_ntp = extract_neuralflux_ntp(ele.funcs)
-        tmp_u0 = get_mtk_initstates(tmp_ele_sys; sol_0=tmp_sol_0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
+        tmp_u0 = get_mtk_initstates(tmp_ele_sys; sol_0=input0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
         tmp_p = get_mtk_params(tmp_ele_sys; params=params)
         u0 = vcat(u0, tmp_u0)
         p = vcat(p, tmp_p)

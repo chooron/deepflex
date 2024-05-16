@@ -1,3 +1,9 @@
+"""
+$(TYPEDEF)
+A custom ODEProblem solver
+# Fields
+$(FIELDS)
+"""
 @kwdef struct ODESolver <: AbstractSolver
     alg::OrdinaryDiffEqAlgorithm = Tsit5()
     sensealg = InterpolatingAdjoint()

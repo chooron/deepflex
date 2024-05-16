@@ -1,5 +1,9 @@
+"""
+$(SIGNATURES)
+
+Construct calculation graphs based on all common hydrological fluxes in hydrological elements
+"""
 function build_compute_topology(fluxes::AbstractVector{<:AbstractFlux})
-    # 构建函数之间的计算图
     var_names = unique(vcat(get_input_output_names(fluxes)...))
     var_names_ntp = namedtuple(var_names, collect(1:length(var_names)))
     topology = SimpleDiGraph(length(var_names))
@@ -14,8 +18,12 @@ function build_compute_topology(fluxes::AbstractVector{<:AbstractFlux})
     topology
 end
 
+"""
+$(SIGNATURES)
+
+Construct a calculation graph based on all hydrological elements in the hydrological unit
+"""
 function build_compute_topology(elements::AbstractVector{<:AbstractElement})
-    # 构建函数之间的计算图
     var_names = unique(vcat(get_input_output_names(elements)..., get_state_names(elements)...))
     var_names_ntp = namedtuple(var_names, collect(1:length(var_names)))
     topology = SimpleDiGraph(length(var_names))

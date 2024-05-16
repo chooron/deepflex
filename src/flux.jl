@@ -272,5 +272,3 @@ function (flux::NeuralFlux)(input::Union{ComponentVector,NamedTuple}, params::Un
     y_pred = flux.func(x, params[flux.chain_name])
     process_output(y_pred, get_output_names(flux))
 end
-
-export SimpleFlux, StateFlux, LagFlux, NeuralFlux, StdMeanNormFlux, MinMaxNormFlux, TranparentFlux

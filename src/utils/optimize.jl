@@ -1,9 +1,14 @@
-mse(y, y_hat) = sum((y .- y_hat) .^ 2) / length(y)
+
 default_callback_func(p, l) = begin
     @info l
     false
 end
 
+"""
+$(SIGNATURES)
+
+Parameter optimization for global search of hydrological units, nodes
+"""
 function param_box_optim(
     component::AbstractComponent;
     tunable_pas::ComponentArray,
@@ -44,6 +49,11 @@ function param_box_optim(
     ComponentVector(sol.u, tunable_pas_axes)
 end
 
+"""
+$(SIGNATURES)
+
+Parameter optimization for local search of hydrological units, nodes
+"""
 function param_grad_optim(
     component::AbstractComponent;
     tunable_pas::AbstractVector,

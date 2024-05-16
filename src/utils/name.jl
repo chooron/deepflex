@@ -1,4 +1,3 @@
-#* name utils for flux
 function get_input_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
     if func.input_names isa Vector
         input_names = func.input_names

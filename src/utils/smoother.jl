@@ -1,13 +1,3 @@
-# function step_function(parameter::NamedTuple)
-#     function inner_step_func(x::T) where {T<:Number}
-#         _step_func(x, parameter)
-#     end
-#     function inner_step_func(x::Vector{T}) where {T<:Number}
-#         _step_func.(x, [parameter])
-#     end
-#     inner_step_func
-# end
-
 function ifelse_func(x::Union{Num,T}) where {T<:Number}
     if x > 0.0
         return 1.0

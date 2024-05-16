@@ -16,11 +16,11 @@ function extract_params(params::ComponentVector, param_names::Vector{Symbol})
     namedtuple(param_names, [params[k] for k in param_names])
 end
 
-function extract_params(params::NamedTuple, param_names::Vector{Symbol})
+function extract_params(params::NamedTuple, ::Vector{Symbol})
     params
 end
 
-function extract_params(params::Vector, param_names::Vector{Symbol})
+function extract_params(::Vector, param_names::Vector{Symbol})
     @assert length(param_names) == 0
     NamedTuple()
 end

@@ -9,7 +9,7 @@ using BenchmarkTools
 using ModelingToolkit
 using OrdinaryDiffEq
 using ComponentArrays
-using LumpedHydro
+# using LumpedHydro
 
 # test gr4j model
 
@@ -20,15 +20,13 @@ df = DataFrame(data);
 # time = 1:10000
 prcp_vec = df[!, "P"]
 et_vec = df[!, "ET"]
-# flow_vec = df[time, "flow(mm)"]
 
 # build model
-
 unit_params = (x1=320.11, x2=2.42, x3=69.63, x4=1.39, ω=3.5, γ=5.0)
 init_states = (soilwater=0.6 * 320.11, routingstore=0.70 * 69.63)
 pas = ComponentVector(gr4j=(params=unit_params, initstates=init_states, weight=1.0))
 
-model = LumpedHydro.GR4J.Node(name=:gr4j, step=false, mtk=true)
+model = LumpedHydro.GR4J.Node(name=:gr4j, step=true, mtk=false)
 solver = LumpedHydro.ODESolver(alg=Tsit5())
 input = (gr4j=(prcp=prcp_vec, pet=et_vec, time=1:1:length(prcp_vec)),)
 result = model(input, pas, solver=solver);
