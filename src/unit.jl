@@ -125,13 +125,14 @@ function (unit::HydroUnit{false})(
     nfunc_ntp_list = [extract_neuralflux_ntp(ele.funcs) for ele in unit.elements]
     unit_input_names = get_input_names(unit)
     elements_input_names = [get_input_names(ele) for ele in unit.elements]
+    ts = collect(input[:time])
     #* init system and problem with the input data
     build_sys = setup_input(
         unit.system, elements_systems,
-        input=input, name=unit.name,
+        input=input, time=ts, name=unit.name,
         input_names=elements_input_names
     )
-    prob = init_prob(build_sys, elements_systems, nfunc_ntp_list=nfunc_ntp_list, time=input[:time])
+    prob = init_prob(build_sys, elements_systems, nfunc_ntp_list=nfunc_ntp_list, time=ts)
     #* setup problem with input parameters
     input0 = namedtuple(unit_input_names, [input[nm][1] for nm in unit_input_names])
     new_prob = setup_prob(unit, prob, input0=input0, params=pas[:params], init_states=pas[:initstates])
@@ -154,7 +155,7 @@ function build_unit_system(
             #* 这里是为了找到element之间共享的flux但是不是作为unit输入的flux
             share_var_names = intersect(vcat(get_var_names(tmp_ele1)...), vcat(get_var_names(tmp_ele2)...))
             for nm in setdiff(share_var_names, elements_input_names)
-                push!(eqs, getproperty(tmp_ele1.sys, nm) ~ getproperty(tmp_ele2.sys, nm))
+                push!(eqs, getproperty(tmp_ele1.system, nm) ~ getproperty(tmp_ele2.system, nm))
             end
         end
     end

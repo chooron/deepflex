@@ -6,15 +6,15 @@ ENV["JULIA_DEBUG"] = "Documenter"
 cp("./docs/Manifest.toml", "./docs/src/assets/Manifest.toml", force = true)
 cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
 
-DocMeta.setdocmeta!(DeepFlex, :DocTestSetup,
-    :(using DeepFlex); recursive = true)
+DocMeta.setdocmeta!(LumpedHydro, :DocTestSetup,
+    :(using LumpedHydro); recursive = true)
 
 makedocs(;
     modules = [DeepFlex],
     authors = "jing xin",
     sitename = "DeepFlex.jl",
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
-        canonical = "https://docs.sciml.ai/DeepFlex.jl/dev/"),
+        canonical = "https://docs.sciml.ai/LumpedHydro.jl/dev/"),
     clean = true,
     doctest = false,
     linkcheck = true,

@@ -96,13 +96,14 @@ function setup_input(
     unit_system::ODESystem,
     ele_systems::Vector{ODESystem};
     input::NamedTuple,
+    time::Vector,
     input_names::Vector{Vector{Symbol}},
     name::Symbol,
 )
     eqs = Equation[]
     for (idx, system) in enumerate(ele_systems)
         for nm in filter(nm -> nm in input_names[idx], keys(input))
-            push!(eqs, getproperty(system, nm) ~ @itpfn(nm, input[nm], input[:time]))
+            push!(eqs, getproperty(system, nm) ~ @itpfn(nm, input[nm], time))
         end
     end
     compose_sys = compose(ODESystem(eqs, t; name=Symbol(name, :_comp_sys)), unit_system)

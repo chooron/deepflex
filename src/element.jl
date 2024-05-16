@@ -172,11 +172,12 @@ function solve_prob(
     init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
 
     ele_input_names = get_input_names(ele)
+    ts = collect(input[:time])
     input0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
     nfunc_ntp = extract_neuralflux_ntp(ele.funcs)
-
-    build_sys = setup_input(ele.system, input=input[ele_input_names], time=input[:time], name=ele.name)
-    prob = init_prob(build_sys, ele.system, nfunc_ntp=nfunc_ntp, time=input[:time])
+    
+    build_sys = setup_input(ele.system, input=input[ele_input_names], time=ts, name=ele.name)
+    prob = init_prob(build_sys, ele.system, nfunc_ntp=nfunc_ntp, time=ts)
     new_prob = setup_prob(ele, prob, input0=input0, params=params, init_states=init_states, nfunc_ntp=nfunc_ntp)
 
     solved_states = solver(new_prob, get_state_names(ele.dfuncs))
