@@ -40,7 +40,7 @@ struct HydroElement{mtk} <: AbstractElement
     The calculation topology map constructed based on common hydrological fluxes,
     ensures the orderly calculation of multiple hydrological fluxes.
     """
-    topology::SimpleDiGraph
+    topology::MetaTopology
     """
     Modelingtoolkit.jl related variables,
     This is a pre-built ODESystem based on the input hydrological flux,
@@ -83,26 +83,36 @@ end
 # 求解并计算
 function (ele::HydroElement)(
     input::NamedTuple,
-    pas::ComponentVector;
+    params::ComponentVector;
 )
-    #* 构建各个输出变量对应的计算函数
-    func_ntp = namedtuple(
-        vcat([get_output_names(func) for func in ele.funcs]...),
-        vcat([repeat([func], length(get_output_names(func))) for func in ele.funcs]...)
-    )
-    ele_var_names = unique(vcat(get_input_output_names(ele.funcs)...))
     fluxes = input
-    for flux_idx in topological_sort(ele.topology)
-        tmp_flux_name = ele_var_names[flux_idx]
+    for flux_idx in topological_sort(ele.topology.digraph)
+        tmp_flux_name = ele.topology.node_names[flux_idx]
         if !(tmp_flux_name in keys(fluxes))
-            tmp_func = func_ntp[tmp_flux_name]
-            tmp_output = tmp_func(fluxes, pas[:params])
+            tmp_func = ele.topology.node_maps[tmp_flux_name]
+            tmp_output = tmp_func(fluxes, params)
             fluxes = merge(fluxes, tmp_output)
         end
     end
     fluxes
 end
 
+function (elements::AbstractVector{<:HydroElement})(
+    input::NamedTuple,
+    params::ComponentVector,
+    topology::MetaTopology,
+)
+    #* 针对多个element的网络计算
+    fluxes = input
+    for flux_idx in topological_sort(topology.digraph)
+        tmp_flux_name = topology.node_names[flux_idx]
+        if !(tmp_flux_name in keys(fluxes))
+            tmp_ele = topology.node_maps[tmp_flux_name]
+            fluxes = merge(fluxes, tmp_ele(fluxes, params))
+        end
+    end
+    fluxes
+end
 
 function add_inputflux!(
     ele::HydroElement;
@@ -134,76 +144,56 @@ function add_outputflux!(
     end
 end
 
-function get_sol_0(
-    ele::HydroElement{true};
-    input0::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector
-)
-    init_states_ntp = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
-    sol_0 = merge(input0, init_states_ntp)
-    for func in ele.funcs
-        sol_0 = merge(sol_0, func(sol_0, params))
-    end
-    sol_0
-end
-
-function setup_prob(
-    ele::HydroElement{true},
-    prob::ODEProblem;
-    input0::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector,
-    nfunc_ntp::NamedTuple
-)
-    sol_0 = get_sol_0(ele, input0=input0, params=params, init_states=init_states)
-    u0 = get_mtk_initstates(ele.system; sol_0=sol_0, state_names=get_state_names(ele), nfunc_ntp=nfunc_ntp)
-    p = get_mtk_params(ele.system; params=params)
-    remake(prob, p=p, u0=u0)
-end
-
 function solve_prob(
     ele::HydroElement{true};
     input::NamedTuple,
-    pas::ComponentVector,
+    params::ComponentVector,
+    init_states::ComponentVector,
     solver::AbstractSolver=ODESolver()
 )
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
-
-    ele_input_names = get_input_names(ele)
+    #* 准备计算数据，包括时间，名称，初始状态，neuralflux信息
     ts = collect(input[:time])
-    input0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
+    ele_input_names, ele_state_names = get_input_names(ele), get_state_names(ele)
     nfunc_ntp = extract_neuralflux_ntp(ele.funcs)
-    
-    build_sys = setup_input(ele.system, input=input[ele_input_names], time=ts, name=ele.name)
-    prob = init_prob(build_sys, ele.system, nfunc_ntp=nfunc_ntp, time=ts)
-    new_prob = setup_prob(ele, prob, input0=input0, params=params, init_states=init_states, nfunc_ntp=nfunc_ntp)
+    input_0 = namedtuple(ele_input_names, [input[nm][1] for nm in ele_input_names])
+    initstates_ntp = namedtuple(keys(init_states), [init_states[nm] for nm in keys(init_states)])
+    sol_0 = ele(merge(input_0, initstates_ntp), params)
 
-    solved_states = solver(new_prob, get_state_names(ele.dfuncs))
+    # 构建问题和setter
+    build_sys = setup_input(ele.system, input=input[ele_input_names], time=ts, name=ele.name)
+    prob = init_prob(build_sys, [ele.system], [nfunc_ntp], ts)
+
+    # 获取u0和p实际值
+    u0 = get_mtk_initstates([ele.system], sol_0, [ele_state_names], [nfunc_ntp])
+    p = get_mtk_params([ele.system], params)
+
+    new_prob = remake(prob, p=p, u0=u0)
+
+    solved_states = solver(new_prob, ele_state_names)
     solved_states
 end
 
 function solve_prob(
     ele::HydroElement{false};
     input::NamedTuple,
-    pas::Union{NamedTuple,ComponentVector},
+    params::ComponentVector,
+    init_states::ComponentVector,
     solver::AbstractSolver=ODESolver()
 )
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
     ele_input_names = get_input_names(ele)
+    ele_state_names = get_state_names(ele)
     itp_dict = namedtuple(ele_input_names, [LinearInterpolation(input[nm], input[:time], extrapolate=true) for nm in ele_input_names])
+
     function singel_ele_ode_func!(du, u, p, t)
         tmp_input = namedtuple(ele_input_names, [itp_dict[nm](t) for nm in ele_input_names])
-        tmp_states = namedtuple(get_state_names(ele), u)
+        tmp_states = namedtuple(ele_state_names, u)
         tmp_fluxes = merge(tmp_input, tmp_states)
-        for func in ele.funcs
-            tmp_fluxes = merge(tmp_fluxes, func(tmp_fluxes, params))
-        end
-        du[:] = [dfunc(tmp_fluxes, params)[first(get_output_names(dfunc))] for dfunc in ele.dfuncs]
+        tmp_fluxes = ele(tmp_fluxes, params)
+        du[:] = [dfunc(tmp_fluxes, params)[dfunc.state_names] for dfunc in ele.dfuncs]
     end
-    prob = ODEProblem(singel_ele_ode_func!, collect(init_states[get_state_names(ele)]), (input[:time][1], input[:time][end]))
-    solved_states = solver(prob, get_state_names(ele))
+    
+    tspan = (input[:time][1], input[:time][end])
+    prob = ODEProblem(singel_ele_ode_func!, collect(init_states[ele_state_names]), tspan)
+    solved_states = solver(prob, ele_state_names)
     solved_states
 end

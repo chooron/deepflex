@@ -11,7 +11,8 @@ using OrdinaryDiffEq
 using ModelingToolkit
 # using LumpedHydro
 
-model = LumpedHydro.M50.Node(name=:m50, mtk=true, step=false)
+include("../../src/LumpedHydro.jl")
+model = LumpedHydro.M50.Node(name=:m50, mtk=false, step=false)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names
@@ -21,7 +22,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:100
+ts = 1:1000
 
 mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
 mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
@@ -46,10 +47,7 @@ initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 pas = ComponentVector(m50=(params=params, initstates=initstates, weight=1.0),)
 
 solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
-# prob = LumpedHydro.setup_input(model.elements[2], input=input[model.elements[2].input_names], time=ts)
-# new_prob = LumpedHydro.setup_prob(model.elements[2], prob, input=input[model.elements[2].input_names], params=params, init_states=initstates)
-# solved_state = solver(new_prob, model.elements[2].state_names)
-results = model(input, pas, solver=solver)
+@btime results = model(input, pas, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),
@@ -57,3 +55,4 @@ results = model(input, pas, solver=solver)
 #     Lux.Dense(16 => 1, Lux.leakyrelu)
 # )
 # func = (x, p) -> LuxCore.stateless_apply(q_ann, x, p)
+

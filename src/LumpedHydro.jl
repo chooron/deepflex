@@ -10,9 +10,6 @@ using Reexport
 using StableRNGs
 using DocStringExtensions
 
-# run time stats
-using BenchmarkTools
-
 # Multitreading and parallel computing
 using Base.Threads
 
@@ -23,7 +20,8 @@ using ModelingToolkitNeuralNets
 using ModelingToolkitStandardLibrary.Blocks
 using Symbolics
 using SymbolicUtils
-using SciMLStructures: Tunable, replace, replace!
+using SymbolicIndexingInterface
+using SciMLStructures: Tunable, replace
 
 # graph compute
 using Graphs

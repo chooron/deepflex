@@ -49,6 +49,19 @@ function param_box_optim(
     ComponentVector(sol.u, tunable_pas_axes)
 end
 
+function get_predict_func()
+    # build predict function
+    function predict_func(x::AbstractVector{T}, p) where {T}
+        component, input, tunable_pas_axes, const_pas = p
+        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
+        component(input, tmp_pas)
+    end
+    predict_func
+end
+
+const predict_func = get_predict_func()
+
 """
 $(SIGNATURES)
 
@@ -75,20 +88,14 @@ function param_grad_optim(
 
     tunable_pas_axes = getaxes(tunable_pas)
 
-    # build predict function
-    function predict_func(x::AbstractVector{T}, p) where {T}
-        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas)
-    end
-
     function objective(x::AbstractVector{T}, p) where {T}
-        loss_func(target[target_name], predict_func(x, p)[target_name]) # vcat(results.u...)
+        loss_func(target[target_name], predict_func(x, p)[target_name])
     end
 
     # build optim problem
     optf = Optimization.OptimizationFunction(objective, adtype)
-    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas))
+    prob_args = (component, input, tunable_pas_axes, const_pas)
+    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
 
     ComponentVector(sol.u, tunable_pas_axes)

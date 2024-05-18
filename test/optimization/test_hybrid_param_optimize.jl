@@ -1,13 +1,13 @@
 # import lib
 using CSV
 using DataFrames
-# using CairoMakie
 using ComponentArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Lux
 using StableRNGs
+using Enzyme
 # using LumpedHydro
 
 # test exphydro model
@@ -20,7 +20,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:100
+ts = 1:10000
 input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
 output = (flow=df[ts, "Flow"],)
 
@@ -46,7 +46,7 @@ const_pas = ComponentVector(m50=(params=ComponentVector(
 
 params_axes = getaxes(tunable_pas)
 
-model = LumpedHydro.M50.Node(name=:m50, mtk=true)
+model = LumpedHydro.M50.Node(name=:m50, mtk=false, step=false)
 
 best_pas = LumpedHydro.param_grad_optim(
     model,

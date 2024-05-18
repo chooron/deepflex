@@ -7,10 +7,10 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
-using LumpedHydro
+# using LumpedHydro
 
 # test exphydro model
-# include("../../src/LumpedHydro.jl")
+include("../../src/LumpedHydro.jl")
 
 # predefine the parameters
 # init_parameter = [0.0, 100.0, 0.01, 20, 1.0, 1.0, -1.0]
@@ -21,7 +21,7 @@ const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, 
 
 params_axes = getaxes(tunable_pas)
 
-model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=false, step=true)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
