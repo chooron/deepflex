@@ -1,21 +1,22 @@
-@reexport module ExpHydro
+@reexport module XAJ
 
 using ..LumpedHydro
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Surface(; name::Symbol, mtk::Bool=true)
+function Soil(; name::Symbol, mtk::Bool=true)
     funcs = [
-        PetFlux([:temp, :lday]),
-        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        InfiltrationFlux([:rainfall, :melt])
+        SimpleFlux([:prcp], [:infilstration], param_names=[:Aim],
+            func=(i, p; kw...) -> @.[(1 - p[:Aim]) * i[:prcp]]),
+        SimpleFlux([:infilstration, :soilwater], [:runoff], param_names=[:a, :b, :wmax],
+            func=(i, p; kw...) -> @.[i[:infilstration] * (abs(0.5 - p[:a]))^(1 - p[:b]) * (abs(i[:soilwater] / p[:wmax]))^p[:b] +
+                                     i[:infilstration] * (1 - abs(0.5 + p[:a]))^(1 - p[:b]) * (abs(1 - i[:soilwater] / p[:wmax]))^p[:b]]),
+        EvapFlux([:soilwater, :pet], param_names=[:Smax])
     ]
 
     dfuncs = [
-        StateFlux([:snowfall], [:melt], :snowwater, mtk=mtk),
+        StateFlux([:infilstration], [:runoff, :evap], :soilwater, mtk=mtk),
     ]
 
     HydroElement(
@@ -23,28 +24,6 @@ function Surface(; name::Symbol, mtk::Bool=true)
         funcs=funcs,
         dfuncs=dfuncs,
         mtk=mtk,
-    )
-end
-
-"""
-SoilWaterReservoir in Exp-Hydro
-"""
-function Soil(; name::Symbol, mtk::Bool=true)
-    funcs = [
-        EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
-        SurfaceflowFlux([:soilwater], param_names=[:Smax]),
-    ]
-
-    dfuncs = [
-        StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
-    ]
-
-    HydroElement(
-        Symbol(name, :_soil_),
-        funcs=funcs,
-        dfuncs=dfuncs,
-        mtk=mtk
     )
 end
 
@@ -73,7 +52,7 @@ function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
 end
 
 function Route(; name::Symbol)
-    
+
     funcs = [
         SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]

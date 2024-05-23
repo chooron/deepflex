@@ -28,6 +28,7 @@ function param_box_optim(
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
     maxiters = get(kwargs, :maxiters, 10)
+    solver = get(kwargs, :solver, ODESolver())
 
     tunable_pas_axes = getaxes(tunable_pas)
 
@@ -36,7 +37,7 @@ function param_box_optim(
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         const_pas = tunable_pas_type.(const_pas)
         tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas)
+        component(input, tmp_pas, timeidx=timeidx, solver=solver)
     end
 
     objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
@@ -52,10 +53,10 @@ end
 function get_predict_func()
     # build predict function
     function predict_func(x::AbstractVector{T}, p) where {T}
-        component, input, tunable_pas_axes, const_pas = p
+        component, input, timeidx, tunable_pas_axes, const_pas = p
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas)
+        component(input, tmp_pas, timeidx=timeidx)
     end
     predict_func
 end
@@ -71,8 +72,9 @@ function param_grad_optim(
     component::AbstractComponent;
     tunable_pas::AbstractVector,
     const_pas::AbstractVector,
-    input::NamedTuple,
+    input::Union{NamedTuple,StructArray},
     target::NamedTuple,
+    timeidx::Vector,
     kwargs...,
 )
     """
@@ -89,12 +91,13 @@ function param_grad_optim(
     tunable_pas_axes = getaxes(tunable_pas)
 
     function objective(x::AbstractVector{T}, p) where {T}
-        loss_func(target[target_name], predict_func(x, p)[target_name])
+        loss = loss_func(target[target_name], getproperty(predict_func(x, p), target_name))
+        loss
     end
 
     # build optim problem
     optf = Optimization.OptimizationFunction(objective, adtype)
-    prob_args = (component, input, tunable_pas_axes, const_pas)
+    prob_args = (component, input, timeidx, tunable_pas_axes, const_pas)
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
 

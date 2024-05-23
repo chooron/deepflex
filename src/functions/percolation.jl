@@ -17,7 +17,7 @@ function percolation_func(
     p::namedtuple(:x1);
     kw...
 )
-    @.((p[:x1]^(-4)) / 4 * ((4 / 9)^(4)) * (i[:soilwater]^5))
+    @.[(p[:x1]^(-4)) / 4 * ((4 / 9)^(4)) * (i[:soilwater]^5)]
 end
 
 export PercolationFlux, percolation_func

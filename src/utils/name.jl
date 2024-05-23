@@ -25,21 +25,14 @@ function get_param_names(func::AbstractFlux)
     param_names
 end
 
+function get_param_names(::AbstractStateFlux)
+    Symbol[]
+end
+
 function get_param_names(func::AbstractNeuralFlux)
     [func.chain_name]
 end
 
-function extract_neuralflux_ntp(funcs::Vector{<:AbstractFlux})
-    nn_flux_list = filter(flux -> flux isa AbstractNeuralFlux, funcs)
-    nfunc_ntp = NamedTuple()
-    if length(nn_flux_list) > 0
-        nfunc_ntp = namedtuple(
-            [flux.chain_name for flux in nn_flux_list],
-            [get_input_names(flux) for flux in nn_flux_list]
-        )
-    end
-    nfunc_ntp
-end
 
 function get_input_names(func::AbstractStateFlux)
     vcat(func.influx_names, func.outflux_names)
@@ -126,7 +119,7 @@ get_state_names(ele::AbstractElement) = get_state_names(ele.dfuncs)
 
 get_param_names(ele::AbstractElement) = get_param_names(vcat(ele.funcs, ele.dfuncs))
 
-function get_input_output_names(elements::Vector{<:AbstractElement})
+function get_var_names(elements::Vector{<:AbstractElement})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
@@ -141,9 +134,9 @@ function get_input_output_names(elements::Vector{<:AbstractElement})
     input_names, output_names, state_names
 end
 
-get_input_names(elements::Vector{<:AbstractElement}) = get_input_output_names(elements)[1]
+get_input_names(elements::Vector{<:AbstractElement}) = get_var_names(elements)[1]
 
-get_output_names(elements::Vector{<:AbstractElement}) = get_input_output_names(elements)[2]
+get_output_names(elements::Vector{<:AbstractElement}) = get_var_names(elements)[2]
 
 function get_param_names(elements::Vector{<:AbstractElement})
     param_names = Vector{Symbol}()
@@ -162,7 +155,7 @@ function get_state_names(elements::Vector{<:AbstractElement})
 end
 
 #* unit name utils
-get_input_output_names(unit::AbstractUnit) = get_input_output_names(unit.elements)
+get_var_names(unit::AbstractUnit) = get_var_names(unit.elements)
 
 get_input_names(unit::AbstractUnit) = get_input_names(unit.elements)
 
@@ -172,23 +165,25 @@ get_param_names(unit::AbstractUnit) = get_param_names(unit.elements)
 
 get_state_names(unit::AbstractUnit) = get_state_names(unit.elements)
 
-
 #* name utils for elements
-function get_input_output_names(node::AbstractNode)
+function get_var_names(node::AbstractNode)
     input_names_list = []
     output_names_list = []
+    state_names_list = []
     for subname in node.subnames
         tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
-        ele_input_names, ele_output_names = get_input_output_names(tmp_elements)
+        ele_input_names, ele_output_names, ele_state_names = get_var_names(tmp_elements)
         push!(input_names_list, ele_input_names)
         push!(output_names_list, ele_output_names)
+        push!(state_names_list, ele_state_names)
     end
-    namedtuple(node.subnames, input_names_list), namedtuple(node.subnames, output_names_list)
+    node_sub_names = Tuple(node.subnames)
+    NamedTuple{node_sub_names}(input_names_list), NamedTuple{node_sub_names}(output_names_list), NamedTuple{node_sub_names}(state_names_list)
 end
 
-get_input_names(node::AbstractNode) = get_input_output_names(node)[1]
+get_input_names(node::AbstractNode) = get_var_names(node)[1]
 
-get_output_names(node::AbstractNode) = get_input_output_names(node)[2]
+get_output_names(node::AbstractNode) = get_var_names(node)[2]
 
 function get_param_names(node::AbstractNode)
     param_tuple_list = []
@@ -196,7 +191,7 @@ function get_param_names(node::AbstractNode)
         tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
         push!(param_tuple_list, get_param_names(tmp_elements))
     end
-    namedtuple(node.subnames, param_tuple_list)
+    NamedTuple{Tuple(node.subnames)}(param_tuple_list)
 end
 
 function get_state_names(node::AbstractNode)
@@ -205,5 +200,5 @@ function get_state_names(node::AbstractNode)
         tmp_elements = vcat(node.units[subname].elements..., node.routes[subname])
         push!(state_tuple_list, get_state_names(tmp_elements))
     end
-    namedtuple(node.subnames, state_tuple_list)
+    NamedTuple{Tuple(node.subnames)}(param_tuple_list)
 end

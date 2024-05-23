@@ -18,8 +18,8 @@ function baseflow_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * p[:Qmax] +
-       sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * p[:Qmax] * exp(-p[:f] * (p[:Smax] - i[:soilwater])))
+    @.[sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * p[:Qmax] +
+       sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * p[:Qmax] * exp(-p[:f] * (p[:Smax] - i[:soilwater]))]
 end
 
 function baseflow_func(
@@ -27,7 +27,7 @@ function baseflow_func(
     p::namedtuple(:x3, :γ);
     kw...
 )
-    @.((p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ]))
+    @.[(p[:x3]^(1 - p[:γ])) / (p[:γ] - 1) * (i[:routingstore]^p[:γ])]
 end
 
 export BaseflowFlux, baseflow_func

@@ -16,7 +16,7 @@ function flow_func(
     p::NamedTuple;
     kw...
 )
-    i[:baseflow] .+ i[:surfaceflow]
+    [i[:baseflow] .+ i[:surfaceflow]]
 end
 
 function flow_func(
@@ -24,7 +24,7 @@ function flow_func(
     p::NamedTuple;
     kw...
 )
-    @.(i[:routedflow] + sf(i[:fastflow] + i[:recharge]) * (i[:fastflow] + i[:recharge]))
+    @.[i[:routedflow] + sf(i[:fastflow] + i[:recharge]) * (i[:fastflow] + i[:recharge])]
 end
 
 function flow_func(
@@ -32,7 +32,7 @@ function flow_func(
     p::NamedTuple;
     kw...
 )
-    @.(i[:surfaceflow] + i[:baseflow] + i[:interflow])
+    @.[i[:surfaceflow] + i[:baseflow] + i[:interflow]]
 end
 
 export FlowFlux, flow_func

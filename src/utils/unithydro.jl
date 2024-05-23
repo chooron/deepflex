@@ -13,6 +13,27 @@ function update_lag_state!(lag_state::Array{T}, input::Number) where {T<:Number}
     lag_state[2, end] = 0
 end
 
+function solve_lag_weights(input::Vector, lag_time::Number, lag_func::Function, smooth_func::Function)
+    #* 首先将lagflux转换为discrete problem
+    function discrete_prob!(du, u, p, t)
+        tmp_u = input[Int(t)] .* p + u
+        tmp_u = circshift(tmp_u, -1)
+        tmp_u[end] = 0
+        du[1:end] = tmp_u
+    end
+    delta_t = 1.0
+    ts = 1:(ceil(lag_time / delta_t)|>Int)
+    #* 将weight作为param输入到prob中
+    lag_weights = [lag_func(t, lag_time, smooth_func=smooth_func) for t in ts]
+    lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
+    prob = DiscreteProblem(discrete_prob!, zeros(eltype(input[1]), length(ts)), (1.0, length(input)), lag_weights)
+    #* 求解这个问题
+    sol = solve(prob, FunctionMap())
+    sol_u = hcat((sol.u)...)
+    #* 得到权重计算结果
+    sol_u[1, :]
+end
+
 function uh_1_half(input, lag; kw...)
     sf = kw[:smooth_func]
     value = @.(sf(input - lag) +

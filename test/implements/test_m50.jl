@@ -2,6 +2,7 @@
 using CSV
 using DataFrames
 using ComponentArrays
+using StructArrays
 using BenchmarkTools
 using NamedTupleTools
 using DataFrames
@@ -12,7 +13,7 @@ using ModelingToolkit
 # using LumpedHydro
 
 include("../../src/LumpedHydro.jl")
-model = LumpedHydro.M50.Node(name=:m50, mtk=false, step=false)
+model = LumpedHydro.M50.Unit(name=:m50, mtk=true, step=false)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names
@@ -22,14 +23,14 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:1000
+ts = collect(1:10000)
 
 mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
 mean_soilwater, std_soilwater = mean(df[ts, "SoilWater"]), std(df[ts, "SoilWater"])
 mean_temp, std_temp = mean(df[ts, "Temp"]), std(df[ts, "Temp"])
 mean_prcp, std_prcp = mean(df[ts, "Prcp"]), std(df[ts, "Prcp"])
 
-input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"]),) # , snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),
+input = StructArray((lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"])) # , snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),
 
 et_ann = Lux.Chain(Lux.Dense(3, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu))
 q_ann = Lux.Chain(Lux.Dense(2, 16, Lux.tanh), Lux.Dense(16, 1, Lux.leakyrelu))
@@ -44,10 +45,10 @@ params = ComponentVector(
     mean_prcp=mean_prcp, std_prcp=std_prcp,
     etnn=et_ann_p, qnn=q_ann_p)
 initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
-pas = ComponentVector(m50=(params=params, initstates=initstates, weight=1.0),)
+pas = ComponentVector(params=params, initstates=initstates) # , weight=1.0
 
 solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
-@btime results = model(input, pas, solver=solver)
+@btime results = model(input, pas, ts, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),

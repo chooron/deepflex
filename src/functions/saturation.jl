@@ -20,7 +20,7 @@ function saturation_func(
     p::namedtuple(:x1);
     kw...
 )
-    @.(max(0, i[:infiltration] * (1 - (i[:soilwater] / p[:x1])^2)))
+    @.[max(0, i[:infiltration] * (1 - (i[:soilwater] / p[:x1])^2))]
 end
 
 """
@@ -31,7 +31,7 @@ function saturation_func(
     p::namedtuple(:Smax, :b);
     kw...
 )
-    @.((1 - min(1, max(0, (1 - i[:soilwater] / p[:Smax])))^p[:b]) * i[:infiltration])
+    @.[(1 - min(1, max(0, (1 - i[:soilwater] / p[:Smax])))^p[:b]) * i[:infiltration]]
 end
 
 """
@@ -44,8 +44,8 @@ function saturation_func(
 )
     sf = get(kw, :smooth_func, step_func)
     p_i = i[:infiltration] .* (1 .- p[:Aim])
-    @.(sf((0.5 - p[:a]) - i[:soilwater] / p[:Wmax]) * (p_i * (abs(0.5 - p[:a])^(1 - p[:b]) * abs(i[:soilwater] / p[:Wmax])^p[:b])) +
-       (sf(i[:soilwater] / p[:Wmax] - (0.5 - p[:a])) * (p_i * (1 - (0.5 + p[:a])^(1 - p[:b]) * abs(1 - i[:soilwater] / p[:Wmax])^p[:b]))))
+    @.[sf((0.5 - p[:a]) - i[:soilwater] / p[:Wmax]) * (p_i * (abs(0.5 - p[:a])^(1 - p[:b]) * abs(i[:soilwater] / p[:Wmax])^p[:b])) +
+       (sf(i[:soilwater] / p[:Wmax] - (0.5 - p[:a])) * (p_i * (1 - (0.5 + p[:a])^(1 - p[:b]) * abs(1 - i[:soilwater] / p[:Wmax])^p[:b])))]
 end
 
 export SaturationFlux, saturation_func

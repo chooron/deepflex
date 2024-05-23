@@ -4,6 +4,7 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
+using StructArrays
 # using LumpedHydro
 # test exphydro model
 include("../../src/LumpedHydro.jl")
@@ -11,7 +12,7 @@ include("../../src/LumpedHydro.jl")
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:10000
+ts = collect(1:10000)
 lday_vec = df[ts, "dayl(day)"]
 prcp_vec = df[ts, "prcp(mm/day)"]
 temp_vec = df[ts, "tmean(C)"]
@@ -24,17 +25,17 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 pas = ComponentVector((params=unit_params, initstates=unit_init_states, weight=1.0))
 
-model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=true, step=false)
+model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false, step=true)
 
-input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec))
+input = StructArray((prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)))
 solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
-@benchmark result = model(input, pas, solver=solver);
+result = model(input, pas, ts, solver=solver);
 # result_df = DataFrame(result)
 
-# # plot result
-# fig = Figure(size=(400, 300))
-# ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-# lines!(ax, ts, flow_vec, color=:red)
-# lines!(ax, ts, result_df[!, :totalflow], color=:blue)
+# plot result
+fig = Figure(size=(400, 300))
+ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+lines!(ax, ts, flow_vec, color=:red)
+lines!(ax, ts, result.totalflow, color=:blue)
 
-# fig
+fig

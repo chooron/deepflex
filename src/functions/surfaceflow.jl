@@ -18,7 +18,7 @@ function surfaceflow_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * (i[:soilwater] - p[:Smax]))
+    @.[sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * (i[:soilwater] - p[:Smax])]
 end
 
 function surfaceflow_func(
@@ -26,7 +26,7 @@ function surfaceflow_func(
     p::namedtuple(:Aim);
     kw...
 )
-    @.(i[:surfacerunoff] + p[:Aim] * i[:prcp])
+    @.[i[:surfacerunoff] + p[:Aim] * i[:prcp]]
 end
 
 export SurfaceflowFlux, surfaceflow_func

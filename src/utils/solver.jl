@@ -14,7 +14,6 @@ end
 
 function (solver::ODESolver)(
     ode_prob::ODEProblem,
-    state_names::AbstractVector{Symbol},
 )
     sol = solve(
         ode_prob,
@@ -25,13 +24,11 @@ function (solver::ODESolver)(
         sensealg=solver.sensealg
     )
     if SciMLBase.successful_retcode(sol)
-        solved_u = hcat(sol.u...)
-        namedtuple(state_names, [solved_u[idx, :] for idx in 1:length(state_names)])
+        hcat(sol.u...)
     else
         @error "ode failed to solve"
         false
     end
-
 end
 
 

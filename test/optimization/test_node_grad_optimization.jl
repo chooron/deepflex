@@ -3,6 +3,7 @@ using CSV
 using DataFrames
 # using CairoMakie
 using ComponentArrays
+using StructArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
@@ -21,20 +22,20 @@ const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, 
 
 params_axes = getaxes(tunable_pas)
 
-model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=false, step=true)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=true)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:10000
+ts = collect(1:10000)
 lday_vec = df[ts, "dayl(day)"]
 prcp_vec = df[ts, "prcp(mm/day)"]
 temp_vec = df[ts, "tmean(C)"]
 flow_vec = df[ts, "flow(mm)"]
 
 # parameters optimization
-input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
+input = (exphydro=StructArray((prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec))),)
 output = (flow=flow_vec,)
 
 best_pas = LumpedHydro.param_grad_optim(
@@ -43,7 +44,8 @@ best_pas = LumpedHydro.param_grad_optim(
     const_pas=const_pas,
     input=input,
     target=output,
-    adtype=Optimization.AutoForwardDiff()
+    timeidx=ts,
+    adtype=Optimization.AutoZygote()
 )
 
 total_params = ComponentVector(merge_recursive(NamedTuple(best_pas), NamedTuple(const_pas)))

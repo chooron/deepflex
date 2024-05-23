@@ -9,8 +9,8 @@ function init_var_param(
     var_names::Vector{Symbol},
     param_names::Vector{Symbol},
 )
-    varinfo = namedtuple(var_names, [first(@variables $nm(t) = 0.0) for nm in var_names])
-    paraminfo = namedtuple(param_names, [first(@parameters $nm = 0.0 [tunable = true]) for nm in param_names])
+    varinfo = NamedTuple{Tuple(var_names)}([first(@variables $nm(t) = 0.0) for nm in var_names])
+    paraminfo = NamedTuple{Tuple(param_names)}([first(@parameters $nm = 0.0 [tunable = true]) for nm in param_names])
     varinfo, paraminfo
 end
 
@@ -28,6 +28,7 @@ function build_ele_system(
     name::Symbol
 )
     varinfo, paraminfo = init_var_param(var_names, param_names)
+    paraminfo = ComponentVector(paraminfo)
     eqs = Equation[]
     sub_sys = ODESystem[]
     for func in funcs
@@ -40,18 +41,38 @@ function build_ele_system(
             eqs = vcat(eqs, [connect(nn_in, func.nn.input), connect(nn_out, func.nn.output)])
             sub_sys = vcat(sub_sys, [func.nn, nn_in, nn_out])
         else
-            tmp_input = namedtuple(get_input_names(func), [varinfo[nm] for nm in get_input_names(func)])
-            tmp_param = namedtuple(get_param_names(func), [paraminfo[nm] for nm in get_param_names(func)])
-            eqs = vcat(eqs, [varinfo[nm] ~ func(tmp_input, tmp_param)[nm] for nm in get_output_names(func)])
+            for (idx, nm) in enumerate(get_output_names(func))
+                tmp_paraminfo = ifelse(length(get_param_names(func)) > 0, paraminfo[get_param_names(func)], ComponentVector())
+                @inbounds push!(eqs, varinfo[nm] ~ func(varinfo[get_input_names(func)], tmp_paraminfo)[idx])
+            end
         end
     end
     for dfunc in dfuncs
-        tmp_input = namedtuple(get_input_names(dfunc), [varinfo[nm] for nm in get_input_names(dfunc)])
-        tmp_param = namedtuple(get_param_names(dfunc), [paraminfo[nm] for nm in get_param_names(dfunc)])
-        eqs = vcat(eqs, [D(varinfo[nm]) ~ dfunc(tmp_input, tmp_param)[nm] for nm in get_output_names(dfunc)])
+        eqs = vcat(eqs, [D(varinfo[first(get_output_names(dfunc))]) ~ dfunc(varinfo[get_input_names(dfunc)], ComponentVector())])
     end
     base_sys = ODESystem(eqs, t; name=Symbol(name, :base_sys), systems=sub_sys)
     base_sys
+end
+
+
+function build_unit_system(
+    elements::AbstractVector{<:AbstractElement};
+    name::Symbol,
+)
+    eqs = []
+    ele_input_names = get_input_names(elements)
+    #* 这里是遍历两次这个elements，就是通过对比两两数组的共同flux名称，然后将名称相同的名称构建方程
+    for tmp_ele1 in elements
+        #* 连接element之间的变量
+        for tmp_ele2 in filter(ele -> ele.name != tmp_ele1.name, elements)
+            #* 这里是为了找到element之间共享的flux但是不是作为unit输入的flux
+            share_var_names = intersect(vcat(get_var_names(tmp_ele1)...), vcat(get_var_names(tmp_ele2)...))
+            for nm in setdiff(share_var_names, ele_input_names)
+                push!(eqs, getproperty(tmp_ele1.system, nm) ~ getproperty(tmp_ele2.system, nm))
+            end
+        end
+    end
+    compose(ODESystem(eqs, t; name=Symbol(name, :_sys)), [ele.system for ele in elements]...)
 end
 
 """
@@ -75,28 +96,31 @@ Build an interpolation system through input data and couple it with the system
 initialized by hydrological element to form a complete system
 """
 function setup_input(
-    system::ODESystem;
-    input::NamedTuple,
-    time::Vector,
+    ele_system::ODESystem,
+    input::StructArray,
+    timeidx::Vector,
+    input_names::Vector,
     name::Symbol,
 )
     #* 构建data的插值系统
-    itp_eqs = Equation[getproperty(system, key) ~ @itpfn(key, input[key], time) for key in keys(input)]
-    compose_sys = complete(ODESystem(itp_eqs, t; name=Symbol(name, :comp_sys), systems=[system]))
+    itp_eqs = Equation[getproperty(ele_system, nm) ~ @itpfn(nm, getproperty(input, nm), timeidx) for nm in input_names]
+    compose_sys = complete(ODESystem(itp_eqs, t; name=Symbol(name, :comp_sys), systems=[ele_system]))
     structural_simplify(compose_sys)
 end
 
 function setup_input(
     unit_system::ODESystem,
     ele_systems::Vector{ODESystem},
-    input::NamedTuple,
-    ele_input_names::Vector,
+    input::StructArray,
+    timeidx::Vector,
+    elements_input_names::Vector,
+    unit_input_names::Vector,
     name::Symbol,
 )
     eqs = Equation[]
-    for (ele_system, input_names) in zip(ele_systems, ele_input_names)
-        for nm in filter(nm -> nm in input_names, keys(input))
-            push!(eqs, getproperty(ele_system, nm) ~ @itpfn(nm, input[nm], input[:time]))
+    for (ele_system, input_names) in zip(ele_systems, elements_input_names)
+        for nm in filter(nm -> nm in unit_input_names, input_names)
+            push!(eqs, getproperty(ele_system, nm) ~ @itpfn(nm, getproperty(input, nm), timeidx))
         end
     end
     compose_sys = complete(ODESystem(eqs, t; name=Symbol(name, :comp_sys), systems=[unit_system]))
@@ -137,7 +161,7 @@ based on the re-entered initial state combined with the constructed problem
 function get_mtk_initstates(
     prebuild_systems::Vector{ODESystem},
     sol_0::NamedTuple,
-    ele_state_names::Vector{Vector{Symbol}},
+    ele_state_names::Vector,
     nfunc_ntps::Vector,
 )
     #* setup init states
@@ -148,7 +172,7 @@ function get_mtk_initstates(
         end
         for k in keys(nfunc_ntp)
             func_nn_sys = getproperty(prebuild_system, k)
-            for nm in nfunc_ntp[k]
+            for (idx, nm) in enumerate(nfunc_ntp[k])
                 push!(u0, getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm])
             end
         end

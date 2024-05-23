@@ -5,10 +5,12 @@ using TOML
 using Statistics
 using Random
 using ComponentArrays
+using StructArrays
 using NamedTupleTools
 using Reexport
 using StableRNGs
 using DocStringExtensions
+using BenchmarkTools
 
 # Multitreading and parallel computing
 using Base.Threads
@@ -75,13 +77,13 @@ Base.length(::Symbol) = 1
 # const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
 include("utils/lossfunc.jl")
-include("utils/data.jl")
+include("utils/name.jl")
 include("utils/mtk.jl")
 include("utils/optimize.jl")
 include("utils/solver.jl")
 include("utils/smoother.jl")
-include("utils/name.jl")
 include("utils/graph.jl")
+include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
@@ -102,6 +104,7 @@ include("functions/evap.jl")
 include("functions/flow.jl")
 include("functions/infiltration.jl")
 include("functions/melt.jl")
+include("functions/others.jl")
 include("functions/percolation.jl")
 include("functions/pet.jl")
 include("functions/rainfall.jl")
@@ -109,7 +112,6 @@ include("functions/recharge.jl")
 include("functions/saturation.jl")
 include("functions/snowfall.jl")
 include("functions/surfaceflow.jl")
-include("functions/unithydro.jl")
 # Implements Models
 # include("implements/PRNN.jl")
 include("implements/exphydro.jl")

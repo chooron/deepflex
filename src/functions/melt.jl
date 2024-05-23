@@ -18,7 +18,7 @@ function melt_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(i[:temp] - p[:Tmax]) * sf(i[:snowwater]) * min(i[:snowwater], p[:Df] * (i[:temp] - p[:Tmax])))
+    @.[sf(i[:temp] - p[:Tmax]) * sf(i[:snowwater]) * min(i[:snowwater], p[:Df] * (i[:temp] - p[:Tmax]))]
 end
 
 function melt_func(
@@ -27,7 +27,7 @@ function melt_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(i[:temp] - p[:ttm]) * (i[:temp] - p[:ttm]) * p[:cfmax])
+    @.[sf(i[:temp] - p[:ttm]) * (i[:temp] - p[:ttm]) * p[:cfmax]]
 end
 
 export MeltFlux, melt_func

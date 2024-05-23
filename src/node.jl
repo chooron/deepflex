@@ -27,7 +27,7 @@ struct HydroNode <: AbstractNode
     routes::NamedTuple
     "The area corresponding to the node"
     area::Number
-    
+
     function HydroNode(name; units::Vector{<:HydroUnit}, routes::Vector{<:HydroElement}, area::Number=100.0)
         subnames = [unit.name for unit in units]
         units_ntp = namedtuple([unit.name for unit in units], units)
@@ -47,16 +47,16 @@ end
 function (node::HydroNode)(
     input::NamedTuple,
     pas::ComponentVector;
+    timeidx::Vector=collect(1:length(input[first(keys(input))])),
     solver::AbstractSolver=ODESolver()
 )
     output_list = []
-
-    @threads for idx in 1:length(node.subnames)
+    for idx in 1:length(node.subnames) # @threads 
         subname = node.subnames[idx]
         tmp_input = input[subname]
-        tmp_unit_ouput = node.units[idx](tmp_input, pas[subname], solver=solver)
-        tmp_route_output = node.routes[idx](tmp_unit_ouput, pas[subname])
-        push!(output_list, tmp_route_output[:flow] .* pas[subname][:weight])
+        tmp_unit_ouput = node.units[idx](tmp_input, pas[subname], timeidx=timeidx, solver=solver)
+        tmp_route_output = node.routes[idx](tmp_unit_ouput, pas[subname], timeidx=timeidx)
+        push!(output_list, getproperty(tmp_route_output, :flow) .* pas[subname][:weight])
     end
     (flow=sum(output_list),)
 end

@@ -18,7 +18,7 @@ function snowfall_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(p[:Tmin] - i[:temp]) * i[:prcp])
+    @.[sf(p[:Tmin] - i[:temp]) * i[:prcp]]
 end
 
 function snowfall_func(
@@ -29,8 +29,8 @@ function snowfall_func(
     tmp_t1 = p[:tt] - 0.5 * p[:tti]
     tmp_t2 = p[:tt] + 0.5 * p[:tti]
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(tmp_t1 - i[:temp]) * i[:prcp] +
-       sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (tmp_t2 - i[:temp]) / p[:tti])
+    @.[sf(tmp_t1 - i[:temp]) * i[:prcp] +
+       sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (tmp_t2 - i[:temp]) / p[:tti]]
 end
 
 export SnowfallFlux, snowfall_func

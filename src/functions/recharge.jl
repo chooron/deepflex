@@ -17,7 +17,7 @@ function recharge_func(
     p::namedtuple(:x2, :x3, :ω);
     kw...
 )
-    @.(p[:x2] / (abs(p[:x3])^p[:ω]) * abs(i[:routingstore])^p[:ω])
+    @.[p[:x2] / (abs(p[:x3])^p[:ω]) * abs(i[:routingstore])^p[:ω]]
 end
 
 function recharge_func(
@@ -25,7 +25,7 @@ function recharge_func(
     p::namedtuple(:fc, :β);
     kw...
 )
-    @.((i[:infiltration]) * (i[:soilwater] / p[:fc])^p[:β])
+    @.[(i[:infiltration]) * (i[:soilwater] / p[:fc])^p[:β]]
 end
 
 export RechargeFlux, recharge_func

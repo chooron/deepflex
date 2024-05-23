@@ -18,8 +18,8 @@ function infiltration_func(
     kw...
 )
     sf = get(kw, :smooth_func, step_func)
-    @.(sf(i[:liquidwater] - p[:whc] * i[:snowwater]) *
-       (i[:rainfall] + i[:melt] + i[:liquidwater] - p[:whc] * i[:snowwater]))
+    @.[sf(i[:liquidwater] - p[:whc] * i[:snowwater]) *
+       (i[:rainfall] + i[:melt] + i[:liquidwater] - p[:whc] * i[:snowwater])]
 end
 
 
@@ -28,7 +28,7 @@ function infiltration_func(
     p::NamedTuple;
     kw...
 )
-    @.(i[:rainfall] + i[:melt])
+    @.[i[:rainfall] + i[:melt]]
 end
 
 function infiltration_func(
@@ -36,7 +36,7 @@ function infiltration_func(
     p::NamedTuple;
     kw...
 )
-    i[:rainfall]
+    [i[:rainfall]]
 end
 
 export InfiltrationFlux, infiltration_func
