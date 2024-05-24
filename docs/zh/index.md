@@ -87,3 +87,15 @@ fig
 ```
 
 ![1715847407303](image/index/1715847407303.png)
+
+## 代码存在的不足
+
+- 模型种类不全，概念水文模型和当前神经耦合的水文模型待实现
+- **基于梯度的优化方式存在性能不足的问题，在参数较少时基于ForwardDiff，FiniteDiff的AD已经能够满足优化需求，但是ForwardDiff,FiniteDiff不适用于包含神经网络这种有着较多参数的优化问题，为此可以采用非MTK/离散的方式，并使用ReverseDiff的方式（该方式不适用于MTK）求解这个问题，其计算效率会有明显的提升。**
+- 当前主流AD方式的Zygote和Enzyme均有相当严苛的条件，其中Zygote不支持MTK存在的try-catch（通常是在参数设置中引起的）: `ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.`同时Zygote也不支持mutable array，因此也不支持非MTK写法，而Enzyme需要先对代码进行编译，因此存在较多类型问题。
+
+## 未来工作计划
+
+* [ ] 复现当前主流的概念水文模型和已发表并具有代表性的神经耦合的水文模型
+* [ ] 从Lux.jl中LSTM Layer实现方式，来借鉴并修改非MTK的写法，
+* [ ] 根据构建的网络使用迭代计算方式不断从上层调度函数，以此避免计算资源的损耗

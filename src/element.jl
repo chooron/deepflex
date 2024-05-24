@@ -79,18 +79,17 @@ Continuous solve
 """
 function (ele::HydroElement{true})(
     input::StructArray,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver(),
     solved::Bool=false
 )
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
-
+    params = NamedTuple(pas[:params])
+    init_states = NamedTuple(pas[:initstates])
     input_length = length(input)
     ele_var_names = vcat(get_var_names(ele)...)
     fluxes = StructArray(NamedTuple{Tuple(ele_var_names)}(
-        [nm in fieldnames(eltype(input)) ? getproperty(input, nm) : zeros(eltype(input[1]), input_length) for nm in ele_var_names]
+        [nm in fieldnames(eltype(input)) ? getproperty(input, nm) : zeros(eltype(eltype(pas)), input_length) for nm in ele_var_names]
     ))
     if !solved & length(ele.dfuncs) > 0
         solved_states = solve_prob(ele, input=input, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
@@ -109,25 +108,25 @@ end
 
 function (ele::HydroElement{false})(
     input::StructArray,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver(),
 )
     #* 处理输入pas的异常情况
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
-
+    params = NamedTuple(pas[:params])
+    init_states = NamedTuple(pas[:initstates])
+    
     ele_input_names, ele_output_names, ele_state_names = get_var_names(ele)
     ele_var_names = vcat(ele_input_names, ele_output_names, ele_state_names)
     fluxes = StructArray(NamedTuple{Tuple(ele_var_names)}(
-        [nm in ele_input_names ? getproperty(input, nm) : zeros(eltype(input[1]), length(timeidx)) for nm in ele_var_names]
+        [nm in ele_input_names ? getproperty(input, nm) : zeros(eltype(eltype(pas)), length(timeidx)) for nm in ele_var_names]
     ))
     for nm in ele_state_names
         @inbounds getproperty(fluxes, nm)[1] = init_states[nm]
     end
     for i in timeidx
         for tmp_func in ele.funcs
-            tmp_output = tmp_func(fluxes[i], params)
+            tmp_output = tmp_func(fluxes[i], NamedTuple(params))
             for (idx, nm) in enumerate(get_output_names(tmp_func))
                 @inbounds getproperty(fluxes, nm)[i] = tmp_output[idx]
             end
@@ -174,8 +173,8 @@ end
 function solve_prob(
     ele::HydroElement{true};
     input::StructArray,
-    params::ComponentVector,
-    init_states::ComponentVector,
+    params::NamedTuple,
+    init_states::NamedTuple,
     timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver()
 )
@@ -201,8 +200,9 @@ function solve_prob(
             end
         end
     else
-        sol_0 = NamedTuple(init_states)
+        sol_0 = init_states
     end
+
     #* 获取u0和p实际值
     u0 = get_mtk_initstates([ele.system], sol_0, [ele_state_names], [nfunc_ntp])
     p = get_mtk_params([ele.system], params)

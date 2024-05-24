@@ -66,17 +66,17 @@ end
 # 求解并计算
 function (unit::HydroUnit{mtk,true})(
     input::StructArray,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector,
     solver::AbstractSolver=ODESolver()
 ) where {mtk}
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
+    params = NamedTuple(pas[:params])
+    # init_states = NamedTuple(pas[:initstates])
 
     unit_input_names, unit_output_names, unit_state_names = get_var_names(unit)
     unit_var_names = vcat(unit_input_names, unit_output_names, unit_state_names)
     fluxes = StructArray(NamedTuple{Tuple(unit_var_names)}(
-        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(input[1]), length(timeidx)) for nm in unit_var_names]
+        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(params), length(timeidx)) for nm in unit_var_names]
     ))
     for tmp_ele in unit.elements
         tmp_output = tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver)
@@ -89,19 +89,20 @@ end
 
 function (unit::HydroUnit{true,false})(
     input::StructArray,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver()
 )
     #* 处理输入pas的异常情况
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
+    params = NamedTuple(pas[:params])
+    init_states = NamedTuple(pas[:initstates])
 
     #* prepare problem building
     unit_input_names, unit_output_names, unit_state_names = get_var_names(unit)
     unit_var_names = vcat(unit_input_names, unit_output_names, unit_state_names)
+    #* NOTE: generate the fluxes placeholder based on the type of pas
     fluxes = StructArray(NamedTuple{Tuple(unit_var_names)}(
-        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(input[1]), length(timeidx)) for nm in unit_var_names]
+        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(params), length(timeidx)) for nm in unit_var_names]
     ))
     for nm in unit_state_names
         getproperty(fluxes, nm)[1] = init_states[nm]
@@ -149,17 +150,18 @@ end
 
 function (unit::HydroUnit{false,false})(
     input::StructArray,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector,
     solver::AbstractSolver=ODESolver()
 )
-    params = pas[:params] isa Vector ? ComponentVector() : pas[:params]
-    init_states = pas[:initstates] isa Vector ? ComponentVector() : pas[:initstates]
+    params = NamedTuple(pas[:params])
+    init_states = NamedTuple(pas[:initstates])
 
     unit_input_names, unit_output_names, unit_state_names = get_var_names(unit)
     unit_var_names = vcat(unit_input_names, unit_output_names, unit_state_names)
+
     fluxes = StructArray(NamedTuple{Tuple(unit_var_names)}(
-        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(input[1]), length(timeidx)) for nm in unit_var_names]
+        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(pas), length(timeidx)) for nm in unit_var_names]
     ))
     for nm in unit_state_names
         @inbounds getproperty(fluxes, nm)[1] = init_states[nm]

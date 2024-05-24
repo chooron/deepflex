@@ -53,10 +53,10 @@ end
 function get_predict_func()
     # build predict function
     function predict_func(x::AbstractVector{T}, p) where {T}
-        component, input, timeidx, tunable_pas_axes, const_pas = p
+        component, input, timeidx, solver, tunable_pas_axes, const_pas = p
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas, timeidx=timeidx)
+        component(input, tmp_pas, timeidx=timeidx, solver=solver)
     end
     predict_func
 end
@@ -87,6 +87,7 @@ function param_grad_optim(
     loss_func = get(kwargs, :loss_func, mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
+    solver = get(kwargs, :solver, ODESolver())
 
     tunable_pas_axes = getaxes(tunable_pas)
 
@@ -97,7 +98,7 @@ function param_grad_optim(
 
     # build optim problem
     optf = Optimization.OptimizationFunction(objective, adtype)
-    prob_args = (component, input, timeidx, tunable_pas_axes, const_pas)
+    prob_args = (component, input, timeidx, solver, tunable_pas_axes, const_pas)
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
 

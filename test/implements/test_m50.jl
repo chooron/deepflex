@@ -13,7 +13,7 @@ using ModelingToolkit
 # using LumpedHydro
 
 include("../../src/LumpedHydro.jl")
-model = LumpedHydro.M50.Unit(name=:m50, mtk=true, step=false)
+model = LumpedHydro.M50.Unit(name=:m50, mtk=false, step=false)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names
@@ -48,7 +48,7 @@ initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 pas = ComponentVector(params=params, initstates=initstates) # , weight=1.0
 
 solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
-@btime results = model(input, pas, ts, solver=solver)
+@btime results = model(input, pas, timeidx=ts, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),

@@ -16,7 +16,7 @@
 - [X] mtk.jl貌似只能支持一对一输入输出(已解决)
 - [X] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
 - [X] 当前需要找出ODEProblem在用ForwardDifferetial求解时存在的问题，需要构建一个demo来重现这个问题，猜测这个问题应该是可调参数与不可调参数引起的问题
-- [ ] 需要将水文的三种模型进行拆分，LumpedHydro.jl, SpatialHydro.jl, GridedHydro.jl
+- [X] 需要将水文的三种模型进行拆分，LumpedHydro.jl, SpatialHydro.jl, ~~GridedHydro.jl~~
 
 # 工作计划
 
@@ -49,7 +49,11 @@
 - [ ] 构建node时提供构建信息
 - [ ] HBV计算结果有问题
 - [X] M50无法实现在mtk下计算，以及step=false下计算
-- [ ] 将输入数据修改为StructArray类型
+- [X] 将输入数据修改为StructArray类型
+
+* [ ] **~~根据macro提供一个自动生成模型计算的函数~~**
+
+- [ ] 根据计算网络结构迭代计算模型
 
 # 关键功能和实现技术
 

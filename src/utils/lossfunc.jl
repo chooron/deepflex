@@ -2,7 +2,7 @@ function mae(predict::Vector{<:Number}, target::Vector{<:Number})
     sum(abs(target .- predict)) / length(target)
 end
 
-function mse(predict::Vector{<:Number}, target::Vector{<:Number})
+function mse(predict::Vector{<:Number}, target)
     sum((target .- predict) .^ (2)) / length(target)
 end
 

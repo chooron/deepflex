@@ -28,7 +28,6 @@ function build_ele_system(
     name::Symbol
 )
     varinfo, paraminfo = init_var_param(var_names, param_names)
-    paraminfo = ComponentVector(paraminfo)
     eqs = Equation[]
     sub_sys = ODESystem[]
     for func in funcs
@@ -42,13 +41,12 @@ function build_ele_system(
             sub_sys = vcat(sub_sys, [func.nn, nn_in, nn_out])
         else
             for (idx, nm) in enumerate(get_output_names(func))
-                tmp_paraminfo = ifelse(length(get_param_names(func)) > 0, paraminfo[get_param_names(func)], ComponentVector())
-                @inbounds push!(eqs, varinfo[nm] ~ func(varinfo[get_input_names(func)], tmp_paraminfo)[idx])
+                @inbounds push!(eqs, varinfo[nm] ~ func(varinfo[get_input_names(func)], paraminfo[get_param_names(func)])[idx])
             end
         end
     end
     for dfunc in dfuncs
-        eqs = vcat(eqs, [D(varinfo[first(get_output_names(dfunc))]) ~ dfunc(varinfo[get_input_names(dfunc)], ComponentVector())])
+        eqs = vcat(eqs, [D(varinfo[first(get_output_names(dfunc))]) ~ dfunc(varinfo[get_input_names(dfunc)], NamedTuple())])
     end
     base_sys = ODESystem(eqs, t; name=Symbol(name, :base_sys), systems=sub_sys)
     base_sys
@@ -209,7 +207,7 @@ based on the re-entered parameters combined with the constructed problem
 """
 function get_mtk_params(
     prebuild_systems::Vector{ODESystem},
-    params::ComponentVector,
+    params::NamedTuple,
 )
     #* setup parameters
     p = Pair[]

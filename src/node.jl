@@ -46,7 +46,7 @@ end
 
 function (node::HydroNode)(
     input::NamedTuple,
-    pas::ComponentVector;
+    pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector=collect(1:length(input[first(keys(input))])),
     solver::AbstractSolver=ODESolver()
 )

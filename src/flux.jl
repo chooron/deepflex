@@ -1,8 +1,8 @@
-function (flux::AbstractFlux)(input::NamedTuple, params::Union{NamedTuple,ComponentVector})
+function (flux::AbstractFlux)(input::NamedTuple, params::NamedTuple)
     flux.inner_func(input, params)
 end
 
-function (flux::AbstractFlux)(input::StructArray, params::Union{NamedTuple,ComponentVector})
+function (flux::AbstractFlux)(input::StructArray, params::NamedTuple)
     flux.inner_func(input, params)
 end
 
@@ -58,23 +58,21 @@ struct SimpleFlux <: AbstractSimpleFlux
             output_names = [output_names]
         end
 
-        function inner_flux_func(input::NamedTuple, params::ComponentVector)
+        function inner_flux_func(input::NamedTuple, params::NamedTuple)
             """
             单值计算
             """
             tmp_input = input[input_names]
-            tmp_params = NamedTuple(params)[param_names]
-            tmp_output = func(tmp_input, tmp_params, smooth_func=smooth_func)
+            tmp_output = func(tmp_input, params[param_names], smooth_func=smooth_func)
             tmp_output
         end
 
-        function inner_flux_func(input::StructArray, params::ComponentVector)
+        function inner_flux_func(input::StructArray, params::NamedTuple)
             """
             数组计算
             """
             tmp_input = StructArrays.components(input)[input_names]
-            tmp_params = NamedTuple(params[param_names])
-            tmp_output = func(tmp_input, tmp_params, smooth_func=smooth_func)
+            tmp_output = func(tmp_input, params[param_names], smooth_func=smooth_func)
             tmp_output
         end
 
@@ -116,7 +114,7 @@ mutable struct StateFlux{mtk} <: AbstractStateFlux
         state_names::Symbol;
         mtk::Bool=true
     )
-        function inner_flux_func_mtk(i::NamedTuple, p::ComponentVector)
+        function inner_flux_func_mtk(i::NamedTuple, p::NamedTuple)
             sum([i[nm] for nm in influx_names]) - sum([i[nm] for nm in outflux_names])
         end
 
@@ -156,7 +154,7 @@ struct LagFlux <: AbstractLagFlux
         lag_func::Function,
         smooth_func::Function=step_func,
     )
-        function inner_flux_func(i::StructArray, p::ComponentVector)
+        function inner_flux_func(i::StructArray, p::NamedTuple)
             tmp_input = i[input_names]
             lag_weight = solve_lag_weights(tmp_input, p[lag_time], lag_func, smooth_func)
             i[output_names] .= lag_weight .* tmp_input
@@ -213,7 +211,7 @@ function NeuralFlux(
     end
     func = (x, p) -> LuxCore.stateless_apply(chain, x, p)
 
-    function inner_flux_func(input::NamedTuple, params::ComponentVector)
+    function inner_flux_func(input::NamedTuple, params::NamedTuple)
         """
         单值计算
         """
@@ -222,7 +220,7 @@ function NeuralFlux(
         [first(output[idx, :]) for idx in 1:length(output_names)]
     end
 
-    function inner_flux_func(input::StructArray, params::ComponentVector)
+    function inner_flux_func(input::StructArray, params::NamedTuple)
         """
         数组计算
         """

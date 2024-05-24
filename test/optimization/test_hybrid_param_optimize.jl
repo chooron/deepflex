@@ -2,16 +2,17 @@
 using CSV
 using DataFrames
 using ComponentArrays
+using StructArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Lux
 using StableRNGs
 using Enzyme
-# using LumpedHydro
+using OrdinaryDiffEq
+include("../../src/LumpedHydro.jl")
 
 # test exphydro model
-include("../../src/LumpedHydro.jl")
 
 # base param names
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
@@ -20,8 +21,8 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = 1:10000
-input = (m50=(time=ts, lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
+ts = collect(1:10000)
+input = (m50=StructArray(lday=df[ts, "Lday"], temp=df[ts, "Temp"], prcp=df[ts, "Prcp"], snowwater=df[ts, "SnowWater"], infiltration=df[ts, "Infiltration"]),)
 output = (flow=df[ts, "Flow"],)
 
 mean_snowwater, std_snowwater = mean(df[ts, "SnowWater"]), std(df[ts, "SnowWater"])
@@ -54,7 +55,10 @@ best_pas = LumpedHydro.param_grad_optim(
     const_pas=const_pas,
     input=input,
     target=output,
-    adtype=Optimization.AutoForwardDiff()
+    timeidx=ts,
+    adtype=Optimization.AutoDiffractor(),
+    solver=LumpedHydro.ODESolver(alg=Rosenbrock23()),
+    maxiters=100
 )
 
 # total_params = LumpedHydro.merge_ca(best_pas, const_pas)[:param]

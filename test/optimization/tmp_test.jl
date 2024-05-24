@@ -69,13 +69,3 @@ end
 @btime getproperty(sa, :a)[:] = ones(1000)
 
 
-axes = getaxes(ComponentVector(a=1, b=2, c=3))
-
-y = StructArray((a=[1, 2, 3, 4], b=[2, 3, 4, 5]))
-function f2(x)
-    tmp_x = ComponentVector(x, axes)
-    y.a .+= tmp_x.a * 2 + tmp_x.b * tmp_x.c
-    sum(y.a)
-end
-
-Zygote.gradient(f2, [1, 2, 3])

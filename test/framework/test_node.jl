@@ -11,7 +11,7 @@ using CairoMakie
 
 include("../../src/LumpedHydro.jl")
 
-model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=false, step=false)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
@@ -26,9 +26,9 @@ unit_input = StructArray(lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp
 
 unit_init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 
-input = (exphydro=unit_input, time=collect(ts))
+input = (exphydro=unit_input, )
 pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
-results = model(input, pas)
+results = model(input, pas, timeidx=collect(ts))
 
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")

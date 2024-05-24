@@ -42,6 +42,7 @@ using NonlinearSolve
 # deep learning
 using Lux
 using Zygote
+using Diffractor
 
 # parameters Optimization
 using Optimization
@@ -50,6 +51,12 @@ using OptimizationOptimisers
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
+
+## io type
+const INPUT_TYPE = StructArray
+const PAS_TYPE = ComponentVector
+const FUNC_INPUT_TYPE = NamedTuple
+const FUNC_PARAM_TYPE = NamedTuple
 
 ## Abstract Component Types
 abstract type AbstractComponent end
@@ -68,9 +75,6 @@ abstract type AbstractElement <: AbstractComponent end
 abstract type AbstractUnit <: AbstractComponent end
 #* 负责单元的内部汇流计算
 abstract type AbstractNode <: AbstractComponent end
-
-# work for lux nn
-Base.length(::Symbol) = 1
 
 ## Sensealg type
 # const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())

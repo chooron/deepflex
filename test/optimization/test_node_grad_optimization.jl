@@ -22,7 +22,7 @@ const_pas = ComponentVector(exphydro=(initstates=ComponentVector(snowwater=0.0, 
 
 params_axes = getaxes(tunable_pas)
 
-model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=true)
+model = LumpedHydro.ExpHydro.Node(name=:exphydro, mtk=true, step=false)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
