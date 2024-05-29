@@ -24,11 +24,17 @@ function (solver::ODESolver)(
         sensealg=solver.sensealg
     )
     if SciMLBase.successful_retcode(sol)
-        hcat(sol.u...)
+        solved_states = hcat(sol.u...)
+        [solved_states[i,:] for i in 1:size(solved_states)[1]]
     else
         @error "ode failed to solve"
         false
     end
 end
 
+
+# todo
+struct DisSolver <: AbstractSolver
+    
+end
 

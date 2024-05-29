@@ -65,30 +65,20 @@ end
 
 # 求解并计算
 function (unit::HydroUnit{mtk,true})(
-    input::StructArray,
+    input::NamedTuple,
     pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector,
     solver::AbstractSolver=ODESolver()
 ) where {mtk}
-    params = NamedTuple(pas[:params])
-    # init_states = NamedTuple(pas[:initstates])
-
-    unit_input_names, unit_output_names, unit_state_names = get_var_names(unit)
-    unit_var_names = vcat(unit_input_names, unit_output_names, unit_state_names)
-    fluxes = StructArray(NamedTuple{Tuple(unit_var_names)}(
-        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(params), length(timeidx)) for nm in unit_var_names]
-    ))
+    fluxes = input
     for tmp_ele in unit.elements
-        tmp_output = tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver)
-        for nm in vcat(get_var_names(tmp_ele)[[2, 3]]...)
-            getproperty(fluxes, nm) .= getproperty(tmp_output, nm)
-        end
+        fluxes = merge(fluxes, tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver))
     end
     fluxes
 end
 
 function (unit::HydroUnit{true,false})(
-    input::StructArray,
+    input::NamedTuple,
     pas::Union{ComponentVector,NamedTuple};
     timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver()
@@ -98,15 +88,8 @@ function (unit::HydroUnit{true,false})(
     init_states = NamedTuple(pas[:initstates])
 
     #* prepare problem building
-    unit_input_names, unit_output_names, unit_state_names = get_var_names(unit)
-    unit_var_names = vcat(unit_input_names, unit_output_names, unit_state_names)
-    #* NOTE: generate the fluxes placeholder based on the type of pas
-    fluxes = StructArray(NamedTuple{Tuple(unit_var_names)}(
-        [nm in unit_input_names ? getproperty(input, nm) : zeros(eltype(params), length(timeidx)) for nm in unit_var_names]
-    ))
-    for nm in unit_state_names
-        getproperty(fluxes, nm)[1] = init_states[nm]
-    end
+    unit_input_names, _, unit_state_names = get_var_names(unit)
+
     nfunc_ntp_list, elements_input_names, elements_state_names = [], [], []
     for ele in unit.elements
         ele_input_names, _, ele_state_names = get_var_names(ele)
@@ -120,30 +103,26 @@ function (unit::HydroUnit{true,false})(
     prob = init_prob(build_sys, elements_systems, nfunc_ntp_list, timeidx)
 
     #* setup problem with input parameters
-    fluxes_0 = fluxes[1]
+    fluxes_0 = merge(NamedTuple{keys(input)}([input[nm][1] for nm in keys(input)]), init_states)
     for tmp_ele in unit.elements
         for tmp_func in tmp_ele.funcs
-            tmp_output = NamedTuple{Tuple(get_output_names(tmp_func))}(tmp_func(fluxes_0, params))
-            fluxes_0 = merge(fluxes_0, tmp_output)
+            tmp_input = [fluxes_0[nm] for nm in get_input_names(tmp_func)]
+            tmp_params = [params[nm] for nm in get_param_names(tmp_func)]
+            tmp_ouput = NamedTuple{Tuple(get_output_names(tmp_func))}(tmp_func(tmp_input, tmp_params))
+            fluxes_0 = merge(fluxes_0, tmp_ouput)
         end
     end
-
-    # 获取u0和p实际值
+    #* 获取u0和p实际值
     u0 = get_mtk_initstates(elements_systems, fluxes_0, elements_state_names, nfunc_ntp_list)
     p = get_mtk_params(elements_systems, params)
     new_prob = remake(prob, p=p, u0=u0)
     solved_states = solver(new_prob)
+    states_ntp = NamedTuple{Tuple(unit_state_names)}(solved_states)
 
-    # 更新fluxes中state计算结果
-    for (idx, nm) in enumerate(unit_state_names)
-        getproperty(fluxes, nm) .= solved_states[idx, :]
-    end
-
+    #* 根据推求的结果计算出其他变量
+    fluxes = merge(input, states_ntp)
     for tmp_ele in unit.elements
-        tmp_output = tmp_ele(fluxes, pas, timeidx=timeidx, solved=true)
-        for nm in vcat(get_var_names(tmp_ele)[[2, 3]]...)
-            getproperty(fluxes, nm) .= getproperty(tmp_output, nm)
-        end
+        fluxes = merge(fluxes, tmp_ele(fluxes, pas, timeidx=timeidx, solved=true))
     end
     fluxes
 end
@@ -151,9 +130,12 @@ end
 function (unit::HydroUnit{false,false})(
     input::StructArray,
     pas::Union{ComponentVector,NamedTuple};
-    timeidx::Vector,
+    timeidx::Vector=collect(1:length(input)),
     solver::AbstractSolver=ODESolver()
 )
+    #! 当前的求解方式好像无法满足将stateflux合并到一起的求解方式，
+    #! 因为后续的stateflux可能需要其他输入变量但是是中间状态
+    #* 我想到一个方法或许可以解决这个问题：在构建unit之前就将elements的dflux进行重建
     params = NamedTuple(pas[:params])
     init_states = NamedTuple(pas[:initstates])
 

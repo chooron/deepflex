@@ -6,22 +6,22 @@ using ..LumpedHydro
 SoilWaterReservoir in Exp-Hydro
 """
 function Surface(; name::Symbol, mtk::Bool=true)
-    funcs = [
-        PetFlux([:temp, :lday]),
-        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        InfiltrationFlux([:rainfall, :melt])
+    fluxes = [
+        SimpleFlux([:temp, :lday], [:pet]),
+        SimpleFlux([:prcp, :temp], [:snowfall], param_names=[:Tmin]),
+        SimpleFlux([:snowwater, :temp], [:melt], param_names=[:Tmax, :Df]),
+        SimpleFlux([:prcp, :temp], [:rainfall], param_names=[:Tmin]),
+        SimpleFlux([:rainfall, :melt], [:infiltration])
     ]
 
-    dfuncs = [
-        StateFlux([:snowfall], [:melt], :snowwater, mtk=mtk),
+    dfluxes = [
+        StateFlux([:snowfall], [:melt], :snowwater, fluxes=fluxes),
     ]
 
     HydroElement(
-        Symbol(name, :_surface_),
-        funcs=funcs,
-        dfuncs=dfuncs,
+        Symbol(name, :_surface),
+        funcs=fluxes,
+        dfuncs=dfluxes,
         mtk=mtk,
     )
 end
@@ -30,20 +30,20 @@ end
 SoilWaterReservoir in Exp-Hydro
 """
 function Soil(; name::Symbol, mtk::Bool=true)
-    funcs = [
-        EvapFlux([:soilwater, :pet], param_names=[:Smax]),
-        BaseflowFlux([:soilwater], param_names=[:Smax, :Qmax, :f]),
-        SurfaceflowFlux([:soilwater], param_names=[:Smax]),
+    fluxes = [
+        SimpleFlux([:soilwater, :pet], [:evap], param_names=[:Smax]),
+        SimpleFlux([:soilwater], [:baseflow], param_names=[:Smax, :Qmax, :f]),
+        SimpleFlux([:soilwater], [:surfaceflow], param_names=[:Smax]),
     ]
 
-    dfuncs = [
-        StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater)
+    dfluxes = [
+        StateFlux([:infiltration], [:evap, :baseflow, :surfaceflow], :soilwater, fluxes=fluxes)
     ]
 
     HydroElement(
-        Symbol(name, :_soil_),
-        funcs=funcs,
-        dfuncs=dfuncs,
+        Symbol(name, :_soil),
+        funcs=fluxes,
+        dfuncs=dfluxes,
         mtk=mtk
     )
 end
@@ -53,13 +53,13 @@ Inner Route Function in Exphydro
 """
 function FreeWater(; name::Symbol, mtk=true)
 
-    funcs = [
-        FlowFlux([:baseflow, :surfaceflow], :totalflow)
+    fluxes = [
+        SimpleFlux([:baseflow, :surfaceflow], :totalflow)
     ]
 
     HydroElement(
-        Symbol(name, :_zone_),
-        funcs=funcs,
+        Symbol(name, :_zone),
+        funcs=fluxes,
         mtk=mtk
     )
 end
@@ -73,9 +73,9 @@ function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
 end
 
 function Route(; name::Symbol)
-    
+
     funcs = [
-        SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
+        LagFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
     ]
 
     HydroElement(

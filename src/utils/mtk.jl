@@ -23,6 +23,19 @@ constructing a system of ordinary differential equations based on ModelingToolki
 function build_ele_system(
     funcs::Vector{<:AbstractFlux},
     dfuncs::Vector{<:AbstractFlux};
+    name::Symbol
+)
+    funcs_eqs = vcat([func.flux_eqs for func in funcs]...)
+    dfuncs_eqs = vcat([dfunc.state_eq for dfunc in dfuncs]...)
+    sub_sys = vcat([nfunc.sub_sys for nfunc in filter(f -> f isa AbstractNeuralFlux, funcs)]...)
+    base_sys = ODESystem(vcat(funcs_eqs, dfuncs_eqs), t; name=Symbol(name, :_base_sys), systems=sub_sys)
+    base_sys
+end
+
+
+function build_ele_systemv2(
+    funcs::Vector{<:AbstractFlux},
+    dfuncs::Vector{<:AbstractFlux};
     var_names::Vector{Symbol},
     param_names::Vector{Symbol},
     name::Symbol
@@ -95,13 +108,13 @@ initialized by hydrological element to form a complete system
 """
 function setup_input(
     ele_system::ODESystem,
-    input::StructArray,
+    input::NamedTuple,
     timeidx::Vector,
     input_names::Vector,
     name::Symbol,
 )
     #* 构建data的插值系统
-    itp_eqs = Equation[getproperty(ele_system, nm) ~ @itpfn(nm, getproperty(input, nm), timeidx) for nm in input_names]
+    itp_eqs = Equation[getproperty(ele_system, nm) ~ @itpfn(nm, input[nm], timeidx) for nm in input_names]
     compose_sys = complete(ODESystem(itp_eqs, t; name=Symbol(name, :comp_sys), systems=[ele_system]))
     structural_simplify(compose_sys)
 end
@@ -109,7 +122,7 @@ end
 function setup_input(
     unit_system::ODESystem,
     ele_systems::Vector{ODESystem},
-    input::StructArray,
+    input::NamedTuple,
     timeidx::Vector,
     elements_input_names::Vector,
     unit_input_names::Vector,
@@ -118,7 +131,7 @@ function setup_input(
     eqs = Equation[]
     for (ele_system, input_names) in zip(ele_systems, elements_input_names)
         for nm in filter(nm -> nm in unit_input_names, input_names)
-            push!(eqs, getproperty(ele_system, nm) ~ @itpfn(nm, getproperty(input, nm), timeidx))
+            push!(eqs, getproperty(ele_system, nm) ~ @itpfn(nm, input[nm], timeidx))
         end
     end
     compose_sys = complete(ODESystem(eqs, t; name=Symbol(name, :comp_sys), systems=[unit_system]))
@@ -140,13 +153,13 @@ function init_prob(
 )
     #* 设置系统初始值并构建problem
     build_u0 = Pair[]
-    for (idx, system) in enumerate(prebuild_systems)
-        for k in keys(nfunc_ntps[idx])
+    for (system, nfunc_ntp) in zip(prebuild_systems,nfunc_ntps)
+        for k in keys(nfunc_ntp)
             func_nn_sys = getproperty(system, k)
-            push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(nfunc_ntps[idx][k])))
+            push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(nfunc_ntp[k])))
         end
     end
-    prob = ODEProblem(build_system, build_u0, (time[1], time[end]), [], warn_initialize_determined=true)
+    prob = ODEProblem(build_system, build_u0, (time[1], time[end]), Pair[], warn_initialize_determined=false)
     prob
 end
 

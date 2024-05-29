@@ -1,42 +1,28 @@
-function InfiltrationFlux(
-    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:infiltration;
-    param_names::Vector{Symbol}=Symbol[],
-    smooth_func::Function=step_func)
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=infiltration_func,
-        smooth_func=smooth_func
-    )
+@doc"""
+soilwater movement
+Water infiltrates the soil by moving through the surface. Percolation is the movement of water through the soil itself.
+Finally, as the water percolates into the deeper layers of the soil, it reaches ground water, which is water below the surface.
+The upper surface of this underground water is called the "water table". As you can see in the picture above,
+ground water can intersect with surface streams, it can appear at the surface as springs, and it flows generally downhill toward the ocean.
+"""
+
+#* infilstraction
+function expr(eq::HydroEquation{(:snowwater, :liquidwater, :rainfall, :melt),(:infiltration,),(:whc,)}; kw...)
+    snowwater, liquidwater, rainfall, melt = eq.inputs
+    whc = first(eq.params)
+
+    @.[sf(liquidwater - whc * snowwater) *
+     (rainfall + melt + liquidwater - whc * snowwater)]
 end
 
-function infiltration_func(
-    i::namedtuple(:snowwater, :liquidwater, :rainfall, :melt),
-    p::namedtuple(:whc);
-    kw...
-)
-    sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:liquidwater] - p[:whc] * i[:snowwater]) *
-       (i[:rainfall] + i[:melt] + i[:liquidwater] - p[:whc] * i[:snowwater])]
+function expr(eq::HydroEquation{(:rainfall, :melt),(:infiltration,),()}; kw...)
+    rainfall, melt = eq.inputs
+
+    @.[rainfall + melt]
 end
 
+function expr(eq::HydroEquation{(:rainfall,),(:infiltration,),()}; kw...)
+    rainfall = first(eq.inputs)
 
-function infiltration_func(
-    i::namedtuple(:rainfall, :melt),
-    p::NamedTuple;
-    kw...
-)
-    @.[i[:rainfall] + i[:melt]]
+    @.[rainfall]
 end
-
-function infiltration_func(
-    i::namedtuple(:rainfall),
-    p::NamedTuple;
-    kw...
-)
-    [i[:rainfall]]
-end
-
-export InfiltrationFlux, infiltration_func

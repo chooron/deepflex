@@ -25,14 +25,14 @@ model = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=false)
 file_path = "data/m50/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-timeidx = collect(1:1000)
+timeidx = collect(1:10000)
 lday_vec = df[timeidx, "Lday"]
 prcp_vec = df[timeidx, "Prcp"]
 temp_vec = df[timeidx, "Temp"]
 flow_vec = df[timeidx, "SnowWater"]
 
 # parameters optimization
-input = StructArray(prcp=prcp_vec, lday=lday_vec, temp=temp_vec,)
+input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec,)
 output = (snowwater=flow_vec,)
 
 best_pas = LumpedHydro.param_grad_optim(
@@ -42,7 +42,7 @@ best_pas = LumpedHydro.param_grad_optim(
     input=input,
     target=output,
     timeidx=timeidx,
-    adtype=Optimization.AutoZygote(),
+    adtype=Optimization.AutoForwardDiff(),
     target_name=:snowwater
 )
 

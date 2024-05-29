@@ -1,56 +1,35 @@
-function EvapFlux(
-    input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:evap;
-    param_names::Vector{Symbol}=Symbol[],
-    smooth_func::Function=step_func)
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=evap_func,
-        smooth_func=smooth_func
-    )
-end
+function expr(eq::HydroEquation{(:soilwater, :pet),(:evap,),(:Smax,)}; kw...)
+    soilwater, pet = eq.inputs
+    Smax = first(eq.params)
 
-function evap_func(
-    i::namedtuple(:soilwater, :pet),
-    p::namedtuple(:Smax);
-    kw...
-)
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:soilwater]) * sf(i[:soilwater] - p[:Smax]) * i[:pet] +
-       sf(i[:soilwater]) * sf(p[:Smax] - i[:soilwater]) * i[:pet] * (i[:soilwater] / p[:Smax])]
+
+    @.[sf(soilwater) * sf(soilwater - Smax) * pet +
+       sf(soilwater) * sf(Smax - soilwater) * pet * (soilwater / Smax)]
 end
 
-function evap_func(
-    i::namedtuple(:soilwater, :prcp, :pet),
-    p::namedtuple(:x1);
-    kw...
-)
+function expr(eq::HydroEquation{(:soilwater, :pet),(:evap,),(:x1,)}; kw...)
+    soilwater, pet = eq.inputs
+    x1 = first(eq.params)
+
+    @.[pet * (2 * soilwater / x1 - (soilwater / x1)^2)]
+end
+
+function expr(eq::HydroEquation{(:soilwater, :pet),(:evap,),(:c, :LM)}; kw...)
+    soilwater, pet = eq.inputs
+    c, LM = eq.params
+
     sf = get(kw, :smooth_func, step_func)
-    tmp_pet = @.[sf(i[:pet] - i[:prcp]) * (i[:pet] - i[:prcp])]
-    @.[tmp_pet * (2 * i[:soilwater] / p[:x1] - (i[:soilwater] / p[:x1])^2)]
+    @.[sf(soilwater - LM) * pet +
+       sf(LM - soilwater) * sf(soilwater - c * LM) * soilwater / LM * pet +
+       sf(c * LM - soilwater) * c * pet]
 end
 
-function evap_func(
-    i::namedtuple(:soilwater, :pet),
-    p::namedtuple(:c, :LM);
-    kw...
-)
+function expr(eq::HydroEquation{(:soilwater, :pet),(:evap,),(:lp, :fc)}; kw...)
+    soilwater, pet = eq.inputs
+    lp, fc = eq.params
+
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:soilwater] - p[:LM]) * i[:pet] +
-       sf(p[:LM] - i[:soilwater]) * sf(i[:soilwater] - p[:c] * p[:LM]) * i[:soilwater] / p[:LM] * i[:pet] +
-       sf(p[:c] * p[:LM] - i[:soilwater]) * p[:c] * i[:pet]]
+    @.[sf(soilwater - lp * fc) * pet +
+       sf(lp * fc - soilwater) * pet * soilwater / (lp * fc)]
 end
-
-function evap_func(
-    i::namedtuple(:soilwater, :pet),
-    p::namedtuple(:lp, :fc);
-    kw...
-)
-    sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:soilwater] - p[:lp] * p[:fc]) * i[:pet] +
-       sf(p[:lp] * p[:fc] - i[:soilwater]) * i[:pet] * i[:soilwater] / (p[:lp] * p[:fc])]
-end
-
-export EvapFlux, evap_func

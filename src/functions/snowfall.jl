@@ -1,36 +1,18 @@
-function SnowfallFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:snowfall;
-    param_names::Vector{Symbol}=Symbol[],
-    smooth_func::Function=step_func)
+function expr(eq::HydroEquation{(:prcp, :temp),(:snowfall,),(:Tmin,)}; kw...)
+    prcp, temp = eq.inputs
+    Tmin = first(eq.params)
 
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=snowfall_func,
-        smooth_func=smooth_func
-    )
-end
-
-function snowfall_func(
-    i::namedtuple(:prcp, :temp),
-    p::namedtuple(:Tmin);
-    kw...
-)
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(p[:Tmin] - i[:temp]) * i[:prcp]]
+    @.[sf(Tmin - temp) * prcp]
 end
 
-function snowfall_func(
-    i::namedtuple(:prcp, :temp),
-    p::namedtuple(:tt, :tti);
-    kw...
-)
-    tmp_t1 = p[:tt] - 0.5 * p[:tti]
-    tmp_t2 = p[:tt] + 0.5 * p[:tti]
+function expr(eq::HydroEquation{(:prcp, :temp),(:snowfall,),(:tt, :tti)}; kw...)
+    prcp, temp = eq.inputs
+    tt, tti = eq.params
+
+    tmp_t1 = tt - 0.5 * tti
+    tmp_t2 = tt + 0.5 * tti
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(tmp_t1 - i[:temp]) * i[:prcp] +
-       sf(tmp_t2 - i[:temp]) * sf(i[:temp] - tmp_t1) * i[:prcp] * (tmp_t2 - i[:temp]) / p[:tti]]
+    @.[sf(tmp_t1 - temp) * prcp +
+       sf(tmp_t2 - temp) * sf(temp - tmp_t1) * prcp * (tmp_t2 - temp) / tti]
 end
-
-export SnowfallFlux, snowfall_func

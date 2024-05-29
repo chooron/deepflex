@@ -5,6 +5,7 @@ using ComponentArrays
 using StructArrays
 using BenchmarkTools
 using NamedTupleTools
+using OrdinaryDiffEq
 
 include("../../src/LumpedHydro.jl")
 
@@ -20,19 +21,13 @@ file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
-input = StructArray((lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]))
-# solver = LumpedHydro.ODESolver()
-# solved_states = LumpedHydro.solve_prob(ele, input=input, pas=pas, solver=solver)
-# input = merge(input, solved_states)
-@btime results = ele(input, pas, timeidx=ts);
+input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
+input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 
-# function f1(p)
-#     tmp_p = ComponentVector(p, getaxes(params))
-#     x = ele(input, tmp_p, init_states, ts).rainfall
-#     x
-# end
+function test_build_system()
+    build_sys = LumpedHydro.setup_input(ele.system, input, ts, LumpedHydro.get_input_names(ele), :test)
+    init_prob = ODEProblem(build_sys, Pair[], (1, 100), [])
+    init_prob
+end
 
-# ForwardDiff.jacobian(f1, ps)
-# f1(ps)
-
-# Zygote.jacobian(f1,ps)
+@btime results = ele(input, pas, timeidx=ts)

@@ -63,6 +63,25 @@ abstract type AbstractComponent end
 abstract type AbstractSolver end
 abstract type AbstractOptimizer end
 
+abstract type AbstractEquation end
+
+struct HydroEquation{input_names,output_names,param_names} <: AbstractEquation
+    inputs::Vector{Num}
+    outputs::Vector{Num}
+    params::Vector{Num}
+
+    function HydroEquation(
+        input_names::Vector{Symbol},
+        output_names::Vector{Symbol},
+        param_names::Vector{Symbol},
+    )
+        inputs = vcat([@variables $var(t) = 0.0 for var in input_names]...)
+        outputs = vcat([@variables $var(t) = 0.0 for var in output_names]...)
+        params = vcat([@parameters $p = 0.0 [tunable = true] for p in param_names]...)
+        return new{Tuple(input_names),Tuple(output_names),Tuple(param_names)}(inputs, outputs, params)
+    end
+end
+
 abstract type AbstractFlux end
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
@@ -103,7 +122,6 @@ include("node.jl")
 export HydroNode
 
 # Implement Flux
-include("functions/baseflow.jl")
 include("functions/evap.jl")
 include("functions/flow.jl")
 include("functions/infiltration.jl")
@@ -115,14 +133,13 @@ include("functions/rainfall.jl")
 include("functions/recharge.jl")
 include("functions/saturation.jl")
 include("functions/snowfall.jl")
-include("functions/surfaceflow.jl")
 # Implements Models
 # include("implements/PRNN.jl")
 include("implements/exphydro.jl")
-include("implements/m50.jl")
-include("implements/gr4j.jl")
-include("implements/hymod.jl")
-include("implements/hbv.jl")
+# include("implements/m50.jl")
+# include("implements/gr4j.jl")
+# include("implements/hymod.jl")
+# include("implements/hbv.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractOptimizer,

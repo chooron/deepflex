@@ -19,5 +19,5 @@ file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
-input = StructArray((time=ts, lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]))
+input = StructArray(lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 @btime results = unit(input, pas, timeidx=ts)

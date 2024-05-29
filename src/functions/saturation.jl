@@ -1,51 +1,23 @@
-function SaturationFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:saturation;
-    param_names::Vector{Symbol}=Symbol[],
-    smooth_func::Function=step_func)
+function expr(eq::HydroEquation{(:soilwater, :infiltration),(:saturation,),(:x1,)}; kw...)
+    soilwater, infiltration = eq.inputs
+    x1 = first(eq.params)
 
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=saturation_func,
-        smooth_func=smooth_func
-    )
+    @.[max(0, infiltration * (1 - (soilwater / x1)^2))]
 end
 
-"""
-used for GR4J
-"""
-function saturation_func(
-    i::namedtuple(:soilwater, :infiltration),
-    p::namedtuple(:x1);
-    kw...
-)
-    @.[max(0, i[:infiltration] * (1 - (i[:soilwater] / p[:x1])^2))]
+function expr(eq::HydroEquation{(:soilwater, :infiltration),(:saturation,),(:Smax, :b)}; kw...)
+    soilwater, infiltration = eq.inputs
+    Smax, b = eq.params
+
+    @.[(1 - min(1, max(0, (1 - soilwater / Smax)))^b) * infiltration]
 end
 
-"""
-used in HyMOD
-"""
-function saturation_func(
-    i::namedtuple(:soilwater, :infiltration),
-    p::namedtuple(:Smax, :b);
-    kw...
-)
-    @.[(1 - min(1, max(0, (1 - i[:soilwater] / p[:Smax])))^p[:b]) * i[:infiltration]]
-end
+function expr(eq::HydroEquation{(:soilwater, :infiltration),(:saturation,),(:Aim, :Wmax, :a, :b)}; kw...)
+    soilwater, infiltration = eq.inputs
+    Aim, Wmax, a, b = eq.params
 
-"""
-used in XAJ
-"""
-function saturation_func(
-    i::namedtuple(:soilwater, :infiltration),
-    p::namedtuple(:Aim, :Wmax, :a, :b);
-    kw...
-)
     sf = get(kw, :smooth_func, step_func)
-    p_i = i[:infiltration] .* (1 .- p[:Aim])
-    @.[sf((0.5 - p[:a]) - i[:soilwater] / p[:Wmax]) * (p_i * (abs(0.5 - p[:a])^(1 - p[:b]) * abs(i[:soilwater] / p[:Wmax])^p[:b])) +
-       (sf(i[:soilwater] / p[:Wmax] - (0.5 - p[:a])) * (p_i * (1 - (0.5 + p[:a])^(1 - p[:b]) * abs(1 - i[:soilwater] / p[:Wmax])^p[:b])))]
+    p_i = infiltration .* (1 .- Aim)
+    @.[sf((0.5 - a) - soilwater / Wmax) * (p_i * (abs(0.5 - a)^(1 - b) * abs(soilwater / Wmax)^b)) +
+     (sf(soilwater / Wmax - (0.5 - a)) * (p_i * (1 - abs(0.5 + a)^(1 - b) * abs(1 - soilwater / Wmax)^b)))]
 end
-
-export SaturationFlux, saturation_func

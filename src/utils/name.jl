@@ -39,7 +39,7 @@ function get_input_names(func::AbstractStateFlux)
 end
 
 function get_output_names(func::AbstractStateFlux)
-    [func.state_names]
+    [func.state_name]
 end
 
 function get_input_names(func::AbstractLagFlux)

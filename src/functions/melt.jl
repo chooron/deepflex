@@ -1,33 +1,15 @@
-function MeltFlux(input_names::Union{Vector{Symbol},Dict{Symbol,Symbol}},
-    output_names::Symbol=:melt;
-    param_names::Vector{Symbol}=Symbol[],
-    smooth_func::Function=step_func)
-
-    SimpleFlux(
-        input_names,
-        output_names,
-        param_names=param_names,
-        func=melt_func,
-        smooth_func=smooth_func
-    )
-end
-
-function melt_func(
-    i::namedtuple(:snowwater, :temp),
-    p::namedtuple(:Tmax, :Df);
-    kw...
-)
+function expr(eq::HydroEquation{(:snowwater, :temp),(:melt,),(:Tmax, :Df)};kw...)
+    snowwater, temp = eq.inputs
+    Tmax, Df = eq.params
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:temp] - p[:Tmax]) * sf(i[:snowwater]) * min(i[:snowwater], p[:Df] * (i[:temp] - p[:Tmax]))]
+
+    @.[sf(temp - Tmax) * sf(snowwater) * min(snowwater, Df * (temp - Tmax))]
 end
 
-function melt_func(
-    i::namedtuple(:temp),
-    p::namedtuple(:cfmax, :ttm);
-    kw...
-)
+function expr(eq::HydroEquation{(:temp,),(:melt,),(:cfmax, :ttm)};kw...)
+    temp = first(eq.inputs)
+    cfmax, ttm = eq.params
+
     sf = get(kw, :smooth_func, step_func)
-    @.[sf(i[:temp] - p[:ttm]) * (i[:temp] - p[:ttm]) * p[:cfmax]]
+    @.[sf(temp - ttm) * (temp - ttm) * cfmax]
 end
-
-export MeltFlux, melt_func

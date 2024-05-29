@@ -72,7 +72,7 @@ function param_grad_optim(
     component::AbstractComponent;
     tunable_pas::AbstractVector,
     const_pas::AbstractVector,
-    input::Union{NamedTuple,StructArray},
+    input::NamedTuple,
     target::NamedTuple,
     timeidx::Vector,
     kwargs...,
