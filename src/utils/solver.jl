@@ -23,18 +23,33 @@ function (solver::ODESolver)(
         abstol=solver.abstol,
         sensealg=solver.sensealg
     )
-    if SciMLBase.successful_retcode(sol)
-        solved_states = hcat(sol.u...)
-        [solved_states[i,:] for i in 1:size(solved_states)[1]]
-    else
-        @error "ode failed to solve"
-        false
-    end
+    num_u = length(ode_prob.u0)
+    [sol[i, :] for i in 1:num_u]
 end
 
-
-# todo
-struct DisSolver <: AbstractSolver
-    
+"""
+$(TYPEDEF)
+A custom ODEProblem solver
+# Fields
+$(FIELDS)
+"""
+@kwdef struct DiscreteSolver <: AbstractSolver
+    alg = FunctionMap()
+    reltol = 1e-3
+    abstol = 1e-3
+    sensealg = InterpolatingAdjoint()
 end
 
+function (solver::DiscreteSolver)(
+    ode_prob::DiscreteProblem
+)
+    sol = solve(
+        ode_prob,
+        solver.alg,
+        reltol=solver.reltol,
+        abstol=solver.abstol,
+        sensealg=solver.sensealg
+    )
+    num_u = length(ode_prob.u0)
+    [sol[i, :] for i in 1:num_u]
+end

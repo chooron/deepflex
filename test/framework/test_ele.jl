@@ -9,7 +9,7 @@ using OrdinaryDiffEq
 
 include("../../src/LumpedHydro.jl")
 
-ele = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=false)
+ele = LumpedHydro.ExpHydro.Surface(name=:sf, mtk=true, ptype=:discrete)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 ps = [f, Smax, Qmax, Df, Tmax, Tmin]
@@ -29,5 +29,5 @@ function test_build_system()
     init_prob = ODEProblem(build_sys, Pair[], (1, 100), [])
     init_prob
 end
-
-@btime results = ele(input, pas, timeidx=ts)
+solver = LumpedHydro.DiscreteSolver()
+results = ele(input, pas, timeidx=ts, solver=solver)

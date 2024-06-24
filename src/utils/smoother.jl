@@ -9,7 +9,7 @@ end
 @register_symbolic ifelse_func(x)
 
 function step_func(x::Union{Num,T}) where {T<:Number}
-    (tanh(5.0 * x) + 1.0) * 0.5
+    (tanh(500.0 * x) + 1.0) * 0.5
 end
 
 @register_symbolic step_func(x)

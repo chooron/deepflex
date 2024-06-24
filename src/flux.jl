@@ -1,10 +1,3 @@
-function (flux::AbstractFlux)(input::Vector, params::Vector)
-    flux.inner_func(input, params)
-end
-
-function (flux::AbstractFlux)(input::Matrix, params::Vector)
-    flux.inner_func(input, params)
-end
 """
 $(TYPEDEF)
 A struct representing common hydrological fluxes
@@ -47,11 +40,13 @@ struct SimpleFlux <: AbstractSimpleFlux
     flux_eqs::Vector{Equation}
 
     function SimpleFlux(
-        input_names::Union{Symbol,Vector{Symbol}},
-        output_names::Union{Symbol,Vector{Symbol}};
-        param_names::Vector{Symbol}=Symbol[],
-        smooth_func::Function=step_func,
+        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
+        param_names::Vector{Symbol}=Symbol[];
+        kwargs...
     )
+        #* 获取输入输出名称
+        input_names, output_names = flux_names[1], flux_names[2]
+
         if input_names isa Symbol
             input_names = [input_names]
         end
@@ -62,23 +57,25 @@ struct SimpleFlux <: AbstractSimpleFlux
 
         #* 根据输入输出参数名称获取对应的计算公式
         hydro_equation = HydroEquation(input_names, output_names, param_names)
-        flux_exprs = expr(hydro_equation, smooth_func=smooth_func)
+        flux_exprs = expr(hydro_equation; kwargs...)
 
         #* 得到计算函数
-        flux_funcs = [build_function(
-            hydro_expr, hydro_equation.inputs, hydro_equation.params, expression=Val{false}
-        ) for hydro_expr in flux_exprs]
+        flux_funcs = [
+            build_function(hydro_expr, hydro_equation.inputs, hydro_equation.params, expression=Val{false})
+            for hydro_expr in flux_exprs
+        ]
 
         #* 得到计算公式
         flux_eqs = [output ~ hydro_expr for (output, hydro_expr) in zip(hydro_equation.outputs, flux_exprs)]
 
-        function inner_flux_func(input::Vector, params::Vector)
+        function inner_flux_func(input::AbstractVector, params::AbstractVector)
             [func(input, params) for func in flux_funcs]
         end
 
-        function inner_flux_func(input::Matrix, params::Vector)
+        function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
             [[func(input[i, :], params) for i in 1:size(input)[1]] for func in flux_funcs]
         end
+
 
         return new(
             input_names,
@@ -90,11 +87,20 @@ struct SimpleFlux <: AbstractSimpleFlux
     end
 
     function SimpleFlux(
-        inputs::Vector{Num},
-        outputs::Vector{Num};
-        params::Vector{Num}=Num[],
+        fluxes::Pair{Vector{Num},Vector{Num}},
+        params::Vector{Num}=Num[];
         exprs::Vector{Num}
     )
+        inputs, outputs = fluxes[1], fluxes[2]
+
+        if inputs isa Num
+            inputs = [inputs]
+        end
+
+        if outputs isa Num
+            outputs = [outputs]
+        end
+
         input_names = Symbolics.tosymbol.(inputs, escape=false)
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = Symbolics.tosymbol.(params)
@@ -105,9 +111,12 @@ struct SimpleFlux <: AbstractSimpleFlux
         #* 得到计算公式
         flux_eqs = [output ~ flux_expr for (output, flux_expr) in zip(outputs, exprs)]
 
-        function inner_flux_func(input::Vector, params::Vector)
-            #* 单值计算
+        function inner_flux_func(input::AbstractVector, params::AbstractVector)
             [func(input, params) for func in flux_funcs]
+        end
+
+        function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
+            [[func(input[i, :], params) for i in 1:size(input)[1]] for func in flux_funcs]
         end
 
         return new(
@@ -116,7 +125,6 @@ struct SimpleFlux <: AbstractSimpleFlux
             param_names,
             inner_flux_func,
             flux_eqs,
-            exprs,
         )
     end
 end
@@ -149,48 +157,22 @@ struct StateFlux <: AbstractStateFlux
     state_eq::Equation
 
     function StateFlux(
-        influx_names::Vector{Symbol},
-        outflux_names::Vector{Symbol},
-        state_name::Symbol;
-        fluxes::Vector{<:AbstractFlux}
+        fluxes::Pair{Vector{Num},Vector{Num}},
+        state::Num;
+        funcs::Vector{<:AbstractFlux}
     )
-        #* 获得elements的输入变量名
-        #* 1. 这个是fluxes计算需要输入的通量
-        fluxes_input_names, fluxes_output_names = get_input_output_names(fluxes)
-        #* 2. 这个是state不通过fluxes计算的输入通量
-        state_input_names = setdiff(vcat(influx_names, outflux_names), fluxes_output_names)
-        #* 3. 合并起来就是计算state所需的最基础通量(不包括状态变量)
-        union_input_names = union(fluxes_input_names, state_input_names)
-
-        #* fluxes计算过程中需要构建的通量
-        fluxes_var_names = vcat(union_input_names, fluxes_output_names)
-        fluxes_param_names = get_param_names(fluxes)
-
-        #* 构建变量
-        fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in fluxes_var_names]
-        fluxes_params = [first(@parameters $param_name = 0.0 [tunable = true]) for param_name in fluxes_param_names]
-        #* 构建state变量
-        flux_state = first(@variables $state_name(t) = 0.0)
-        fluxes_vars_ntp = NamedTuple{Tuple(fluxes_var_names)}(fluxes_vars)
+        influxes, outfluxes = fluxes[1], fluxes[2]
+        #* 转换为Symbol
+        influx_names = Symbolics.tosymbol.(influxes, escape=false)
+        outflux_names = Symbolics.tosymbol.(outfluxes, escape=false)
+        state_name = Symbolics.tosymbol(state, escape=false)
 
         #* 构建函数和公式
-        state_expr = sum(fluxes_vars_ntp[influx_names]) - sum(fluxes_vars_ntp[outflux_names])
-        state_eq = D(flux_state) ~ state_expr
+        state_expr = sum(influxes) - sum(outfluxes)
+        state_eq = D(state) ~ state_expr
 
-        #* 构建state计算的函数并将所有中间状态替换
-        substitute_vars_dict = Dict()
-        for var_nm in keys(fluxes_vars_ntp)
-            for flux in fluxes
-                for j in eachindex(flux.output_names)
-                    if var_nm == flux.output_names[j]
-                        tmp_flux_exprs = Symbolics.rhss(flux.flux_eqs)
-                        substitute_vars_dict[fluxes_vars_ntp[var_nm]] = tmp_flux_exprs[j]
-                    end
-                end
-            end
-        end
-        state_expr_sub = substitute(state_expr, substitute_vars_dict)
-        state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[union_input_names]), fluxes_params, expression=Val{false})
+        #* 构建计算函数
+        state_func = build_state_func(funcs, state_expr, vcat(influx_names, outflux_names))
 
         return new(
             influx_names,
@@ -200,10 +182,31 @@ struct StateFlux <: AbstractStateFlux
             state_eq
         )
     end
-end
 
-function get_state_input_var_names(state_flux::StateFlux)
+    function StateFlux(
+        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
+        state_name::Symbol;
+        funcs::Vector{<:AbstractFlux}
+    )
+        influx_names, outflux_names = flux_names[1], flux_names[2]
+        #* 构建函数和公式
+        influxes = [first(@variables $nm(t) = 0.0) for nm in influx_names]
+        outfluxes = [first(@variables $nm(t) = 0.0) for nm in outflux_names]
+        state = first(@variables $state_name(t) = 0.0)
+        state_expr = sum(influxes) - sum(outfluxes)
+        state_eq = D(state) ~ state_expr
 
+        #* 构建计算函数
+        state_func = build_state_func(funcs, state_expr, vcat(influx_names, outflux_names))
+
+        return new(
+            influx_names,
+            outflux_names,
+            state_name,
+            state_func,
+            state_eq
+        )
+    end
 end
 
 """
@@ -227,21 +230,19 @@ struct LagFlux <: AbstractLagFlux
     inner_func::Function
 
     function LagFlux(
-        input_names::Symbol,
-        output_names::Symbol;
+        flux_name::Symbol,
         lag_time::Symbol,
-        lag_func::Function,
-        smooth_func::Function=step_func,
+        lag_func::Function;
+        kwargs...,
     )
-        function inner_flux_func(i::StructArray, p::NamedTuple)
-            tmp_input = i[input_names]
-            lag_weight = solve_lag_weights(tmp_input, p[lag_time], lag_func, smooth_func)
-            i[output_names] .= lag_weight .* tmp_input
+        function inner_flux_func(i::AbstractMatrix, p::AbstractVector)
+            lag_flux = solve_lag_flux(i[:, 1], p[1], lag_func, kwargs...)
+            [lag_flux]
         end
 
         new(
-            input_names,
-            output_names,
+            flux_name,
+            Symbol(flux_name, :_lag),
             lag_time,
             inner_flux_func,
         )
@@ -275,73 +276,76 @@ struct NeuralFlux <: AbstractNeuralFlux
     flux_eqs::Vector{Equation}
     "neural network sub systems"
     sub_sys::Vector{ODESystem}
-end
 
-function NeuralFlux(
-    input_names::Union{Symbol,Vector{Symbol}},
-    output_names::Union{Symbol,Vector{Symbol}};
-    chain_name::Symbol,
-    chain::Lux.AbstractExplicitLayer,
-    seed::Int=42,
-)
-    if input_names isa Symbol
-        input_names = [input_names]
-    end
-    if output_names isa Symbol
-        output_names = [output_names]
-    end
-
-    #* 根据输入输出参数构建ModelingToolkit系统
-    input_vars = [first(@variables $input_name(t) = 0.0) for input_name in input_names]
-    output_vars = [first(@variables $output_name(t) = 0.0) for output_name in output_names]
-
-    nn_in = RealInputArray(nin=length(input_names), name=Symbol(chain_name, :_in_sys))
-    nn_out = RealOutputArray(nout=length(output_names), name=Symbol(chain_name, :_out_sys))
-    nn = NeuralNetworkBlock(
-        length(input_names), length(output_names);
-        chain=chain, rng=StableRNG(seed), name=Symbol(chain_name, :_nn_sys)
+    function NeuralFlux(
+        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
+        chain::Pair{Symbol,Lux.AbstractExplicitLayer},
+        seed::Int=42,
     )
+        input_names, output_names = flux_names[1], flux_names[2]
+        if input_names isa Symbol
+            input_names = [input_names]
+        end
+        if output_names isa Symbol
+            output_names = [output_names]
+        end
 
-    eqs = Equation[connect(nn_in, nn.input), connect(nn_out, nn.output)]
-    for i in eachindex(input_vars)
-        push!(eqs, input_vars[i] ~ nn_in.u[i])
-    end
-    for i in eachindex(output_vars)
-        push!(eqs, output_vars[i] ~ nn_out.u[i])
-    end
+        #* 根据输入输出参数构建ModelingToolkit系统
+        input_vars = [first(@variables $input_name(t) = 0.0) for input_name in input_names]
+        output_vars = [first(@variables $output_name(t) = 0.0) for output_name in output_names]
 
-    #* 根据chain构建计算函数
-    func = (x, p) -> LuxCore.stateless_apply(chain, x, p)
-
-    function inner_flux_func(input::NamedTuple, params::NamedTuple)
-        """
-        单值计算
-        """
-        x = hcat([input[nm] for nm in input_names]...)'
-        output = func(x, params[chain_name])
-        [first(output[idx, :]) for idx in 1:length(output_names)]
+        return NeuralFlux(input_vars => output_vars, chain_name, chain, seed)
     end
 
-    function inner_flux_func(input::StructArray, params::NamedTuple)
-        """
-        数组计算
-        """
-        x = hcat([getproperty(input, nm) for nm in input_names]...)'
-        output = func(x, params[chain_name])
-        [output[idx, :] for idx in 1:length(output_names)]
-    end
+    function NeuralFlux(
+        fluxes::Pair{Vector{Num},Vector{Num}},
+        chain::Pair{Symbol,Lux.AbstractExplicitLayer},
+        seed::Int=42,
+    )
+        input_vars, output_vars = fluxes[1], fluxes[2]
+        chain_name, chain_model = chain[1], chain[2]
 
-    NeuralFlux(input_names, output_names, chain_name, inner_flux_func, eqs, [nn, nn_in, nn_out])
-end
+        if input_vars isa Num
+            input_vars = [input_vars]
+        end
+        if output_vars isa Num
+            output_vars = [output_vars]
+        end
 
-function extract_neuralflux_ntp(funcs::Vector{<:AbstractFlux})
-    nn_flux_list = filter(flux -> flux isa AbstractNeuralFlux, funcs)
-    nfunc_ntp = NamedTuple()
-    flxu_chain_names = [flux.chain_name for flux in nn_flux_list]
-    if length(nn_flux_list) > 0
-        nfunc_ntp = NamedTuple{Tuple(flxu_chain_names)}(
-            [get_input_names(flux) for flux in nn_flux_list]
+        input_names = Symbolics.tosymbol.(input_vars, escape=false)
+        output_names = Symbolics.tosymbol.(output_vars, escape=false)
+
+        nn_in = RealInputArray(nin=length(input_names), name=Symbol(chain_name, :_in_sys))
+        nn_out = RealOutputArray(nout=length(output_names), name=Symbol(chain_name, :_out_sys))
+        nn = NeuralNetworkBlock(
+            length(input_names), length(output_names);
+            chain=chain_model, rng=StableRNG(seed), name=Symbol(chain_name, :_nn_sys)
+        )
+
+        eqs = Equation[connect(nn_in, nn.input), connect(nn_out, nn.output)]
+        for i in eachindex(input_vars)
+            push!(eqs, input_vars[i] ~ nn_in.u[i])
+        end
+        for i in eachindex(output_vars)
+            push!(eqs, output_vars[i] ~ nn_out.u[i])
+        end
+
+        #* 根据chain构建计算函数
+        func = (x, p) -> LuxCore.stateless_apply(chain_model, x, p)
+
+        function inner_flux_func(input::AbstractVector, params::AbstractVector)
+            x = hcat(input...)'
+            output = func(x, params[chain_name])
+            [first(output[idx, :]) for idx in 1:length(output_names)]
+        end
+
+        new(
+            input_names,
+            output_names,
+            chain_name,
+            inner_flux_func,
+            eqs,
+            [nn, nn_in, nn_out]
         )
     end
-    nfunc_ntp
 end

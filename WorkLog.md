@@ -53,7 +53,17 @@
 
 * [ ] **~~根据macro提供一个自动生成模型计算的函数~~**
 
-- [ ] 根据计算网络结构迭代计算模型
+- [X] 根据计算网络结构迭代计算模型
+- [ ] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
+
+# 暑假工作计划
+
+前面有杂事耽搁了，最近可以重新优化这个框架啦，计划改造项目如下：
+
+- [X] 我想让Flux的构建方式能够更有可读性，就是输入输出变量用键值对来连接
+- [ ] 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善
+- [ ] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
+- [ ] 记得本来采用StructArray，能够有效的避免反复计算带来的问题
 
 # 关键功能和实现技术
 
@@ -70,3 +80,12 @@
 # 一些结论
 
 * namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型
+
+# 优化模型的问题
+
+**AutoZygote**
+
+- No MTK:
+  **ERROR: MethodError: no method matching length(::ChainRulesCore.ZeroTangent)**
+- MTK:
+  **ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.**

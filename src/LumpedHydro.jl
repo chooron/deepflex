@@ -88,16 +88,22 @@ abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractLagFlux <: AbstractFlux end
 
+function (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector)
+    flux.inner_func(input, params)
+end
+
+function (flux::AbstractFlux)(input::AbstractMatrix, params::AbstractVector)
+    flux.inner_func(input, params)
+end
+
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractUnit <: AbstractComponent end
-#* 负责单元的内部汇流计算
-abstract type AbstractNode <: AbstractComponent end
 
-## Sensealg type
-# const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
-# const default_ode_sensealg = ForwardDiffSensitivity()
+# Sensealg type
+const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
+const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
 include("utils/lossfunc.jl")
 include("utils/name.jl")
@@ -118,9 +124,6 @@ export HydroElement, add_inputflux!, add_outputflux!, solve_prob
 include("unit.jl")
 export HydroUnit, update_unit!, add_elements!, remove_elements!
 
-include("node.jl")
-export HydroNode
-
 # Implement Flux
 include("functions/evap.jl")
 include("functions/flow.jl")
@@ -137,7 +140,7 @@ include("functions/snowfall.jl")
 # include("implements/PRNN.jl")
 include("implements/exphydro.jl")
 # include("implements/m50.jl")
-# include("implements/gr4j.jl")
+include("implements/gr4j.jl")
 # include("implements/hymod.jl")
 # include("implements/hbv.jl")
 

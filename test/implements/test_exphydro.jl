@@ -4,7 +4,6 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
-using StructArrays
 # using LumpedHydro
 # test exphydro model
 include("../../src/LumpedHydro.jl")
@@ -25,17 +24,18 @@ unit_init_states = (snowwater=0.0, soilwater=1303.004248)
 
 pas = ComponentVector((params=unit_params, initstates=unit_init_states, weight=1.0))
 
-model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false, step=true)
+model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false)
 
-input = StructArray((prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)))
+input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
 solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
-result = model(input, pas, ts, solver=solver);
+# solver = LumpedHydro.DiscreteSolver()
+result = model(input, pas, timeidx=ts, solver=solver);
 # result_df = DataFrame(result)
 
 # plot result
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 lines!(ax, ts, flow_vec, color=:red)
-lines!(ax, ts, result.totalflow, color=:blue)
+lines!(ax, ts, result.flow, color=:blue)
 
 fig

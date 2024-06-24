@@ -1,7 +1,6 @@
 # import lib
 using CSV
 using DataFrames
-# using CairoMakie
 using ComponentArrays
 using OptimizationOptimisers
 using BenchmarkTools
@@ -11,7 +10,7 @@ using StructArrays
 
 include("../../src/LumpedHydro.jl")
 
-# # test exphydro model
+# test exphydro model
 
 # predefine the parameters
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
@@ -42,10 +41,6 @@ best_pas = LumpedHydro.param_grad_optim(
     input=input,
     target=output,
     timeidx=timeidx,
-    adtype=Optimization.AutoForwardDiff(),
+    adtype=Optimization.AutoEnzyme(),
     target_name=:snowwater
 )
-
-
-# total_params = DeepFlex.merge_ca(best_pas, const_pas)[:param]
-# result = model(input, total_params)

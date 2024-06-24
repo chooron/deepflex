@@ -17,21 +17,21 @@ function expr(eq::HydroEquation{(:routingstore,),(:baseflow,),(:x3, :γ)}; kw...
     @.[(x3^(1 - γ)) / (γ - 1) * routingstore^γ]
 end
 
-#* totalflow
-function expr(eq::HydroEquation{(:baseflow, :surfaceflow),(:totalflow,),()}; kw...)
+#* flow
+function expr(eq::HydroEquation{(:baseflow, :surfaceflow),(:flow,),()}; kw...)
     baseflow, surfaceflow = eq.inputs
 
     @.[baseflow + surfaceflow]
 end
 
-function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow),(:totalflow,),()}; kw...)
+function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow),(:flow,),()}; kw...)
     routedflow, recharge, fastflow = eq.inputs
     sf = get(kw, :smooth_func, step_func)
 
     @.[routedflow + sf(fastflow + recharge) * (fastflow + recharge)]
 end
 
-function expr(eq::HydroEquation{(:surfaceflow, :baseflow, :interflow),(:totalflow,),()}; kw...)
+function expr(eq::HydroEquation{(:surfaceflow, :baseflow, :interflow),(:flow,),()}; kw...)
     surfaceflow, baseflow, interflow = eq.inputs
 
     @.[surfaceflow + baseflow + interflow]
@@ -51,4 +51,27 @@ function expr(eq::HydroEquation{(:surfacerunoff, :prcp),(:surfaceflow,),(:Aim,)}
     Aim = first(eq.params)
 
     @.[surfacerunoff + Aim * prcp]
+end
+
+# for gr4j
+function expr(eq::HydroEquation{(:infiltration, :percolation, :saturation),(:outflow,),()}; kw...)
+    infiltration, percolation, saturation = eq.inputs
+    @.[infiltration - saturation + percolation]
+end
+
+function expr(eq::HydroEquation{(:outflow,),(:slowflow, :fastflow),()}; kw...)
+    outflow = first(eq.inputs)
+    @.[outflow * 0.9, outflow * 0.1]
+end
+
+function expr(eq::HydroEquation{(:routingstore,),(:routedflow,),(:x3, :γ)}; kw...)
+    routingstore = first(eq.inputs)
+    x3, γ = eq.params
+    # @.[((abs(x3)^(1 - γ)) / (γ - 1) * (abs(routingstore)^γ))]
+    @.[routingstore * (1.0 - (1.0 + (routingstore / x3)^4)^(-1 / 4))]
+end
+
+function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow_lag,),(:flow,),()}; kw...)
+    routedflow, recharge, fastflow_lag = eq.inputs
+    @.[routedflow + max(0.0, recharge + fastflow_lag)]
 end

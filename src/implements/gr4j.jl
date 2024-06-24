@@ -8,12 +8,12 @@ SoilWaterReservoir in GR4J
 function Surface(; name::Symbol, mtk::Bool=true)
 
     funcs = [
-        RainfallFlux([:prcp, :pet]),
-        InfiltrationFlux([:rainfall])
+        SimpleFlux([:prcp, :pet] => [:rainfall]),
+        SimpleFlux([:rainfall] => [:infiltration])
     ]
 
     HydroElement(
-        Symbol(name, :_surf_),
+        Symbol(name, :_surface),
         funcs=funcs,
         mtk=mtk
     )
@@ -24,79 +24,61 @@ SoilWaterReservoir in GR4J
 """
 function Soil(; name::Symbol, mtk::Bool=true)
 
-    funcs = [
-        SaturationFlux([:soilwater, :infiltration], param_names=[:x1]),
-        EvapFlux([:soilwater, :prcp, :pet], param_names=[:x1]),
-        PercolationFlux([:soilwater], param_names=[:x1]),
-        SimpleFlux([:infiltration, :percolation, :saturation], :tempflow,
-            param_names=Symbol[], func=(i, p; kw...) -> @.(i[:infiltration] - i[:saturation] + i[:percolation])),
-        SimpleFlux([:tempflow], [:slowflow, :fastflow],
-            param_names=Symbol[], func=(i, p; kw...) -> [i[:tempflow] .* 0.9, i[:tempflow] .* 0.1]),
+    fluxes = [
+        SimpleFlux([:soilwater, :infiltration] => [:saturation], [:x1]),
+        SimpleFlux([:soilwater, :pet] => [:evap], [:x1]),
+        SimpleFlux([:soilwater] => [:percolation], [:x1]),
+        SimpleFlux([:infiltration, :percolation, :saturation] => [:outflow]),
+        SimpleFlux([:outflow] => [:slowflow, :fastflow]),]
+
+    lfluxes = [
+        LagFlux(:slowflow, :x4, LumpedHydro.uh_1_half),
+        LagFlux(:fastflow, :x4, LumpedHydro.uh_2_full),
     ]
 
-    dfuncs = [
-        StateFlux([:saturation], [:evap, :percolation], :soilwater)
+    dfluxes = [
+        StateFlux([:saturation] => [:evap, :percolation], :soilwater, funcs=fluxes)
     ]
 
     HydroElement(
         Symbol(name, :_soil_),
-        funcs=funcs,
-        dfuncs=dfuncs,
+        funcs=vcat(fluxes, lfluxes),
+        dfuncs=dfluxes,
         mtk=mtk
     )
 end
 
 function FreeWater(; name::Symbol, mtk::Bool=true)
 
-    funcs = [
-        RechargeFlux([:routingstore], param_names=[:x2, :x3, :ω]),
-        SimpleFlux([:routingstore], :routedflow,
-            param_names=[:x3, :γ],
-            func=(i, p; kw...) -> @.((abs(p[:x3])^(1 - p[:γ])) / (p[:γ] - 1) * (abs(i[:routingstore])^p[:γ]))),]
+    fluxes = [
+        SimpleFlux([:routingstore] => [:recharge], [:x2, :x3, :ω]),
+        SimpleFlux([:routingstore] => [:routedflow], [:x3, :γ]),
+        SimpleFlux([:routedflow, :recharge, :fastflow_lag] => [:flow])
+    ]
 
-
-    dfuncs = [
-        StateFlux([:slowflow, :recharge], [:routedflow], :routingstore),
+    dfluxes = [
+        StateFlux([:slowflow_lag] => [:recharge, :routedflow], :routingstore, funcs=fluxes),
     ]
 
     HydroElement(
         Symbol(name, :_zone_),
-        funcs=funcs,
-        dfuncs=dfuncs,
+        funcs=fluxes,
+        dfuncs=dfluxes,
         mtk=mtk
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    HydroUnit(
-        name,
-        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk), FreeWater(name=name, mtk=mtk)],
-        step=step,
-    )
-end
+function Unit(; name::Symbol, mtk::Bool=true)
 
-function Route(; name::Symbol)
-
-    funcs = [
-        LagFlux(:slowflow, :slowflow_lag, lag_func=LumpedHydro.uh_1_half, lag_time=:x4),
-        LagFlux(:fastflow, :fastflow_lag, lag_func=LumpedHydro.uh_2_full, lag_time=:x4),
-        SimpleFlux([:routedflow, :recharge, :fastflow_lag], :flow, param_names=Symbol[],
-            func=(i, p; kw...) -> @.(i[:routedflow] + i[:recharge] + i[:fastflow_lag]))
+    elements = [
+        Surface(name=name, mtk=mtk),
+        Soil(name=name, mtk=mtk),
+        FreeWater(name=name, mtk=mtk)
     ]
 
-    HydroElement(
+    HydroUnit(
         name,
-        funcs=funcs,
-        mtk=false
+        elements=elements,
     )
 end
-
-function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    HydroNode(
-        name,
-        units=[Unit(name=name, mtk=mtk, step=step)],
-        routes=[Route(name=name)],
-    )
-end
-
 end

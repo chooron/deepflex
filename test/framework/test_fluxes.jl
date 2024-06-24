@@ -1,16 +1,14 @@
 include("../../src/LumpedHydro.jl")
 using Symbolics
 using ModelingToolkit
+using Lux
+
+function test_predefine_flux()
+    evap_flux = LumpedHydro.SimpleFlux([:soilwater, :pet] => [:evap], [:x1])
+end
 
 function test_simpleflux()
-    evap_flux = LumpedHydro.SimpleFlux([:soilwater, :pet], [:evap], param_names=[:x1])
-    @variables t a(t) b(t) c(t)
-    @parameters p1 p2 p3
-    custom_flux = LumpedHydro.SimpleFlux([a, b], [c], params=[p1, p2, p3], exprs=[a * p1 + b * p2 + p3])
-    custom_flux_func = custom_flux.flux_func
-    custom_flux_func((a=1, b=1), (p1=2, p2=3, p3=1))
-    # Symbolics.rhss(evap_flux.flux_eqs)
-    custom_flux.flux_eqs
+
 end
 
 function test_stateflux()
@@ -29,7 +27,6 @@ function test_stateflux()
 end
 
 function test_neuralflux()
-    using Lux
     ann = Lux.Chain(
         Lux.Dense(3 => 16, Lux.tanh),
         Lux.Dense(16 => 1, Lux.leakyrelu)
@@ -37,3 +34,10 @@ function test_neuralflux()
     nn_flux = LumpedHydro.NeuralFlux([:a, :b, :c], [:d], chain_name=:et, chain=ann)
     tmp_sys = nn_flux.nn_sys
 end
+
+@variables t a(t) b(t) c(t)
+@parameters p1 p2 p3
+
+custom_flux = LumpedHydro.SimpleFlux([a, b] => [c], [p1, p2, p3], exprs=[a * p1 + b * p2 + p3])
+custom_flux_func = custom_flux.inner_func
+custom_flux.inner_func.([[1, 2], [2, 3], [2, 3]], Ref([2, 3, 1]))

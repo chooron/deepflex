@@ -4,6 +4,20 @@ default_callback_func(p, l) = begin
     false
 end
 
+function get_predict_func()
+    #* build predict function
+    function predict_func(x::AbstractVector{T}, p) where {T}
+        component, input, timeidx, solver, tunable_pas_axes, const_pas = p
+        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+        #! 震惊，这个merge_recursive会影响zygote.jl
+        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
+        component(input, tmp_pas, timeidx=timeidx, solver=solver)
+    end
+    predict_func
+end
+
+const predict_func = get_predict_func()
+
 """
 $(SIGNATURES)
 
@@ -15,6 +29,7 @@ function param_box_optim(
     const_pas::ComponentArray,
     input::NamedTuple,
     target::NamedTuple,
+    timeidx::Vector,
     kwargs...,
 )
     """
@@ -32,36 +47,19 @@ function param_box_optim(
 
     tunable_pas_axes = getaxes(tunable_pas)
 
-    predict_func(x, p) = begin
-        tunable_pas_type = eltype(x)
-        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        const_pas = tunable_pas_type.(const_pas)
-        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas, timeidx=timeidx, solver=solver)
+    function objective(x::AbstractVector{T}, p) where {T}
+        loss = loss_func(target[target_name], getproperty(predict_func(x, p), target_name))
+        loss
     end
-
-    objective(x, p) = loss_func(target[target_name], predict_func(x, p)[target_name])
 
     # 构建问题
     optf = Optimization.OptimizationFunction(objective)
-    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), lb=lb, ub=ub)
+    prob_args = (component, input, timeidx, solver, tunable_pas_axes, const_pas)
+    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args, lb=lb, ub=ub)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
 
     ComponentVector(sol.u, tunable_pas_axes)
 end
-
-function get_predict_func()
-    # build predict function
-    function predict_func(x::AbstractVector{T}, p) where {T}
-        component, input, timeidx, solver, tunable_pas_axes, const_pas = p
-        tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
-        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas, timeidx=timeidx, solver=solver)
-    end
-    predict_func
-end
-
-const predict_func = get_predict_func()
 
 """
 $(SIGNATURES)
