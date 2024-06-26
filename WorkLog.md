@@ -54,7 +54,9 @@
 * [ ] **~~根据macro提供一个自动生成模型计算的函数~~**
 
 - [X] 根据计算网络结构迭代计算模型
-- [ ] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
+- [X] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
+- [ ] stateflux生成临时函数时存在问题
+- [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
 
 # 暑假工作计划
 

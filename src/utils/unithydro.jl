@@ -19,7 +19,7 @@ function solve_lag_flux(input::Vector, lag_time::Number, lag_func::Function; kwa
     ts = 0:200
     #* 将weight作为param输入到prob中
     lag_weights = [lag_func(t, lag_time) for t in ts]
-    lag_weights = vcat([lag_weights[1]], (circshift(lag_weights, -1).-lag_weights)[1:end-1])
+    lag_weights = vcat((circshift(lag_weights, -1).-lag_weights)[1:end-1])
 
     #* 首先将lagflux转换为discrete problem
     function discrete_prob(u, p, t)

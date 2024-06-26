@@ -32,7 +32,8 @@ struct HydroUnit{mtk} <: AbstractUnit
     function HydroUnit(name; elements::Vector{<:AbstractElement})
 
         mtk = !(false in [typeof(ele).parameters[1] for ele in elements])
-        sorted_elements = sort_elements_by_topograph(elements)
+        # sorted_elements = sort_elements_by_topograph(elements)
+        # println([ele.name for ele in sorted_elements])
 
         # if mtk
         #     system = build_unit_system(sorted_elements, name=name)
@@ -42,7 +43,7 @@ struct HydroUnit{mtk} <: AbstractUnit
 
         new{mtk}(
             name,
-            sorted_elements,
+            elements,
         )
     end
 end

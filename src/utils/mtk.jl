@@ -16,7 +16,6 @@ function build_ele_system(
     base_sys
 end
 
-
 function build_state_func(
     fluxes::Vector{<:AbstractFlux},
     state_expr::Num,
@@ -49,8 +48,48 @@ function build_state_func(
             end
         end
     end
-    state_expr_sub = substitute(state_expr, substitute_vars_dict)
+    state_expr_sub = state_expr
+    for _ in 1:length(substitute_vars_dict)
+        state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
+    end
     state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[union_input_names]), fluxes_params, expression=Val{false})
+    state_func
+end
+
+# todo 需要构建一个用于预测new state的函数
+function build_new_state_func(
+    fluxes::Vector{<:AbstractFlux},
+    state_expr::Num,
+)
+    #* 获得elements的输入变量名
+    fluxes_input_names, fluxes_output_names = get_input_output_names(fluxes)
+    #* fluxes计算过程中需要构建的通量
+    fluxes_var_names = vcat(fluxes_input_names, fluxes_output_names)
+
+    #* 构建变量
+    fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in fluxes_var_names]
+    fluxes_params = [first(@parameters $param_name = 0.0 [tunable = true]) for param_name in get_param_names(fluxes)]
+    fluxes_vars_ntp = NamedTuple{Tuple(fluxes_var_names)}(fluxes_vars)
+
+    #* 构建state计算的函数并将所有中间状态替换
+    substitute_vars_dict = Dict()
+    for var_nm in keys(fluxes_vars_ntp)
+        for flux in fluxes
+            tmp_output_names = get_output_names(flux)
+            for j in eachindex(tmp_output_names)
+                if var_nm == tmp_output_names[j]
+                    tmp_flux_exprs = Symbolics.rhss(flux.flux_eqs)
+                    substitute_vars_dict[fluxes_vars_ntp[var_nm]] = tmp_flux_exprs[j]
+                end
+            end
+        end
+    end
+
+    state_expr_sub = state_expr
+    for _ in 1:length(substitute_vars_dict)
+        state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
+    end
+    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[fluxes_input_names]), fluxes_params, expression=Val{false})
     state_func
 end
 
@@ -96,19 +135,17 @@ used for hydrological element
 """
 function init_prob(
     build_system::ODESystem,
-    prebuild_systems::ODESystem,
-    nfunc_ntps::Vector,
+    prebuild_system::ODESystem,
+    nfunc_ntp::NamedTuple,
     time::AbstractVector,
 )
     #* 设置系统初始值并构建problem
     build_u0 = Pair[]
-    for (system, nfunc_ntp) in zip(prebuild_systems, nfunc_ntps)
-        for k in keys(nfunc_ntp)
-            func_nn_sys = getproperty(system, k)
-            push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(nfunc_ntp[k])))
-        end
+    for k in keys(nfunc_ntp)
+        func_nn_sys = getproperty(prebuild_system, k)
+        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(nfunc_ntp[k])))
     end
-    prob = ODESystem(build_system, build_u0, (time[1], time[end]), Pair[], warn_initialize_determined=false)
+    prob = ODEProblem(build_system, build_u0, (time[1], time[end]), Pair[], warn_initialize_determined=false)
     prob
 end
 

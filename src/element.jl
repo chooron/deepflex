@@ -37,6 +37,10 @@ struct HydroElement{mtk} <: AbstractElement
     """
     dfuncs::Vector
     """
+    Hydrological lag fluxes
+    """
+    lfuncs::Vector
+    """
     Modelingtoolkit.jl related variables,
     This is a pre-built ODESystem based on the input hydrological flux,
     which is used to support the construction of the ODESystem after data input.
@@ -46,13 +50,15 @@ struct HydroElement{mtk} <: AbstractElement
     function HydroElement(
         name::Symbol;
         funcs::Vector,
-        dfuncs::Vector=SimpleFlux[],
+        dfuncs::Vector=StateFlux[],
+        lfuncs::Vector=LagFlux[],
         mtk::Bool=false
     )
         return new{mtk}(
             name,
             funcs,
             dfuncs,
+            lfuncs,
             mtk ? build_ele_system(funcs, dfuncs, name=name) : nothing
         )
     end
@@ -68,11 +74,12 @@ function (ele::HydroElement)(
     params = NamedTuple(pas[:params])
     init_states = NamedTuple(pas[:initstates])
     fluxes = input
-    if !solved & length(ele.dfuncs) > 0
+    if !solved & (length(ele.dfuncs) > 0)
         solved_states = solve_prob(ele, input=input, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
-        fluxes = merge(fluxes, NamedTuple{Tuple(get_state_names(ele))}(solved_states))
+        solved_states = NamedTuple{Tuple(get_state_names(ele))}(solved_states)
+        fluxes = merge(fluxes, solved_states)
     end
-    for ele_func in ele.funcs
+    for ele_func in vcat(ele.funcs, ele.lfuncs)
         tmp_mtr = hcat([fluxes[nm] for nm in get_input_names(ele_func)]...)
         tmp_params_vec = eltype(params)[params[get_param_names(ele_func)]...]
         tmp_output = ele_func(tmp_mtr, tmp_params_vec)
@@ -80,36 +87,6 @@ function (ele::HydroElement)(
         fluxes = merge(fluxes, tmp_output_ntp)
     end
     fluxes
-end
-
-function add_inputflux!(
-    ele::HydroElement;
-    func_ntp::NamedTuple,
-)
-    for key in keys(func_ntp)
-        for func in func_ntp[key]
-            push!(ele.funcs, func)
-        end
-        dfunc = first(filter!(dfn -> dfn.output_names == key, ele.dfuncs))
-        for func in func_ntp[key]
-            dfunc.influx_names = vcat(dfunc.influx_names, get_output_names(func))
-        end
-    end
-end
-
-function add_outputflux!(
-    ele::HydroElement;
-    func_ntp::NamedTuple,
-)
-    for key in keys(func_ntp)
-        for func in func_ntp[key]
-            push!(ele.funcs, func)
-        end
-        dfunc = first(filter!(dfn -> dfn.output_names == key, ele.dfuncs))
-        for func in func_ntp[key]
-            dfunc.outflux_names = vcat(dfunc.outflux_names, get_output_names(func))
-        end
-    end
 end
 
 function solve_prob(

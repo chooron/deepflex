@@ -7,10 +7,6 @@ function test_predefine_flux()
     evap_flux = LumpedHydro.SimpleFlux([:soilwater, :pet] => [:evap], [:x1])
 end
 
-function test_simpleflux()
-
-end
-
 function test_stateflux()
     #* test state flux
     funcs = [
@@ -40,4 +36,4 @@ end
 
 custom_flux = LumpedHydro.SimpleFlux([a, b] => [c], [p1, p2, p3], exprs=[a * p1 + b * p2 + p3])
 custom_flux_func = custom_flux.inner_func
-custom_flux.inner_func.([[1, 2], [2, 3], [2, 3]], Ref([2, 3, 1]))
+custom_flux_func([2, 3], [2, 3, 1])

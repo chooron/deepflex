@@ -113,6 +113,7 @@ include("utils/solver.jl")
 include("utils/smoother.jl")
 include("utils/graph.jl")
 include("utils/unithydro.jl")
+export step_func, ifelse_func
 
 # framework build
 include("flux.jl")
@@ -138,11 +139,13 @@ include("functions/saturation.jl")
 include("functions/snowfall.jl")
 # Implements Models
 # include("implements/PRNN.jl")
+include("implements/cemaneige.jl")
 include("implements/exphydro.jl")
-# include("implements/m50.jl")
 include("implements/gr4j.jl")
-# include("implements/hymod.jl")
-# include("implements/hbv.jl")
+include("implements/hbv_edu.jl")
+include("implements/hymod.jl")
+include("implements/simhyd.jl")
+# include("implements/m50.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractOptimizer,

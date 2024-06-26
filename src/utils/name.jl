@@ -33,13 +33,12 @@ function get_param_names(func::AbstractNeuralFlux)
     [func.chain_name]
 end
 
-
 function get_input_names(func::AbstractStateFlux)
-    vcat(func.influx_names, func.outflux_names)
+    func.input_names
 end
 
 function get_output_names(func::AbstractStateFlux)
-    [func.state_name]
+    func.output_names
 end
 
 function get_input_names(func::AbstractLagFlux)
@@ -146,7 +145,7 @@ function get_param_names(elements::Vector{<:AbstractElement})
     param_names
 end
 
-function get_state_names(elements::Vector{<:AbstractElement})
+function get_state_names(elements::Vector{T}) where {T<:AbstractElement}
     state_names = Vector{Symbol}()
     for ele in elements
         union!(state_names, get_state_names(ele.dfuncs))

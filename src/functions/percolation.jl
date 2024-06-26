@@ -1,5 +1,5 @@
 #* percolation
-function expr(eq::HydroEquation{(:soilwater,),(:percolation,),(:x1,)};kw...)
+function expr(eq::HydroEquation{(:soilwater,),(:percolation,),(:x1,)}; kw...)
     soilwater = first(eq.inputs)
     x1 = first(eq.params)
 

@@ -1,4 +1,3 @@
-# import lib
 using CSV
 using Random
 using DataFrames
@@ -7,30 +6,27 @@ using CairoMakie
 using CairoMakie: Axis
 # using LumpedHydro
 
-
-# test gr4j model
-
-file_path = "data/hymod/LA011201_forcings.csv"
+include("../../src/LumpedHydro.jl")
+file_path = "E:\\JlCode\\hymod\\sample.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 prcp_vec = df[!, "precip"]
 et_vec = df[!, "pet"]
+q_vec = df[!, "q"]
 
 # build model
-s_max, b, a, kf, ks = 10, 5, 0.5, 0.5, 0.5
-unit_params = ComponentVector(Smax=s_max, b=b, a=a, kf=kf, ks=ks)
-init_states = ComponentVector(soilwater=0.0, fr1=1.0, fr2=1.0,
-    fr3=1.0, sr=1.0
-)
-ps = ComponentVector(hymod=(params=unit_params, initstates=init_states, weight=1.0))
+unit_params = ComponentVector(alpha=0.56377, bexp=0.45505, kf=0.96141, cmax=85.8419, ks=0.349047)
+init_states = ComponentVector(soilwater=0.0, fastwater1=0.0, fastwater2=0.0, fastwater3=0.0, slowwater=0.0) # 
+ps = ComponentVector(params=unit_params, initstates=init_states)
 
-model = LumpedHydro.HyMOD.Node(name=:hymod, mtk=true, step=true);
-
-input = (hymod=(prcp=prcp_vec, pet=et_vec, time=1:length(et_vec)),)
-output = model(input, ps)
-
-# plot result
+model = LumpedHydro.HyMOD.Unit(name=:hymod, mtk=true);
+LumpedHydro.get_state_names(model)
+input = (prcp=prcp_vec, pet=et_vec)
+output = model(input, ps, timeidx=collect(1:length(q_vec)))
+output_df = DataFrame(output)
+# # plot result
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
 lines!(ax, 1:length(et_vec), output[:flow], color=:blue)
+lines!(ax, 1:length(et_vec), df[!, "q"] /1e3, color=:red)
 fig

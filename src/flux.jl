@@ -141,11 +141,9 @@ snowwater_flux = StateFlux([:snowfall], [:melt], :snowwater, [])
 """
 struct StateFlux <: AbstractStateFlux
     "input hydrological flux name for state flux"
-    influx_names::Vector{Symbol}
+    input_names::Vector{Symbol}
     "output hydrological flux name for state flux"
-    outflux_names::Vector{Symbol}
-    "name of the state flux"
-    state_name::Symbol
+    output_names::Vector{Symbol}
     """
     Function used to calculate hydrological state fluxes, fixed in most cases.
     If there is a need for modification, it is generally recommended to modify the calculation formula of the input and output flux.
@@ -165,6 +163,7 @@ struct StateFlux <: AbstractStateFlux
         #* 转换为Symbol
         influx_names = Symbolics.tosymbol.(influxes, escape=false)
         outflux_names = Symbolics.tosymbol.(outfluxes, escape=false)
+        input_names = Symbol.(union(vcat(influx_names, outflux_names)))
         state_name = Symbolics.tosymbol(state, escape=false)
 
         #* 构建函数和公式
@@ -172,12 +171,11 @@ struct StateFlux <: AbstractStateFlux
         state_eq = D(state) ~ state_expr
 
         #* 构建计算函数
-        state_func = build_state_func(funcs, state_expr, vcat(influx_names, outflux_names))
+        state_func = build_state_func(funcs, state_expr, input_names)
 
         return new(
-            influx_names,
-            outflux_names,
-            state_name,
+            input_names,
+            [state_name],
             state_func,
             state_eq
         )
@@ -189,6 +187,7 @@ struct StateFlux <: AbstractStateFlux
         funcs::Vector{<:AbstractFlux}
     )
         influx_names, outflux_names = flux_names[1], flux_names[2]
+        input_names = vcat(influx_names, outflux_names)
         #* 构建函数和公式
         influxes = [first(@variables $nm(t) = 0.0) for nm in influx_names]
         outfluxes = [first(@variables $nm(t) = 0.0) for nm in outflux_names]
@@ -197,13 +196,59 @@ struct StateFlux <: AbstractStateFlux
         state_eq = D(state) ~ state_expr
 
         #* 构建计算函数
-        state_func = build_state_func(funcs, state_expr, vcat(influx_names, outflux_names))
+        state_func = build_state_func(funcs, state_expr, input_names)
 
         return new(
-            influx_names,
-            outflux_names,
-            state_name,
+            input_names,
+            [state_name],
             state_func,
+            state_eq
+        )
+    end
+
+    function StateFlux(
+        state_names::Pair{Symbol,Symbol};
+        funcs::Vector{<:AbstractFlux}
+    )
+        new_state_name, ori_state_name = state_names[1], state_names[2]
+        #* 构建函数和公式
+        ori_state = first(@variables $ori_state_name(t) = 0.0)
+        new_state = first(@variables $new_state_name(t) = 0.0)
+        state_expr = new_state - ori_state
+        state_eq = D(ori_state) ~ state_expr
+
+        #* 构建计算函数
+        fluxes_input_names = get_input_names(fluxes)
+        new_state_func = build_new_state_func(funcs, state_expr)
+
+        return new(
+            setdiff(fluxes_input_names, [ori_state_name]),
+            [ori_state_name],
+            new_state_func,
+            state_eq
+        )
+    end
+
+    function StateFlux(
+        states::Pair{Num,Num};
+        funcs::Vector{<:AbstractFlux}
+    )
+        #* 构建函数和公式
+        new_state, ori_state = states[1], states[2]
+        state_expr = new_state - ori_state
+        state_eq = D(ori_state) ~ state_expr
+
+        ori_state_name = Symbolics.tosymbol(ori_state, escape=false)
+        new_state_name = Symbolics.tosymbol(new_state, escape=false)
+
+        #* 构建计算函数
+        fluxes_input_names = get_input_names(funcs)
+        new_state_func = build_new_state_func(funcs, state_expr)
+
+        return new(
+            fluxes_input_names,
+            [ori_state_name],
+            new_state_func,
             state_eq
         )
     end

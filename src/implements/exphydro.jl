@@ -5,7 +5,7 @@ using ..LumpedHydro
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Surface(; name::Symbol, mtk::Bool=true)
+function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     fluxes = [
         SimpleFlux([:temp, :lday] => [:pet]),
         SimpleFlux([:prcp, :temp] => [:snowfall], [:Tmin]),
@@ -29,7 +29,7 @@ end
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function Soil(; name::Symbol, mtk::Bool=true)
+function SoilStorage(; name::Symbol, mtk::Bool=true)
     fluxes = [
         SimpleFlux([:soilwater, :pet] => [:evap], [:Smax]),
         SimpleFlux([:soilwater] => [:baseflow], [:Smax, :Qmax, :f]),
@@ -67,8 +67,8 @@ end
 function Unit(; name::Symbol, mtk::Bool=true)
 
     elements = [
-        Surface(name=name, mtk=mtk),
-        Soil(name=name, mtk=mtk),
+        SurfaceStorage(name=name, mtk=mtk),
+        SoilStorage(name=name, mtk=mtk),
         FreeWater(name=name, mtk=mtk)
     ]
 

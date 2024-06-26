@@ -78,5 +78,5 @@ function sort_elements_by_topograph(elements::AbstractVector{<:AbstractElement})
             end
         end
     end
-    sorted_elements
+    reverse(sorted_elements)
 end

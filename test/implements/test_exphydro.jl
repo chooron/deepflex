@@ -29,7 +29,7 @@ model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false)
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
 solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
 # solver = LumpedHydro.DiscreteSolver()
-result = model(input, pas, timeidx=ts, solver=solver);
+@btime result = model(input, pas, timeidx=ts, solver=solver);
 # result_df = DataFrame(result)
 
 # plot result

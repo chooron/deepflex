@@ -64,11 +64,12 @@ function expr(eq::HydroEquation{(:outflow,),(:slowflow, :fastflow),()}; kw...)
     @.[outflow * 0.9, outflow * 0.1]
 end
 
-function expr(eq::HydroEquation{(:routingstore,),(:routedflow,),(:x3, :γ)}; kw...)
-    routingstore = first(eq.inputs)
+function expr(eq::HydroEquation{(:routingstore, :recharge, :slowflow_lag),(:routedflow,),(:x3, :γ)}; kw...)
+    routingstore, recharge, slowflow_lag = eq.inputs
+    rgt = @.(routingstore + slowflow_lag + recharge)
     x3, γ = eq.params
-    # @.[((abs(x3)^(1 - γ)) / (γ - 1) * (abs(routingstore)^γ))]
-    @.[routingstore * (1.0 - (1.0 + (routingstore / x3)^4)^(-1 / 4))]
+    @.[((abs(x3)^(1 - γ)) / (γ - 1) * (abs(rgt)^γ))]
+    # @.[rgt * (1.0 - (1.0 + (rgt / x3)^4)^(-1 / 4))]
 end
 
 function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow_lag,),(:flow,),()}; kw...)

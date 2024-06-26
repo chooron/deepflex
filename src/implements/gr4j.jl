@@ -42,8 +42,9 @@ function Soil(; name::Symbol, mtk::Bool=true)
 
     HydroElement(
         Symbol(name, :_soil_),
-        funcs=vcat(fluxes, lfluxes),
+        funcs=fluxes,
         dfuncs=dfluxes,
+        lfuncs=lfluxes,
         mtk=mtk
     )
 end
@@ -52,12 +53,12 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
 
     fluxes = [
         SimpleFlux([:routingstore] => [:recharge], [:x2, :x3, :ω]),
-        SimpleFlux([:routingstore] => [:routedflow], [:x3, :γ]),
+        SimpleFlux([:routingstore, :recharge, :slowflow_lag] => [:routedflow], [:x3, :γ]),
         SimpleFlux([:routedflow, :recharge, :fastflow_lag] => [:flow])
     ]
 
     dfluxes = [
-        StateFlux([:slowflow_lag] => [:recharge, :routedflow], :routingstore, funcs=fluxes),
+        StateFlux([:slowflow_lag, :recharge] => [:routedflow], :routingstore, funcs=fluxes),
     ]
 
     HydroElement(
