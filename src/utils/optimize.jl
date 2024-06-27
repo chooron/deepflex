@@ -10,8 +10,8 @@ function get_predict_func()
         component, input, timeidx, solver, tunable_pas_axes, const_pas = p
         tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
         #! 震惊，这个merge_recursive会影响zygote.jl
-        tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
-        component(input, tmp_pas, timeidx=timeidx, solver=solver)
+        # tmp_pas = ComponentVector(merge_recursive(NamedTuple(tmp_tunable_pas), NamedTuple(const_pas)))
+        component(input, tmp_tunable_pas, timeidx=timeidx, solver=solver)
     end
     predict_func
 end
@@ -90,7 +90,8 @@ function param_grad_optim(
     tunable_pas_axes = getaxes(tunable_pas)
 
     function objective(x::AbstractVector{T}, p) where {T}
-        loss = loss_func(target[target_name], getproperty(predict_func(x, p), target_name))
+        predict_result = predict_func(x, p)
+        loss = loss_func(target[target_name], getproperty(predict_result, target_name))
         loss
     end
 

@@ -34,6 +34,21 @@ end
 @variables t a(t) b(t) c(t)
 @parameters p1 p2 p3
 
-custom_flux = LumpedHydro.SimpleFlux([a, b] => [c], [p1, p2, p3], exprs=[a * p1 + b * p2 + p3])
+custom_flux = LumpedHydro.SimpleFlux([a, b] => [c], [p1, p2, p3], flux_exprs=@.[a * p1 + b * p2 + p3])
 custom_flux_func = custom_flux.inner_func
-custom_flux_func([2, 3], [2, 3, 1])
+
+[[1 2 3]; [2 3 4]]
+function pr(v)
+    println(typeof(v))
+    println(v)
+    println(v[1])
+end
+
+pr.(eachslice(Vector, dims=2))
+
+ntp = (a=rand(10000), b=rand(10000), c=rand(10000))
+
+@btime NamedTuple{(:a,:b,:c)}([ntp[k] for k in keys(ntp)])
+@btime reduce(hcat, ntp)
+collect(())
+custom_flux_func.([[2, 3], [2, 3], [2, 3]], Ref([2, 3, 1]))

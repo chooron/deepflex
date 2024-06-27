@@ -64,8 +64,8 @@
 
 - [X] 我想让Flux的构建方式能够更有可读性，就是输入输出变量用键值对来连接
 - [ ] 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善
-- [ ] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
-- [ ] 记得本来采用StructArray，能够有效的避免反复计算带来的问题
+- [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
+- [ ] ~~记得本来采用StructArray，能够有效的避免反复计算带来的问题~~
 
 # 关键功能和实现技术
 
@@ -87,7 +87,7 @@
 
 **AutoZygote**
 
-- No MTK:
+- No MTK (Solved):
   **ERROR: MethodError: no method matching length(::ChainRulesCore.ZeroTangent)**
 - MTK:
   **ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.**

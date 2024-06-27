@@ -7,6 +7,7 @@ using Random
 using ComponentArrays
 using StructArrays
 using NamedTupleTools
+using RecursiveArrayTools
 using Reexport
 using StableRNGs
 using DocStringExtensions
@@ -88,11 +89,7 @@ abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractLagFlux <: AbstractFlux end
 
-function (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector)
-    flux.inner_func(input, params)
-end
-
-function (flux::AbstractFlux)(input::AbstractMatrix, params::AbstractVector)
+function (flux::AbstractFlux)(input::AbstractArray, params::AbstractArray)
     flux.inner_func(input, params)
 end
 
@@ -117,13 +114,13 @@ export step_func, ifelse_func
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, LagFlux, NeuralFlux, StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
+export SimpleFlux, StateFlux, LagFlux, NeuralFlux
 
 include("element.jl")
-export HydroElement, add_inputflux!, add_outputflux!, solve_prob
+export HydroElement, solve_prob # , add_inputflux!, add_outputflux!, 
 
 include("unit.jl")
-export HydroUnit, update_unit!, add_elements!, remove_elements!
+export HydroUnit #, update_unit!, add_elements!, remove_elements!
 
 # Implement Flux
 include("functions/evap.jl")
@@ -145,7 +142,7 @@ include("implements/gr4j.jl")
 include("implements/hbv_edu.jl")
 include("implements/hymod.jl")
 include("implements/simhyd.jl")
-# include("implements/m50.jl")
+include("implements/m50.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractOptimizer,
@@ -154,5 +151,8 @@ export AbstractComponent, AbstractSolver, AbstractOptimizer,
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV
+
+# export special flux
+export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 end

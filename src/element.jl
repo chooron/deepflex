@@ -46,6 +46,10 @@ struct HydroElement{mtk} <: AbstractElement
     which is used to support the construction of the ODESystem after data input.
     """
     system::Union{DiscreteSystem,ODESystem,Nothing}
+    """
+    element information: keys contains: input, output, param, state    
+    """
+    nameinfo::NamedTuple
 
     function HydroElement(
         name::Symbol;
@@ -54,12 +58,19 @@ struct HydroElement{mtk} <: AbstractElement
         lfuncs::Vector=LagFlux[],
         mtk::Bool=false
     )
+        ele_input_names, ele_output_names, ele_state_names = get_var_names(funcs, dfuncs)
+        ele_param_names = get_param_names(vcat(funcs, dfuncs))
+
+        system = mtk ? build_ele_system(funcs, dfuncs, name=name) : nothing
+        nameinfo = (input=ele_input_names, output=ele_output_names, state=ele_state_names, param=ele_param_names)
+
         return new{mtk}(
             name,
             funcs,
             dfuncs,
             lfuncs,
-            mtk ? build_ele_system(funcs, dfuncs, name=name) : nothing
+            system,
+            nameinfo
         )
     end
 end
@@ -73,17 +84,22 @@ function (ele::HydroElement)(
 )
     params = NamedTuple(pas[:params])
     init_states = NamedTuple(pas[:initstates])
+    ele_state_names= ele.nameinfo[:state]
     fluxes = input
     if !solved & (length(ele.dfuncs) > 0)
         solved_states = solve_prob(ele, input=input, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
-        solved_states = NamedTuple{Tuple(get_state_names(ele))}(solved_states)
+        solved_states = NamedTuple{Tuple(ele_state_names)}(solved_states)
         fluxes = merge(fluxes, solved_states)
     end
     for ele_func in vcat(ele.funcs, ele.lfuncs)
-        tmp_mtr = hcat([fluxes[nm] for nm in get_input_names(ele_func)]...)
-        tmp_params_vec = eltype(params)[params[get_param_names(ele_func)]...]
-        tmp_output = ele_func(tmp_mtr, tmp_params_vec)
-        tmp_output_ntp = NamedTuple{Tuple(get_output_names(ele_func))}(tmp_output)
+        tmp_mtr = reduce(hcat, [fluxes[nm] for nm in ele_func.input_names])
+        tmp_params_vec = eltype(params)[params[ele_func.param_names]...]
+        tmp_output_names = ele_func.output_names
+        tmp_output = ele_func.(eachrow(tmp_mtr), Ref(tmp_params_vec))
+        tmp_output_mtr = reduce(hcat, tmp_output)
+        tmp_output_ntp = NamedTuple{Tuple(tmp_output_names)}(
+            [tmp_output_mtr[idx, :] for idx in 1:length(tmp_output_names)]
+        )
         fluxes = merge(fluxes, tmp_output_ntp)
     end
     fluxes
@@ -98,7 +114,8 @@ function solve_prob(
     solver::AbstractSolver=ODESolver()
 )
     #* 准备计算数据，包括时间，名称，初始状态，neuralflux信息
-    ele_input_names, _, ele_state_names = get_var_names(ele)
+    ele_input_names = ele.nameinfo[:input]
+    ele_state_names = ele.nameinfo[:state]
     ele_input_state_names = vcat(ele_input_names, ele_state_names)
 
     nn_flux_list = filter(flux -> flux isa AbstractNeuralFlux, ele.funcs)
@@ -145,12 +162,8 @@ function solve_prob(
     timeidx::Vector=collect(1:length(input[1])),
     solver::AbstractSolver=ODESolver(),
 )
-    ele_input_names = get_input_names(ele)
-    ele_state_names = get_state_names(ele)
-
-    funcs_input_names, funcs_output_names = get_input_output_names(ele.funcs)
-    dfuncs_input_names = [union(funcs_input_names, setdiff(get_input_names(dfunc), funcs_output_names)) for dfunc in ele.dfuncs]
-
+    ele_input_names = ele.nameinfo[:input]
+    ele_state_names = ele.nameinfo[:state]
     itpfunc_ntp = NamedTuple{Tuple(ele_input_names)}(
         [LinearInterpolation(input[nm], timeidx, extrapolate=true) for nm in ele_input_names]
     )
@@ -162,10 +175,10 @@ function solve_prob(
                     state_idx = findfirst(x -> x == nm, ele_state_names)
                     isnothing(state_idx) ? itpfunc_ntp[nm](t) : u[state_idx]
                 end
-                for nm in dfuncs_input_name
+                for nm in dfunc.input_names
             ]
         end
-        for dfuncs_input_name in dfuncs_input_names
+        for dfunc in ele.dfuncs
     ]
 
     if solver isa ODESolver
@@ -177,7 +190,7 @@ function solve_prob(
             singel_ele_ode_func!,
             collect(init_states[ele_state_names]),
             (timeidx[1], timeidx[end]),
-            collect(params[get_param_names(ele)])
+            collect(params[ele.nameinfo[:param]])
         )
     elseif solver isa DiscreteSolver
         function singel_ele_ode_func(u, p, t)
@@ -188,7 +201,7 @@ function solve_prob(
             singel_ele_ode_func,
             collect(init_states[ele_state_names]),
             (timeidx[1], timeidx[end]),
-            collect(params[get_param_names(ele)])
+            collect(params[ele.nameinfo[:param]])
         )
     end
 

@@ -43,24 +43,24 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     funcs = [
         LumpedHydro.SimpleFlux(
             [prcp] => [prcp_], [zthresh, altitude, height],
-            exprs=@.[ifelse(zthresh > altitude, prcp * exp((altitude - height) * 0.0004), prcp * ifelse(height <= zthresh, exp(zthresh - height) * 0.0004, 1))]
+            flux_exprs=@.[ifelse(zthresh > altitude, prcp * exp((altitude - height) * 0.0004), prcp * ifelse(height <= zthresh, exp(zthresh - height) * 0.0004, 1))]
         ),
         LumpedHydro.SimpleFlux(
             [mean_temp, min_temp, max_temp] => [mean_temp_, min_temp_, max_temp_], [altitude, height],
-            exprs=@.[(altitude - height) * (-0.0065) + mean_temp, (altitude - height) * (-0.0065) + min_temp, (altitude - height) * (-0.0065) + max_temp]
+            flux_exprs=@.[(altitude - height) * (-0.0065) + mean_temp, (altitude - height) * (-0.0065) + min_temp, (altitude - height) * (-0.0065) + max_temp]
         ),
         LumpedHydro.SimpleFlux(
             [prcp, mean_temp, max_temp, min_temp] => [solid_frac], [altitude, zthresh],
-            exprs=@.[ifelse_func(zthresh - altitude) * (ifelse_func(max_temp) * ifelse_func(-min_temp) * (1.0 - max_temp / (max_temp - min_temp)) + ifelse_func(-max_temp)) +
+            flux_exprs=@.[ifelse_func(zthresh - altitude) * (ifelse_func(max_temp) * ifelse_func(-min_temp) * (1.0 - max_temp / (max_temp - min_temp)) + ifelse_func(-max_temp)) +
                      ifelse_func(altitude - zthresh) * (ifelse_func(-mean_temp) + ifelse_func(3 - mean_temp) * ifelse_func(mean_temp) * (1 - (mean_temp + 1) / 4.0))]
         ),
-        LumpedHydro.SimpleFlux([prcp, solid_frac] => [snowfall, rainfall], exprs=@.[prcp * solid_frac, prcp * (1 - solid_frac)]),
-        LumpedHydro.SimpleFlux([thermal, mean_temp] => [new_thermal], [CTG], exprs=@.[min(0.0, CTG * thermal + (1 - CTG) * mean_temp)]),
+        LumpedHydro.SimpleFlux([prcp, solid_frac] => [snowfall, rainfall], flux_exprs=@.[prcp * solid_frac, prcp * (1 - solid_frac)]),
+        LumpedHydro.SimpleFlux([thermal, mean_temp] => [new_thermal], [CTG], flux_exprs=@.[min(0.0, CTG * thermal + (1 - CTG) * mean_temp)]),
         LumpedHydro.SimpleFlux([snowfall, snowwater, new_thermal, mean_temp] => [melt], [Kf, CTG, snwthresh],
-            exprs=@.[ifelse((new_thermal == 0) & (mean_temp > 0), min(Kf * mean_temp, snowwater + snowfall), 0.0) * (0.9 * min(1.0, (snowwater + snowfall) / snwthresh) + 0.1)]
+            flux_exprs=@.[ifelse((new_thermal == 0) & (mean_temp > 0), min(Kf * mean_temp, snowwater + snowfall), 0.0) * (0.9 * min(1.0, (snowwater + snowfall) / snwthresh) + 0.1)]
         ),
-        LumpedHydro.SimpleFlux([snowfall, melt, snowwater] => [new_snowwater], exprs=@.[snowwater + snowfall - melt]),
-        LumpedHydro.SimpleFlux([rainfall, melt] => [infiltration], exprs=@.[rainfall + melt]),
+        LumpedHydro.SimpleFlux([snowfall, melt, snowwater] => [new_snowwater], flux_exprs=@.[snowwater + snowfall - melt]),
+        LumpedHydro.SimpleFlux([rainfall, melt] => [infiltration], flux_exprs=@.[rainfall + melt]),
     ]
 
     dfuncs = [

@@ -54,7 +54,7 @@ Inner Route Function in Exphydro
 function FreeWater(; name::Symbol, mtk=true)
 
     fluxes = [
-        SimpleFlux([:baseflow, :surfaceflow] => [:flow])
+        SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] .+ i[2]])
     ]
 
     HydroElement(

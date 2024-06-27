@@ -19,21 +19,14 @@ end
 function build_state_func(
     fluxes::Vector{<:AbstractFlux},
     state_expr::Num,
-    state_input_names::Vector{Symbol}
+    state_input_names::Vector{Symbol},
+    funcs_var_names::Vector{Symbol},
+    funcs_param_names::Vector{Symbol},
 )
-    #* 获得elements的输入变量名
-    #* 1. 这个是fluxes计算需要输入的通量
-    fluxes_input_names, fluxes_output_names = get_input_output_names(fluxes)
-    #* 2. 这个是state不通过fluxes计算的输入通量
-    #* 3. 合并起来就是计算state所需的最基础通量(不包括状态变量)
-    union_input_names = union(fluxes_input_names, setdiff(state_input_names, fluxes_output_names))
-    #* fluxes计算过程中需要构建的通量
-    fluxes_var_names = vcat(union_input_names, fluxes_output_names)
-
     #* 构建变量
-    fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in fluxes_var_names]
-    fluxes_params = [first(@parameters $param_name = 0.0 [tunable = true]) for param_name in get_param_names(fluxes)]
-    fluxes_vars_ntp = NamedTuple{Tuple(fluxes_var_names)}(fluxes_vars)
+    fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in funcs_var_names]
+    fluxes_params = [first(@parameters $nm = 0.0 [tunable = true]) for nm in funcs_param_names]
+    fluxes_vars_ntp = NamedTuple{Tuple(funcs_var_names)}(fluxes_vars)
 
     #* 构建state计算的函数并将所有中间状态替换
     substitute_vars_dict = Dict()
@@ -52,7 +45,7 @@ function build_state_func(
     for _ in 1:length(substitute_vars_dict)
         state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
     end
-    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[union_input_names]), fluxes_params, expression=Val{false})
+    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[state_input_names]), fluxes_params, expression=Val{false})
     state_func
 end
 
@@ -121,6 +114,7 @@ function setup_input(
     name::Symbol,
 )
     #* 构建data的插值系统
+    #! 这个语句会影响zygote的优化计算
     itp_eqs = Equation[getproperty(ele_system, nm) ~ @itpfn(nm, input[nm], timeidx) for nm in input_names]
     compose_sys = complete(ODESystem(itp_eqs, t; name=Symbol(name, :comp_sys), systems=[ele_system]))
     structural_simplify(compose_sys)

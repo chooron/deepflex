@@ -1,5 +1,4 @@
 # import lib
-# tested in https://github.com/ckrapu/gr4j_theano
 using CSV
 using Random
 using DataFrames
@@ -22,21 +21,19 @@ df = DataFrame(data);
 prcp_vec = df[!, "precip"]
 et_vec = df[!, "pet"]
 
-model = LumpedHydro.SIMHYD.Unit(name=:simhyd, mtk=false);
+model = LumpedHydro.SIMHYD.Unit(name=:simhyd, mtk=true);
 LumpedHydro.get_input_names(model)
 LumpedHydro.get_output_names(model)
 LumpedHydro.get_param_names(model)
 LumpedHydro.get_state_names(model)
 
-
 # build model
+input = (prcp=prcp_vec, pet=et_vec)
 unit_params = (INSC=25.0, COEFF=200.0, SQ=5.0, SMSC=200.0, SUB=0.2, CRAK=0.2, K=0.5)
 init_states = (SMS=100.0, GW=0.0)
 pas = ComponentVector(params=unit_params, initstates=init_states)
-
 result = model(input, pas, timeidx=collect(1:length(prcp_vec)));
 
-# CSV.write("tmp.csv", result_df)
 # plot result
 fig = Figure(size=(400, 400))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")

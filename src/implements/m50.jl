@@ -1,23 +1,23 @@
 @reexport module M50
 
+"""
+Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
+"""
 using ..LumpedHydro
 using ..NamedTupleTools
 import ..LumpedHydro: Lux
 
-"""
-SoilWaterReservoir in Exp-Hydro
-"""
-function Surface(; name::Symbol, mtk::Bool=true)
+function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     funcs = [
-        PetFlux([:temp, :lday]),
-        SnowfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        MeltFlux([:snowwater, :temp], param_names=[:Tmax, :Df]),
-        RainfallFlux([:prcp, :temp], param_names=[:Tmin]),
-        InfiltrationFlux([:rainfall, :melt])
+        SimpleFlux([:temp, :lday] => [:pet]),
+        SimpleFlux([:prcp, :temp] => [:snowfall], [:Tmin]),
+        SimpleFlux([:snowwater, :temp] => [:melt], [:Tmax, :Df]),
+        SimpleFlux([:prcp, :temp] => [:rainfall], [:Tmin]),
+        SimpleFlux([:rainfall, :melt] => [:infiltration]),
     ]
 
     dfuncs = [
-        StateFlux([:snowfall], [:melt], :snowwater),
+        StateFlux([:snowfall] => [:melt], :snowwater),
     ]
 
     HydroElement(
@@ -28,7 +28,7 @@ function Surface(; name::Symbol, mtk::Bool=true)
     )
 end
 
-function Soil(; name::Symbol, mtk::Bool=true)
+function SoilStorage(; name::Symbol, mtk::Bool=true)
 
     # 神经网络的定义是在模型之内，需要提取到模型的参数
     et_ann = Lux.Chain(
@@ -45,22 +45,14 @@ function Soil(; name::Symbol, mtk::Bool=true)
 
     funcs = [
         # normalize
-        StdMeanNormFlux(:snowwater, :norm_snw),
-        StdMeanNormFlux(:soilwater, :norm_slw),
-        StdMeanNormFlux(:temp, :norm_temp),
-        StdMeanNormFlux(:prcp, :norm_prcp),
+        StdMeanNormFlux([:snowwater, :soilwater, :prcp, :temp] => [:norm_snw, :norm_slw, :norm_prcp, :norm_temp]),
         # ET ANN
-        NeuralFlux([:norm_snw, :norm_slw, :norm_temp], :evap, chain_name=:etnn, chain=et_ann),
+        NeuralFlux([:norm_snw, :norm_slw, :norm_temp] => [:evap], :etnn => et_ann),
         # Q ANN
-        NeuralFlux([:norm_slw, :norm_prcp], :totalflow, chain_name=:qnn, chain=q_ann),
+        NeuralFlux([:norm_slw, :norm_prcp] => [:flow], :qnn => q_ann),
         # 一些变量转为用于状态计算的形式
-        SimpleFlux([:soilwater, :lday, :evap], :realevap, param_names=Symbol[],
-            func=(i, p; kw...) -> @.(i[:soilwater] * i[:lday] * i[:evap])),
-        SimpleFlux([:soilwater, :totalflow], :realflow, param_names=Symbol[],
-            func=(i, p; kw...) -> begin
-                sf = kw[:smooth_func]
-                @.(sf(i[:soilwater]) * exp(i[:totalflow]))
-            end),
+        SimpleFlux([:soilwater, :lday, :evap] => [:realevap], Symbol[], flux_funcs=[(i, p) -> @.(i[1] * i[2] * i[3])]),
+        SimpleFlux([:soilwater, :flow] => [:realflow], Symbol[], flux_funcs=[(i, p) -> @.(ifelse_func(i[1]) * exp(i[2]))]),
     ]
 
     dfuncs = [
@@ -78,35 +70,9 @@ end
 function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroUnit(
         name,
-        elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk)],
+        elements=[SurfaceStorage(name=name, mtk=mtk), SoilStorage(name=name, mtk=mtk)],
         step=step,
     )
 end
-
-function Route(; name::Symbol, mtk::Bool=true)
-
-    funcs = [
-        SimpleFlux(:totalflow, :flow, param_names=Symbol[], func=(i, p; kw...) -> i[:totalflow])
-    ]
-
-    HydroElement(
-        name,
-        funcs=funcs,
-        mtk=mtk
-    )
-end
-
-"""
-Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
-"""
-
-function Node(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    HydroNode(
-        name,
-        units=[Unit(name=name, mtk=mtk, step=step)],
-        routes=[Route(name=name)],
-    )
-end
-
 
 end

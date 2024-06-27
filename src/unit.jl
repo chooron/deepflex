@@ -23,40 +23,18 @@ HydroUnit(
 )
 ```
 """
-struct HydroUnit{mtk} <: AbstractUnit
+struct HydroUnit <: AbstractUnit
     "hydrological computation unit name"
     name::Symbol
     "hydrological computation elements"
     elements::Vector{<:AbstractElement}
 
     function HydroUnit(name; elements::Vector{<:AbstractElement})
-
-        mtk = !(false in [typeof(ele).parameters[1] for ele in elements])
-        # sorted_elements = sort_elements_by_topograph(elements)
-        # println([ele.name for ele in sorted_elements])
-
-        # if mtk
-        #     system = build_unit_system(sorted_elements, name=name)
-        # else
-        #     system = nothing
-        # end
-
-        new{mtk}(
+        new(
             name,
             elements,
         )
     end
-end
-
-function update_unit!(unit::HydroUnit)
-    unit.elements = sort_elements_by_topograph(unit.elements)
-end
-
-function add_elements!(unit::HydroUnit; elements::Vector{<:AbstractElement})
-    for ele in elements
-        push!(unit.elements, ele)
-    end
-    update_unit!(unit)
 end
 
 # 求解并计算

@@ -40,19 +40,19 @@ function SIMHYD_ELE(; name::Symbol, mtk::Bool=true)
     @parameters X_m = 0.0
 
     funcs = [
-        SimpleFlux([pet] => [IMAX], [INSC], exprs=@.[min(INSC, pet)]),
-        SimpleFlux([prcp, IMAX] => [INT], Num[], exprs=@.[min(IMAX, prcp)]),
-        SimpleFlux([prcp, INT] => [INR], Num[], exprs=@.[prcp - INT]),
-        SimpleFlux([pet, INT] => [POT], Num[], exprs=@.[pet - INT]),
-        SimpleFlux([POT, SMS] => [EVAP], [SMSC], exprs=@.[min(10 * (SMS / SMSC), POT)]),
-        SimpleFlux([INR, SMS] => [RMO], [COEFF, SQ, SMSC], exprs=@.[min(COEFF * exp(-SQ * (SMS / SMSC)), INR)]),
-        SimpleFlux([INR, RMO] => [IRUN], Num[], exprs=@.[INR - RMO]),
-        SimpleFlux([RMO, SMS] => [SRUN], [SUB, SMSC], exprs=@.[SUB * (SMS / SMSC) * RMO]),
-        SimpleFlux([RMO, SRUN, SMS] => [REC], [CRAK, SMSC], exprs=@.[CRAK * (SMS / SMSC) * (RMO - SRUN)]),
-        SimpleFlux([RMO, SRUN, REC] => [SMF], Num[], exprs=@.[RMO - SRUN - REC]),
-        SimpleFlux([SMS, SMF] => [GWF], [SMSC], exprs=@.[ifelse(SMS == SMSC, SMF, 0.0)]),
-        SimpleFlux([GW] => [BAS], [K], exprs=@.[K * GW]),
-        SimpleFlux([IRUN, SRUN, BAS] => [U], [K], exprs=@.[IRUN + SRUN + BAS]),
+        SimpleFlux([pet] => [IMAX], [INSC], flux_exprs=@.[min(INSC, pet)]),
+        SimpleFlux([prcp, IMAX] => [INT], Num[], flux_exprs=@.[min(IMAX, prcp)]),
+        SimpleFlux([prcp, INT] => [INR], Num[], flux_exprs=@.[prcp - INT]),
+        SimpleFlux([pet, INT] => [POT], Num[], flux_exprs=@.[pet - INT]),
+        SimpleFlux([POT, SMS] => [EVAP], [SMSC], flux_exprs=@.[min(10 * (SMS / SMSC), POT)]),
+        SimpleFlux([INR, SMS] => [RMO], [COEFF, SQ, SMSC], flux_exprs=@.[min(COEFF * exp(-SQ * (SMS / SMSC)), INR)]),
+        SimpleFlux([INR, RMO] => [IRUN], Num[], flux_exprs=@.[INR - RMO]),
+        SimpleFlux([RMO, SMS] => [SRUN], [SUB, SMSC], flux_exprs=@.[SUB * (SMS / SMSC) * RMO]),
+        SimpleFlux([RMO, SRUN, SMS] => [REC], [CRAK, SMSC], flux_exprs=@.[CRAK * (SMS / SMSC) * (RMO - SRUN)]),
+        SimpleFlux([RMO, SRUN, REC] => [SMF], Num[], flux_exprs=@.[RMO - SRUN - REC]),
+        SimpleFlux([SMS, SMF] => [GWF], [SMSC], flux_exprs=@.[ifelse(SMS == SMSC, SMF, 0.0)]),
+        SimpleFlux([GW] => [BAS], [K], flux_exprs=@.[K * GW]),
+        SimpleFlux([IRUN, SRUN, BAS] => [U], [K], flux_exprs=@.[IRUN + SRUN + BAS]),
     ]
 
     dfuncs = [
@@ -78,5 +78,4 @@ function Unit(; name::Symbol, mtk::Bool=true)
         elements=elements,
     )
 end
-
 end

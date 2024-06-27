@@ -31,11 +31,10 @@ solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
 # solver = LumpedHydro.DiscreteSolver()
 @btime result = model(input, pas, timeidx=ts, solver=solver);
 # result_df = DataFrame(result)
+# # plot result
+# fig = Figure(size=(400, 300))
+# ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+# lines!(ax, ts, flow_vec, color=:red)
+# lines!(ax, ts, result_df[!,"flow"], color=:blue)
 
-# plot result
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, ts, flow_vec, color=:red)
-lines!(ax, ts, result.flow, color=:blue)
-
-fig
+# fig

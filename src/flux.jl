@@ -42,40 +42,42 @@ struct SimpleFlux <: AbstractSimpleFlux
     function SimpleFlux(
         flux_names::Pair{Vector{Symbol},Vector{Symbol}},
         param_names::Vector{Symbol}=Symbol[];
+        flux_funcs::Vector{<:Function}=Function[],
         kwargs...
     )
         #* 获取输入输出名称
         input_names, output_names = flux_names[1], flux_names[2]
 
-        if input_names isa Symbol
-            input_names = [input_names]
+        if length(flux_funcs) > 0
+            inputs = [first(@variables $var(t) = 0.0) for var in input_names]
+            outputs = [first(@variables $var(t) = 0.0) for var in output_names]
+            params = [first(@parameters $var = 0.0) for var in output_names]
+            flux_eqs = [output ~ flux_func(inputs, params) for (output, flux_func) in zip(outputs, flux_funcs)]
+        else
+            #* 根据输入输出参数名称获取对应的计算公式
+            hydro_equation = HydroEquation(input_names, output_names, param_names)
+            flux_flux_exprs = expr(hydro_equation; kwargs...)
+            #* 得到计算函数
+            flux_funcs = [
+                build_function(hydro_expr, hydro_equation.inputs, hydro_equation.params, expression=Val{false})
+                for hydro_expr in flux_flux_exprs
+            ]
+            #* 得到计算公式
+            flux_eqs = [output ~ hydro_expr for (output, hydro_expr) in zip(hydro_equation.outputs, flux_flux_exprs)]
         end
 
-        if output_names isa Symbol
-            output_names = [output_names]
-        end
-
-        #* 根据输入输出参数名称获取对应的计算公式
-        hydro_equation = HydroEquation(input_names, output_names, param_names)
-        flux_exprs = expr(hydro_equation; kwargs...)
-
-        #* 得到计算函数
-        flux_funcs = [
-            build_function(hydro_expr, hydro_equation.inputs, hydro_equation.params, expression=Val{false})
-            for hydro_expr in flux_exprs
-        ]
-
-        #* 得到计算公式
-        flux_eqs = [output ~ hydro_expr for (output, hydro_expr) in zip(hydro_equation.outputs, flux_exprs)]
-
-        function inner_flux_func(input::AbstractVector, params::AbstractVector)
+        function inner_flux_func(input::AbstractArray, params::AbstractArray)
             [func(input, params) for func in flux_funcs]
         end
 
-        function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
-            [[func(input[i, :], params) for i in 1:size(input)[1]] for func in flux_funcs]
-        end
+        # function inner_flux_func(input::AbstractMatrix, params::AbstractVector, timeidx::Vector)
+        #     #! 这个地方有问题
+        #     [[func(input[i, :], params) for i in timeidx] for func in flux_funcs]
+        # end
 
+        # function inner_flux_func(input::NamedTuple, params::NamedTuple)
+        #     [[func([input[nm] for nm in input_names], collect(params[param_names]))] for func in flux_funcs]
+        # end
 
         return new(
             input_names,
@@ -89,7 +91,7 @@ struct SimpleFlux <: AbstractSimpleFlux
     function SimpleFlux(
         fluxes::Pair{Vector{Num},Vector{Num}},
         params::Vector{Num}=Num[];
-        exprs::Vector{Num}
+        flux_exprs::Vector{Num}
     )
         inputs, outputs = fluxes[1], fluxes[2]
 
@@ -106,12 +108,12 @@ struct SimpleFlux <: AbstractSimpleFlux
         param_names = Symbolics.tosymbol.(params)
 
         #* 得到计算函数
-        flux_funcs = [build_function(flux_expr, inputs, params, expression=Val{false}) for flux_expr in exprs]
+        flux_funcs = [build_function(flux_expr, inputs, params, expression=Val{false}) for flux_expr in flux_exprs]
 
         #* 得到计算公式
-        flux_eqs = [output ~ flux_expr for (output, flux_expr) in zip(outputs, exprs)]
+        flux_eqs = [output ~ flux_expr for (output, flux_expr) in zip(outputs, flux_exprs)]
 
-        function inner_flux_func(input::AbstractVector, params::AbstractVector)
+        function inner_flux_func(input::AbstractArray, params::AbstractArray)
             [func(input, params) for func in flux_funcs]
         end
 
@@ -163,18 +165,24 @@ struct StateFlux <: AbstractStateFlux
         #* 转换为Symbol
         influx_names = Symbolics.tosymbol.(influxes, escape=false)
         outflux_names = Symbolics.tosymbol.(outfluxes, escape=false)
-        input_names = Symbol.(union(vcat(influx_names, outflux_names)))
+        state_input_names = Symbol.(union(vcat(influx_names, outflux_names)))
         state_name = Symbolics.tosymbol(state, escape=false)
 
         #* 构建函数和公式
         state_expr = sum(influxes) - sum(outfluxes)
         state_eq = D(state) ~ state_expr
 
+        #* 获取state flux name信息
+        funcs_input_names, funcs_output_names = get_input_output_names(funcs)
+        union_input_names = union(funcs_input_names, setdiff(state_input_names, funcs_output_names))
+        funcs_var_names = vcat(union_input_names, funcs_output_names)
+        funcs_param_names = get_param_names(funcs)
+
         #* 构建计算函数
-        state_func = build_state_func(funcs, state_expr, input_names)
+        state_func = build_state_func(funcs, state_expr, union_input_names, funcs_var_names, funcs_param_names)
 
         return new(
-            input_names,
+            union_input_names,
             [state_name],
             state_func,
             state_eq
@@ -187,7 +195,7 @@ struct StateFlux <: AbstractStateFlux
         funcs::Vector{<:AbstractFlux}
     )
         influx_names, outflux_names = flux_names[1], flux_names[2]
-        input_names = vcat(influx_names, outflux_names)
+        state_input_names = vcat(influx_names, outflux_names)
         #* 构建函数和公式
         influxes = [first(@variables $nm(t) = 0.0) for nm in influx_names]
         outfluxes = [first(@variables $nm(t) = 0.0) for nm in outflux_names]
@@ -195,11 +203,17 @@ struct StateFlux <: AbstractStateFlux
         state_expr = sum(influxes) - sum(outfluxes)
         state_eq = D(state) ~ state_expr
 
+        #* 获取state flux name信息
+        funcs_input_names, funcs_output_names = get_input_output_names(funcs)
+        union_input_names = union(funcs_input_names, setdiff(state_input_names, funcs_output_names))
+        funcs_var_names = vcat(union_input_names, funcs_output_names)
+        funcs_param_names = get_param_names(funcs)
+
         #* 构建计算函数
-        state_func = build_state_func(funcs, state_expr, input_names)
+        state_func = build_state_func(funcs, state_expr, union_input_names, funcs_var_names, funcs_param_names)
 
         return new(
-            input_names,
+            union_input_names,
             [state_name],
             state_func,
             state_eq
