@@ -13,7 +13,7 @@ function expr(eq::HydroEquation{(:prcp, :pet),(:rainfall,),()}; kw...)
     @.[sf(prcp - pet) * (prcp - pet)]
 end
 
-function expr(eq::HydroEquation{(:prcp, :pet),(:rainfall,),(:Tmin,)}; kw...)
+function expr(eq::HydroEquation{(:prcp, :pet),(:rainfall,),(:tti,:tt)}; kw...)
     prcp, temp = eq.inputs
     tti, tt = eq.params
     sf = get(kw, :smooth_func, step_func)

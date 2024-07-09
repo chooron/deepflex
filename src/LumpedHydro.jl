@@ -3,15 +3,15 @@ module LumpedHydro
 # common packages
 using TOML
 using Statistics
-using Random
 using ComponentArrays
-using StructArrays
 using NamedTupleTools
 using RecursiveArrayTools
 using Reexport
 using StableRNGs
 using DocStringExtensions
 using BenchmarkTools
+using RuntimeGeneratedFunctions
+RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # Multitreading and parallel computing
 using Base.Threads
@@ -20,11 +20,8 @@ using Base.Threads
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkitNeuralNets
-using ModelingToolkitStandardLibrary.Blocks
 using Symbolics
 using SymbolicUtils
-using SymbolicIndexingInterface
-using SciMLStructures: Tunable, replace
 
 # graph compute
 using Graphs
@@ -43,7 +40,6 @@ using NonlinearSolve
 # deep learning
 using Lux
 using Zygote
-using Diffractor
 
 # parameters Optimization
 using Optimization
@@ -53,18 +49,27 @@ using OptimizationOptimisers
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
-## io type
-const INPUT_TYPE = StructArray
-const PAS_TYPE = ComponentVector
-const FUNC_INPUT_TYPE = NamedTuple
-const FUNC_PARAM_TYPE = NamedTuple
-
 ## Abstract Component Types
 abstract type AbstractComponent end
 abstract type AbstractSolver end
-abstract type AbstractOptimizer end
-
 abstract type AbstractEquation end
+
+# merge ComponentArray:https://github.com/jonniedie/ComponentArrays.jl/issues/186
+function merge_ca(ca::ComponentArray{T}, ca2::ComponentArray{T}) where T
+    ax = getaxes(ca)
+    ax2 = getaxes(ca2)
+    vks = valkeys(ax[1])
+    vks2 = valkeys(ax2[1])
+    _p = Vector{T}()
+    for vk in vks
+        if vk in vks2
+            _p = vcat(_p, ca2[vk])
+        else
+            _p = vcat(_p, ca[vk])
+        end
+    end
+    ComponentArray(_p, ax)
+end
 
 struct HydroEquation{input_names,output_names,param_names} <: AbstractEquation
     inputs::Vector{Num}
@@ -81,11 +86,22 @@ struct HydroEquation{input_names,output_names,param_names} <: AbstractEquation
         params = vcat([@parameters $p = 0.0 [tunable = true] for p in param_names]...)
         return new{Tuple(input_names),Tuple(output_names),Tuple(param_names)}(inputs, outputs, params)
     end
+
+    function HydroEquation(
+        inputs::Vector{Num},
+        outputs::Vector{Num},
+        params::Vector{Num},
+    )
+        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        output_names = Symbolics.tosymbol.(outputs, escape=false)
+        param_names = Symbolics.tosymbol.(params, escape=false)
+        return new{Tuple(input_names),Tuple(output_names),Tuple(param_names)}(inputs, outputs, params)
+    end
 end
 
-abstract type AbstractFlux end
+abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractSimpleFlux <: AbstractFlux end
-abstract type AbstractNeuralFlux <: AbstractFlux end
+abstract type AbstractNeuralFlux <: AbstractSimpleFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractLagFlux <: AbstractFlux end
 
@@ -105,8 +121,8 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 include("utils/lossfunc.jl")
 include("utils/name.jl")
 include("utils/mtk.jl")
-include("utils/optimize.jl")
 include("utils/solver.jl")
+include("utils/special_fluxes.jl")
 include("utils/smoother.jl")
 include("utils/graph.jl")
 include("utils/unithydro.jl")
@@ -122,12 +138,14 @@ export HydroElement, solve_prob # , add_inputflux!, add_outputflux!,
 include("unit.jl")
 export HydroUnit #, update_unit!, add_elements!, remove_elements!
 
+include("optimize.jl")
+export param_grad_optim, param_box_optim
+
 # Implement Flux
 include("functions/evap.jl")
 include("functions/flow.jl")
 include("functions/infiltration.jl")
 include("functions/melt.jl")
-include("functions/others.jl")
 include("functions/percolation.jl")
 include("functions/pet.jl")
 include("functions/rainfall.jl")

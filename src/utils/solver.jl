@@ -15,6 +15,7 @@ end
 function (solver::ODESolver)(
     ode_prob::ODEProblem,
 )
+
     sol = solve(
         ode_prob,
         solver.alg,
@@ -24,7 +25,12 @@ function (solver::ODESolver)(
         sensealg=solver.sensealg
     )
     num_u = length(ode_prob.u0)
-    [sol[i, :] for i in 1:num_u]
+    if SciMLBase.successful_retcode(sol)
+        return [sol[i, :] for i in 1:num_u]
+    else
+        println("solve fail")
+        return [zeros(length(solver.saveat)) for _ in 1:num_u]
+    end
 end
 
 """

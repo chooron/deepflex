@@ -6,6 +6,61 @@ CurrentModule = LumpedHydro
 
 LumpedHydro.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
 
+## 安装
+
+To install ModelingToolkitNeuralNets.jl, use the Julia package manager:
+
+```julia
+using Pkg
+Pkg.add("LumpedHydro")
+```
+
+## 运行一个ExpHydro水文模型
+
+```julia
+# import lib
+using CSV
+using DataFrames
+using CairoMakie
+using BenchmarkTools
+using ComponentArrays
+using LumpedHydro
+
+# load data
+file_path = "data/exphydro/01013500.csv"
+data = CSV.File(file_path);
+df = DataFrame(data);
+ts = collect(1:10000)
+lday_vec = df[ts, "dayl(day)"]
+prcp_vec = df[ts, "prcp(mm/day)"]
+temp_vec = df[ts, "tmean(C)"]
+flow_vec = df[ts, "flow(mm)"]
+
+# build model
+model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false)
+
+# setup parameters and initstates
+f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
+unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
+unit_init_states = (snowwater=0.0, soilwater=1303.004248)
+pas = ComponentVector((params=unit_params, initstates=unit_init_states, weight=1.0))
+
+# run model
+input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
+solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
+result = model(input, pas, timeidx=ts, solver=solver);
+result_df = DataFrame(result)
+
+# plot result
+fig = Figure(size=(400, 300))
+ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
+lines!(ax, ts, flow_vec, color=:red)
+lines!(ax, ts, result_df[!,"flow"], color=:blue)
+fig
+```
+
+![1715847407303](image/index/1715847407303.png)
+
 ## 特性
 
 * [X] 基于julia语言面向函数、多重分派的编程特性，形成了名称驱动的模型构建方式（见自定义模型构建）
@@ -35,63 +90,8 @@ LumpedHydro.jl是一个基于julia语言编写的用于构建概念性水文模�
   * [X] 提供BoxOptimization或更多算法，用于初步的模型参数优化
   * [X] 局部搜索或梯度则更多的用于神经网络内部权重的优化
 
-## 安装
-
-To install ModelingToolkitNeuralNets.jl, use the Julia package manager:
-
-```julia
-using Pkg
-Pkg.add("LumpedHydro")
-```
-
-## 运行一个ExpHydro水文模型
-
-```julia
-# import lib
-using CSV
-using DataFrames
-using CairoMakie
-using BenchmarkTools
-using ComponentArrays
-using LumpedHydro
-
-# load data
-file_path = "data/exphydro/01013500.csv"
-data = CSV.File(file_path);
-df = DataFrame(data);
-ts = 1:1000
-lday_vec = df[ts, "dayl(day)"]
-prcp_vec = df[ts, "prcp(mm/day)"]
-temp_vec = df[ts, "tmean(C)"]
-flow_vec = df[ts, "flow(mm)"]
-
-# build model
-f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
-unit_params = (f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
-unit_init_states = (snowwater=0.0, soilwater=1303.004248)
-
-pas = ComponentVector(exphydro=(params=unit_params, initstates=unit_init_states, weight=1.0))
-
-model = LumpedHydro.ExpHydro.Node(name=:exphydro,mtk=true,step=false)
-
-input = (exphydro=(prcp=prcp_vec, lday=lday_vec, temp=temp_vec, time=1:1:length(lday_vec)),)
-result = model(input, pas);
-result_df = DataFrame(result)
-
-# plot result
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, ts, flow_vec, color=:red)
-lines!(ax, ts, result_df[!, :flow], color=:blue)
-fig
-```
-
-![1715847407303](image/index/1715847407303.png)
-
 ## 代码存在的不足
 
-- 模型种类不全，概念水文模型和当前神经耦合的水文模型待实现
-- **基于梯度的优化方式存在性能不足的问题，在参数较少时基于ForwardDiff，FiniteDiff的AD已经能够满足优化需求，但是ForwardDiff,FiniteDiff不适用于包含神经网络这种有着较多参数的优化问题，为此可以采用非MTK/离散的方式，并使用ReverseDiff的方式（该方式不适用于MTK）求解这个问题，其计算效率会有明显的提升。**
 - 当前主流AD方式的Zygote和Enzyme均有相当严苛的条件，其中Zygote不支持MTK存在的try-catch（通常是在参数设置中引起的）: `ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.`同时Zygote也不支持mutable array，因此也不支持非MTK写法，而Enzyme需要先对代码进行编译，因此存在较多类型问题。
 
 ## 未来工作计划

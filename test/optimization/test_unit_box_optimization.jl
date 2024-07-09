@@ -49,7 +49,11 @@ best_pas = LumpedHydro.param_box_optim(
     const_pas=const_pas,
     input=input,
     target=output,
+    target_name=:flow,
     timeidx=ts,
     lb=tunable_param_lb,
     ub=tunable_param_ub,
+    solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+    maxiters=1000,
+    loss_func=mse,
 )

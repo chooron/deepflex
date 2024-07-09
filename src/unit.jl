@@ -27,12 +27,12 @@ struct HydroUnit <: AbstractUnit
     "hydrological computation unit name"
     name::Symbol
     "hydrological computation elements"
-    elements::Vector{<:AbstractElement}
+    components::Vector{<:AbstractComponent}
 
-    function HydroUnit(name; elements::Vector{<:AbstractElement})
+    function HydroUnit(name; components::Vector{<:AbstractComponent})
         new(
             name,
-            elements,
+            components,
         )
     end
 end
@@ -45,8 +45,9 @@ function (unit::HydroUnit)(
     solver::AbstractSolver=ODESolver()
 )
     fluxes = input
-    for tmp_ele in unit.elements
-        fluxes = merge(fluxes, tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver))
+    for tmp_ele in unit.components
+        tmp_fluxes = tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver)
+        fluxes = merge(fluxes, tmp_fluxes)
     end
     fluxes
 end

@@ -57,6 +57,8 @@
 - [X] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
 - [ ] stateflux生成临时函数时存在问题
 - [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
+- [ ] 新增dPL-HBV, ENN, PRNN
+- [ ] **NeuralFlux嵌入到dfunc无法生成耦合函数**
 
 # 暑假工作计划
 
@@ -91,3 +93,4 @@
   **ERROR: MethodError: no method matching length(::ChainRulesCore.ZeroTangent)**
 - MTK:
   **ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.**
+

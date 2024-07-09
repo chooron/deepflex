@@ -1,56 +1,13 @@
-function get_input_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
-    if func.input_names isa Vector
-        input_names = func.input_names
-    else
-        input_names = [func.input_names]
-    end
-    input_names
+function get_input_names(func::AbstractFlux)
+    keys(func.input_info)
 end
 
-function get_output_names(func::Union{AbstractSimpleFlux,AbstractNeuralFlux})
-    if func.output_names isa Vector
-        output_names = func.output_names
-    else
-        output_names = [func.output_names]
-    end
-    output_names
+function get_output_names(func::AbstractFlux)
+    keys(func.output_info)
 end
 
 function get_param_names(func::AbstractFlux)
-    if func.param_names isa Vector
-        param_names = func.param_names
-    else
-        param_names = [func.param_names]
-    end
-    param_names
-end
-
-function get_param_names(::AbstractStateFlux)
-    Symbol[]
-end
-
-function get_param_names(func::AbstractNeuralFlux)
-    [func.chain_name]
-end
-
-function get_input_names(func::AbstractStateFlux)
-    func.input_names
-end
-
-function get_output_names(func::AbstractStateFlux)
-    func.output_names
-end
-
-function get_input_names(func::AbstractLagFlux)
-    [func.input_names]
-end
-
-function get_output_names(func::AbstractLagFlux)
-    [func.output_names]
-end
-
-function get_param_names(func::AbstractLagFlux)
-    [func.lag_time]
+    keys(func.param_info)
 end
 
 function get_input_output_names(funcs::Vector{<:AbstractFlux})
@@ -154,12 +111,12 @@ function get_state_names(elements::Vector{T}) where {T<:AbstractElement}
 end
 
 #* unit name utils
-get_var_names(unit::AbstractUnit) = get_var_names(unit.elements)
+get_var_names(unit::AbstractUnit) = get_var_names(unit.components)
 
-get_input_names(unit::AbstractUnit) = get_input_names(unit.elements)
+get_input_names(unit::AbstractUnit) = get_input_names(unit.components)
 
-get_output_names(unit::AbstractUnit) = get_output_names(unit.elements)
+get_output_names(unit::AbstractUnit) = get_output_names(unit.components)
 
-get_param_names(unit::AbstractUnit) = get_param_names(unit.elements)
+get_param_names(unit::AbstractUnit) = get_param_names(unit.components)
 
-get_state_names(unit::AbstractUnit) = get_state_names(unit.elements)
+get_state_names(unit::AbstractUnit) = get_state_names(unit.components)

@@ -32,8 +32,8 @@ function Soil(; name::Symbol, mtk::Bool=true)
         SimpleFlux([:outflow] => [:slowflow, :fastflow]),]
 
     lfluxes = [
-        LagFlux(:slowflow, :x4, LumpedHydro.uh_1_half),
-        LagFlux(:fastflow, :x4, LumpedHydro.uh_2_full),
+        LagFlux(:slowflow => :slowflow_routed, :x4, LumpedHydro.uh_1_half),
+        LagFlux(:fastflow => :fastflow_routed, :x4, LumpedHydro.uh_2_full),
     ]
 
     dfluxes = [
@@ -53,12 +53,12 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
 
     fluxes = [
         SimpleFlux([:routingstore] => [:recharge], [:x2, :x3, :ω]),
-        SimpleFlux([:routingstore, :recharge, :slowflow_lag] => [:routedflow], [:x3, :γ]),
-        SimpleFlux([:routedflow, :recharge, :fastflow_lag] => [:flow])
+        SimpleFlux([:routingstore, :recharge, :slowflow_routed] => [:routedflow], [:x3, :γ]),
+        SimpleFlux([:routedflow, :recharge, :fastflow_routed] => [:flow])
     ]
 
     dfluxes = [
-        StateFlux([:slowflow_lag, :recharge] => [:routedflow], :routingstore, funcs=fluxes),
+        StateFlux([:slowflow_routed, :recharge] => [:routedflow], :routingstore, funcs=fluxes),
     ]
 
     HydroElement(
@@ -79,7 +79,7 @@ function Unit(; name::Symbol, mtk::Bool=true)
 
     HydroUnit(
         name,
-        elements=elements,
+        components=elements,
     )
 end
 end

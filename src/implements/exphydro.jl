@@ -5,7 +5,7 @@ using ..LumpedHydro
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SurfaceStorage(; name::Symbol, mtk::Bool=true)
+function SurfaceStorage(; name::Symbol)
     fluxes = [
         SimpleFlux([:temp, :lday] => [:pet]),
         SimpleFlux([:prcp, :temp] => [:snowfall], [:Tmin]),
@@ -15,21 +15,20 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfluxes = [
-        StateFlux([:snowfall] => [:melt], :snowwater, funcs=fluxes),
+        StateFlux([:snowfall] => [:melt], :snowwater, flux_funcs=fluxes),
     ]
 
     HydroElement(
         Symbol(name, :_surface),
         funcs=fluxes,
         dfuncs=dfluxes,
-        mtk=mtk,
     )
 end
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
-function SoilStorage(; name::Symbol, mtk::Bool=true)
+function SoilStorage(; name::Symbol)
     fluxes = [
         SimpleFlux([:soilwater, :pet] => [:evap], [:Smax]),
         SimpleFlux([:soilwater] => [:baseflow], [:Smax, :Qmax, :f]),
@@ -37,21 +36,20 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfluxes = [
-        StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater, funcs=fluxes)
+        StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater, flux_funcs=fluxes)
     ]
 
     HydroElement(
         Symbol(name, :_soil),
         funcs=fluxes,
         dfuncs=dfluxes,
-        mtk=mtk
     )
 end
 
 """
 Inner Route Function in Exphydro
 """
-function FreeWater(; name::Symbol, mtk=true)
+function FreeWater(; name::Symbol)
 
     fluxes = [
         SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] .+ i[2]])
@@ -60,21 +58,20 @@ function FreeWater(; name::Symbol, mtk=true)
     HydroElement(
         Symbol(name, :_zone),
         funcs=fluxes,
-        mtk=mtk
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true)
+function Unit(; name::Symbol)
 
     elements = [
-        SurfaceStorage(name=name, mtk=mtk),
-        SoilStorage(name=name, mtk=mtk),
-        FreeWater(name=name, mtk=mtk)
+        SurfaceStorage(name=name),
+        SoilStorage(name=name),
+        FreeWater(name=name)
     ]
 
     HydroUnit(
         name,
-        elements=elements,
+        components=elements,
     )
 end
 

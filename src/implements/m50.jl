@@ -1,12 +1,11 @@
 @reexport module M50
-
-"""
-Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
-"""
 using ..LumpedHydro
 using ..NamedTupleTools
 import ..LumpedHydro: Lux
 
+"""
+Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)
+"""
 function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     funcs = [
         SimpleFlux([:temp, :lday] => [:pet]),
@@ -30,29 +29,29 @@ end
 
 function SoilStorage(; name::Symbol, mtk::Bool=true)
 
-    # 神经网络的定义是在模型之内，需要提取到模型的参数
     et_ann = Lux.Chain(
         Lux.Dense(3 => 16, Lux.tanh),
-        # Lux.Dense(16 => 16, Lux.leakyrelu),
+        Lux.Dense(16 => 16, Lux.leakyrelu),
         Lux.Dense(16 => 1, Lux.leakyrelu)
     )
 
     q_ann = Lux.Chain(
         Lux.Dense(2 => 16, Lux.tanh),
-        # Lux.Dense(16 => 16, Lux.leakyrelu),
+        Lux.Dense(16 => 16, Lux.leakyrelu),
         Lux.Dense(16 => 1, Lux.leakyrelu)
     )
 
     funcs = [
         # normalize
-        StdMeanNormFlux([:snowwater, :soilwater, :prcp, :temp] => [:norm_snw, :norm_slw, :norm_prcp, :norm_temp]),
+        StdMeanNormFlux([:snowwater, :soilwater, :prcp, :temp] => [:norm_snw, :norm_slw, :norm_prcp, :norm_temp],
+            [:snowwater => [:mean_snowwater, :std_snowwater], :soilwater => [:mean_soilwater, :std_soilwater],
+                :prcp => [:mean_prcp, :std_prcp], :temp => [:mean_temp, :std_temp]]),
         # ET ANN
         NeuralFlux([:norm_snw, :norm_slw, :norm_temp] => [:evap], :etnn => et_ann),
         # Q ANN
         NeuralFlux([:norm_slw, :norm_prcp] => [:flow], :qnn => q_ann),
-        # 一些变量转为用于状态计算的形式
-        SimpleFlux([:soilwater, :lday, :evap] => [:realevap], Symbol[], flux_funcs=[(i, p) -> @.(i[1] * i[2] * i[3])]),
-        SimpleFlux([:soilwater, :flow] => [:realflow], Symbol[], flux_funcs=[(i, p) -> @.(ifelse_func(i[1]) * exp(i[2]))]),
+        SimpleFlux([:soilwater, :lday, :evap] => [:realevap], flux_funcs=[(i, p) -> [i[1] * i[2] * i[3]]]),
+        SimpleFlux([:soilwater, :flow] => [:realflow], flux_funcs=[(i, p) -> [ifelse(i[1] > 0, 1.0, 0.0) * exp(i[2])]]),
     ]
 
     dfuncs = [

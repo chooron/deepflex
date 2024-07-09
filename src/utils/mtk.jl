@@ -9,9 +9,9 @@ function build_ele_system(
     dfuncs::Vector{<:AbstractFlux};
     name::Symbol,
 )
-    funcs_eqs = vcat([func.flux_eqs for func in funcs]...)
-    dfuncs_eqs = vcat([dfunc.state_eq for dfunc in dfuncs]...)
-    sub_sys = vcat([nfunc.sub_sys for nfunc in filter(f -> f isa AbstractNeuralFlux, funcs)]...)
+    funcs_eqs = reduce(vcat, [func.flux_eqs for func in funcs])
+    dfuncs_eqs = reduce(vcat, [dfunc.state_eq for dfunc in dfuncs])
+    sub_sys = reduce(vcat, [nfunc.sub_sys for nfunc in filter(f -> f isa AbstractNeuralFlux, funcs)])
     base_sys = ODESystem(vcat(funcs_eqs, dfuncs_eqs), t; name=Symbol(name, :_base_sys), systems=sub_sys)
     base_sys
 end
@@ -19,15 +19,10 @@ end
 function build_state_func(
     fluxes::Vector{<:AbstractFlux},
     state_expr::Num,
+    fluxes_vars_ntp::NamedTuple,
+    funcs_params::NamedTuple,
     state_input_names::Vector{Symbol},
-    funcs_var_names::Vector{Symbol},
-    funcs_param_names::Vector{Symbol},
 )
-    #* 构建变量
-    fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in funcs_var_names]
-    fluxes_params = [first(@parameters $nm = 0.0 [tunable = true]) for nm in funcs_param_names]
-    fluxes_vars_ntp = NamedTuple{Tuple(funcs_var_names)}(fluxes_vars)
-
     #* 构建state计算的函数并将所有中间状态替换
     substitute_vars_dict = Dict()
     for var_nm in keys(fluxes_vars_ntp)
@@ -45,45 +40,34 @@ function build_state_func(
     for _ in 1:length(substitute_vars_dict)
         state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
     end
-    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[state_input_names]), fluxes_params, expression=Val{false})
+    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[state_input_names]), collect(funcs_params), expression=Val{false})
     state_func
 end
 
-# todo 需要构建一个用于预测new state的函数
-function build_new_state_func(
+function build_state_funcv2(
     fluxes::Vector{<:AbstractFlux},
-    state_expr::Num,
+    state_func::Function,
+    state_input_names::Vector{Symbol},
+    state_param_names::Vector{Symbol},
 )
-    #* 获得elements的输入变量名
-    fluxes_input_names, fluxes_output_names = get_input_output_names(fluxes)
-    #* fluxes计算过程中需要构建的通量
-    fluxes_var_names = vcat(fluxes_input_names, fluxes_output_names)
-
-    #* 构建变量
-    fluxes_vars = [first(@variables $nm(t) = 0.0) for nm in fluxes_var_names]
-    fluxes_params = [first(@parameters $param_name = 0.0 [tunable = true]) for param_name in get_param_names(fluxes)]
-    fluxes_vars_ntp = NamedTuple{Tuple(fluxes_var_names)}(fluxes_vars)
-
-    #* 构建state计算的函数并将所有中间状态替换
-    substitute_vars_dict = Dict()
-    for var_nm in keys(fluxes_vars_ntp)
-        for flux in fluxes
-            tmp_output_names = get_output_names(flux)
-            for j in eachindex(tmp_output_names)
-                if var_nm == tmp_output_names[j]
-                    tmp_flux_exprs = Symbolics.rhss(flux.flux_eqs)
-                    substitute_vars_dict[fluxes_vars_ntp[var_nm]] = tmp_flux_exprs[j]
-                end
-            end
+    flux_exprs = [
+        quote
+            ($(get_output_names(flux)...),) = $(flux)([$(get_input_names(flux))...], [$(get_param_names(flux))...])
         end
-    end
+        for flux in fluxes
+    ]
 
-    state_expr_sub = state_expr
-    for _ in 1:length(substitute_vars_dict)
-        state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
-    end
-    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[fluxes_input_names]), fluxes_params, expression=Val{false})
-    state_func
+    total_param_names = union(state_param_names, get_param_names(fluxes))
+
+    state_func_expr = :((i, p) -> begin
+        ($(state_input_names...),) = i
+        ($(total_param_names...),) = p
+        $flux_exprs
+        return $(state_func)([$(state_input_names)...], [$(state_param_names)...])
+    end)
+
+    func = @RuntimeGeneratedFunction(state_func_expr)
+    func
 end
 
 """

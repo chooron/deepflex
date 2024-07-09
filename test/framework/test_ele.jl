@@ -9,7 +9,7 @@ using OrdinaryDiffEq
 
 include("../../src/LumpedHydro.jl")
 
-ele = LumpedHydro.ExpHydro.SurfaceStorage(name=:sf, mtk=false)
+ele = LumpedHydro.ExpHydro.SurfaceStorage(name=:sf)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 ps = [f, Smax, Qmax, Df, Tmax, Tmin]
@@ -20,14 +20,6 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = collect(1:10000)
+ts = collect(1:100)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-
-# function test_build_system()
-#     build_sys = LumpedHydro.setup_input(ele.system, input, ts, LumpedHydro.get_input_names(ele), :test)
-#     init_prob = ODEProblem(build_sys, Pair[], (1, 100), [])
-#     init_prob
-# end
-# solver = LumpedHydro.DiscreteSolver()
-@btime results = ele(input, pas, timeidx=ts)
+results = ele(input, pas, timeidx=ts)

@@ -6,7 +6,7 @@ function expr(eq::HydroEquation{(:soilwater,),(:baseflow,),(:Smax, :Qmax, :f)}; 
 
     @.[sf(soilwater) * (
         sf(soilwater - Smax) * Qmax +
-        sf(soilwater) * sf(Smax - soilwater) * Qmax * exp(-f * (Smax - soilwater))
+        sf(Smax - soilwater) * Qmax * exp(-f * (Smax - soilwater))
     )]
 end
 
@@ -64,7 +64,7 @@ function expr(eq::HydroEquation{(:outflow,),(:slowflow, :fastflow),()}; kw...)
     @.[outflow * 0.9, outflow * 0.1]
 end
 
-function expr(eq::HydroEquation{(:routingstore, :recharge, :slowflow_lag),(:routedflow,),(:x3, :γ)}; kw...)
+function expr(eq::HydroEquation{(:routingstore, :recharge, :slowflow_routed),(:routedflow,),(:x3, :γ)}; kw...)
     routingstore, recharge, slowflow_lag = eq.inputs
     rgt = @.(routingstore + slowflow_lag + recharge)
     x3, γ = eq.params
@@ -72,7 +72,7 @@ function expr(eq::HydroEquation{(:routingstore, :recharge, :slowflow_lag),(:rout
     # @.[rgt * (1.0 - (1.0 + (rgt / x3)^4)^(-1 / 4))]
 end
 
-function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow_lag,),(:flow,),()}; kw...)
+function expr(eq::HydroEquation{(:routedflow, :recharge, :fastflow_routed),(:flow,),()}; kw...)
     routedflow, recharge, fastflow_lag = eq.inputs
     @.[routedflow + max(0.0, recharge + fastflow_lag)]
 end
