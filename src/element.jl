@@ -24,6 +24,10 @@ struct HydroElement <: AbstractElement
     Hydrological lag fluxes
     """
     lfuncs::Vector
+    """
+    Hydrological lag fluxes
+    """
+    ode_funcs::Vector
 
     function HydroElement(
         name::Symbol;
@@ -34,6 +38,7 @@ struct HydroElement <: AbstractElement
         ele_input_names, ele_output_names, ele_state_names = get_var_names(funcs, dfuncs)
         ele_param_names = get_param_names(vcat(funcs, dfuncs))
         nameinfo = (input=ele_input_names, output=ele_output_names, state=ele_state_names, param=ele_param_names)
+        ode_funcs = [build_state_funcv2(funcs, dfunc, vcat(ele_input_names, ele_state_names)) for dfunc in dfuncs]
 
         return new(
             name,
@@ -41,6 +46,7 @@ struct HydroElement <: AbstractElement
             funcs,
             dfuncs,
             lfuncs,
+            ode_funcs
         )
     end
 end
@@ -52,8 +58,8 @@ function (ele::HydroElement)(
     solver::AbstractSolver=ODESolver(saveat=timeidx),
     solved::Bool=false
 )
-    params = pas[:params]
-    init_states = pas[:initstates]
+    params = NamedTuple(pas[:params])
+    init_states = NamedTuple(pas[:initstates])
     ele_state_names = ele.nameinfo[:state]
     if !solved & (length(ele.dfuncs) > 0)
         solved_states = solve_prob(ele, input=fluxes, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
@@ -80,8 +86,8 @@ end
 function solve_prob(
     ele::HydroElement;
     input::NamedTuple,
-    params::ComponentVector,
-    init_states::ComponentVector,
+    params::NamedTuple,
+    init_states::NamedTuple,
     timeidx::Vector=collect(1:length(input[1])),
     solver::AbstractSolver=ODESolver(saveat=timeidx),
 )
@@ -92,24 +98,12 @@ function solve_prob(
         [LinearInterpolation(input[nm], timeidx, extrapolate=true) for nm in ele_input_names]
     )
 
-    dfuncs_input_names_list = [get_input_names(dfunc) for dfunc in ele.dfuncs]
-
-    dfuncs_input_func_list = [
-        (t, u) -> begin
-            [
-                begin
-                    state_idx = findfirst(x -> x == nm, ele_state_names)
-                    isnothing(state_idx) ? itpfunc_ntp[nm](t) : u[state_idx]
-                end
-                for nm in dfuncs_input_names
-            ]
-        end
-        for dfuncs_input_names in dfuncs_input_names_list
-    ]
+    params = merge(params, (ptype=eltype(params),))
+    dfuncs_input_func = (t, u) -> vcat([itpfunc_ntp[nm](t) for nm in ele_input_names], u)
 
     if solver isa ODESolver
         function singel_ele_ode_func!(du, u, p, t)
-            du[:] = [dfunc.inner_func(dfuncs_input_func(t, u), p) for (dfunc, dfuncs_input_func) in zip(ele.dfuncs, dfuncs_input_func_list)]
+            du[:] = [ode_func(dfuncs_input_func(t, u), p) for ode_func in ele.ode_funcs]
         end
 
         prob = ODEProblem(

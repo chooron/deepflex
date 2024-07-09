@@ -35,14 +35,10 @@ prcp_norm_vec, temp_norm_vec, snowpack_norm_vec, soilwater_norm_vec = [@.((tmp_v
 @parameters Smax = 0.0 [description = "maximum water storage", unit = "mm"]
 @parameters f = 0.0 [description = "runoff decline rate", unit = "mm^(-1)"]
 @parameters Qmax = 0.0 [description = "maximum subsurface runoff", unit = "mm/d"]
-@parameters mean_snowpack = 0.0
-@parameters std_snowpack = 0.0
-@parameters mean_soilwater = 0.0
-@parameters std_soilwater = 0.0
-@parameters mean_prcp = 0.0
-@parameters std_prcp = 0.0
-@parameters mean_temp = 0.0
-@parameters std_temp = 0.0
+@parameters snowpack_norm_param[1:2]
+@parameters soilwater_norm_param[1:2]
+@parameters prcp_norm_param[1:2]
+@parameters temp_norm_param[1:2]
 #! hydrological flux in the Exp-Hydro model
 @variables prcp(t) = 0.0 [description = "precipitation", unit = "mm"]
 @variables temp(t) = 0.0 [description = "precipitation", unit = "°C"]
@@ -80,64 +76,60 @@ snow_funcs = [
     SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
         flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
-snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack, flux_funcs=snow_funcs)]
+snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
 snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the ET NN and Q NN
 et_nn = Lux.Chain(
-    Lux.Dense(3 => 16), # , Lux.tanh
-    # Lux.Dense(16 => 16), # , Lux.leakyrelu
-    Lux.Dense(16 => 2)#, Lux.leakyrelu
+    Lux.Dense(3 => 16, Lux.tanh), # 
+    Lux.Dense(16 => 16, Lux.leakyrelu), # 
+    Lux.Dense(16 => 2, Lux.leakyrelu)#
 )
-
 q_nn = Lux.Chain(
     Lux.Dense(2 => 16),#, Lux.tanh
-    # Lux.Dense(16 => 16),#, Lux.leakyrelu
+    Lux.Dense(16 => 16),#, Lux.leakyrelu
     Lux.Dense(16 => 1)#, Lux.leakyrelu
 )
 
 #! get init parameters for each NN
-et_nn_p = LuxCore.initialparameters(StableRNG(42), et_nn)
-q_nn_p = LuxCore.initialparameters(StableRNG(42), q_nn)
-
-init_params = Lux.initialparameters(StableRNG(42), et_nn)
-
-chain_params = first(@parameters p[1:length(init_params)] = Vector(ComponentVector(init_params)))
-chain_params_type_var = first(@parameters ptype::typeof(typeof(init_params)) = typeof(init_params) [tunable = false])
-lazyconvert_params = Symbolics.array_term(convert, chain_params_type_var, chain_params, size=size(chain_params))
-
-@named input = RealInputArray(nin = 3)
-exprs = LuxCore.stateless_apply(et_nn, [norm_snw, norm_slw, norm_temp], Symbolics.array_term(convert, ptype, p, size = size(p)))[1]
-
 et_nn_flux = NeuralFlux([norm_snw, norm_slw, norm_temp] => [log_evap_div_lday, log_flow], :etnn => et_nn)
 q_nn_flux = NeuralFlux([norm_slw, norm_prcp] => [log_flow], :qnn => q_nn)
-
-et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
-q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
-
-et_nn_flux_expr = Symbolics.rhss(et_nn_flux.flux_eqs)[1]
-
-temp_func1 = build_function(et_nn_flux_expr, [norm_snw, norm_slw, norm_temp], collect(et_nn_flux.param_info), expression=Val{true})
 
 #! define the soil water reservoir
 soil_funcs = [
     #* normalize
     StdMeanNormFlux(
         [snowpack, soilwater, prcp, temp] => [norm_snw, norm_slw, norm_prcp, norm_temp],
-        [[mean_snowpack, std_snowpack], [mean_soilwater, std_soilwater], [mean_prcp, std_prcp], [mean_temp, std_temp]]
+        [snowpack_norm_param, soilwater_norm_param, prcp_norm_param, temp_norm_param]
     ),
     et_nn_flux,
     q_nn_flux,
 ]
 
 state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
-soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], flux_funcs=soil_funcs, state_expr=state_expr)]
+soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], state_expr=state_expr)]
 soil_ele = HydroElement(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 # #! define the Exp-Hydro model
 m50_model = HydroUnit(:m50, components=[snow_ele, soil_ele]);
-soil_dfuncs[1].inner_func
+
+# prepare args
+input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
+et_nn_p = LuxCore.initialparameters(StableRNG(42), et_nn)
+q_nn_p = LuxCore.initialparameters(StableRNG(42), q_nn)
+params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, etnn=et_nn_p, qnn=q_nn_p)
+mean_params = NamedTuple{Tuple([Symbol(:mean_, nm) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(means)
+std_params = NamedTuple{Tuple([Symbol(:std_, nm) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(stds)
+params = reduce(merge, [params, mean_params, std_params])
+pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=params))
+param_list = collect(pas[:params])
+timeidx = collect(1:length(prcp_vec))
+solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
+result = m50_model(input, pas, timeidx=timeidx, solver=solver);
+
 # #! pretrain each NN
+# et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
+# q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
 # et_nn_p_trained = LumpedHydro.nn_param_optim(
 #     et_nn_flux,
 #     input=et_nn_input,
@@ -153,18 +145,6 @@ soil_dfuncs[1].inner_func
 #     init_params=ComponentVector(qnn=q_nn_p),
 #     maxiters=100,
 # )
-
-# prepare args
-# input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
-# params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, etnn=et_nn_p, qnn=q_nn_p)
-# mean_params = NamedTuple{Tuple([Symbol(:mean_, nm) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(means)
-# std_params = NamedTuple{Tuple([Symbol(:std_, nm) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(stds)
-# params = reduce(merge, [params, mean_params, std_params])
-# pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=params))
-# param_list = collect(pas[:params])
-# timeidx = collect(1:length(prcp_vec))
-# solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
-# result = m50_model(input, pas, timeidx=timeidx, solver=solver);
 
 # LumpedHydro.get_input_names(soil_ele)
 # #! set the tunable parameters and constant parameters

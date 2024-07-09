@@ -59,6 +59,9 @@
 - [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
 - [ ] 新增dPL-HBV, ENN, PRNN
 - [ ] **NeuralFlux嵌入到dfunc无法生成耦合函数**
+  - 当前输入变量只能是@varaibles (v(t))[1:4]这种类型，但这种类型或无法实现变量的替换
+  - 考虑的方法是将nnflux前所有flux套入至nnflux中，但这种方式不行，因为nnflux前面可能还有nnflux
+  - 
 
 # 暑假工作计划
 
@@ -93,4 +96,3 @@
   **ERROR: MethodError: no method matching length(::ChainRulesCore.ZeroTangent)**
 - MTK:
   **ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.**
-

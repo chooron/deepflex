@@ -1,9 +1,9 @@
-"""
-$(SIGNATURES)
+# """
+# $(SIGNATURES)
 
-Based on all ordinary hydrological calculation fluxes and state hydrological fluxes in the hydrological calculation module,
-constructing a system of ordinary differential equations based on ModelingToolkit.jl.
-"""
+# Based on all ordinary hydrological calculation fluxes and state hydrological fluxes in the hydrological calculation module,
+# constructing a system of ordinary differential equations based on ModelingToolkit.jl.
+# """
 function build_ele_system(
     funcs::Vector{<:AbstractFlux},
     dfuncs::Vector{<:AbstractFlux};
@@ -17,165 +17,93 @@ function build_ele_system(
 end
 
 function build_state_func(
-    fluxes::Vector{<:AbstractFlux},
-    state_expr::Num,
-    fluxes_vars_ntp::NamedTuple,
-    funcs_params::NamedTuple,
-    state_input_names::Vector{Symbol},
+    funcs::Vector{<:AbstractFlux},
+    dfunc::AbstractStateFlux,
+    input_names::Vector{Symbol},
 )
+    fluxes_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, [dfunc])])
+    funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, [dfunc])])
     #* 构建state计算的函数并将所有中间状态替换
     substitute_vars_dict = Dict()
     for var_nm in keys(fluxes_vars_ntp)
-        for flux in fluxes
-            tmp_output_names = get_output_names(flux)
+        for func in funcs
+            tmp_output_names = get_output_names(func)
             for j in eachindex(tmp_output_names)
                 if var_nm == tmp_output_names[j]
-                    tmp_flux_exprs = Symbolics.rhss(flux.flux_eqs)
-                    substitute_vars_dict[fluxes_vars_ntp[var_nm]] = tmp_flux_exprs[j]
+                    substitute_vars_dict[fluxes_vars_ntp[var_nm]] = func.flux_exprs[j]
                 end
             end
         end
     end
-    state_expr_sub = state_expr
+    state_expr_sub = dfunc.state_expr
     for _ in 1:length(substitute_vars_dict)
         state_expr_sub = substitute(state_expr_sub, substitute_vars_dict)
     end
-    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[state_input_names]), collect(funcs_params), expression=Val{false})
+    state_func = build_function(state_expr_sub, collect(fluxes_vars_ntp[input_names]), collect(funcs_params_ntp), expression=Val{false})
     state_func
 end
 
 function build_state_funcv2(
-    fluxes::Vector{<:AbstractFlux},
-    state_func::Function,
-    state_input_names::Vector{Symbol},
-    state_param_names::Vector{Symbol},
+    funcs::Vector{<:AbstractFlux},
+    dfunc::AbstractStateFlux,
+    input_names::Vector{Symbol},
 )
-    flux_exprs = [
-        quote
-            ($(get_output_names(flux)...),) = $(flux)([$(get_input_names(flux))...], [$(get_param_names(flux))...])
+    fluxes_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, [dfunc])])
+    funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, [dfunc])])
+
+    assign_list = Assignment[]
+    for func in funcs
+        if func isa AbstractNeuralFlux
+            push!(assign_list, Assignment(func.nn_info[:input], MakeArray(collect(func.input_info), Vector)))
+            push!(assign_list, Assignment(func.nn_info[:output], func.flux_expr))
+            if length(func.output_info) > 1
+                for (idx, output) in enumerate(collect(func.output_info))
+                    push!(assign_list, Assignment(output, v[idx]))
+                end
+            else
+                push!(assign_list, Assignment(func.output_info[1], v))
+            end
+        else
+            for (output, expr) in zip(collect(func.output_info), func.flux_exprs)
+                push!(assign_list, Assignment(output, expr))
+            end
         end
-        for flux in fluxes
+    end
+
+    func_args = [DestructuredArgs(collect(fluxes_vars_ntp[input_names])), DestructuredArgs(collect(funcs_params_ntp))]
+    merged_state_func = @RuntimeGeneratedFunction(
+        toexpr(Func(func_args, [], Let(assign_list, dfunc.state_expr, false)))
+    )
+    merged_state_func
+end
+
+function build_state_funcv3(
+    funcs::Vector{<:AbstractFlux},
+    dfunc::AbstractStateFlux,
+    input_names::Vector{Symbol},
+)
+    total_param_names = keys(reduce(hcat, [func.param_info for func in vcat(funcs, dfunc)]))
+    state_input_names = keys(dfunc.input_info)
+    state_param_names = keys(dfunc.param_info)
+
+    func_input_names = [get_input_names(func) for func in funcs]
+    func_output_names = [get_output_names(func) for func in funcs]
+    func_param_names = [get_param_names(func) for func in funcs]
+
+    flux_exprs = [
+        :(($(output_name...),) = $flux([$(input_name...),], [$(param_name...)]))
+        for (input_name, output_name, param_name, flux) in zip(func_input_names, func_output_names, func_param_names, funcs)
     ]
 
-    total_param_names = union(state_param_names, get_param_names(fluxes))
+    state_func = build_function(dfunc.state_expr, collect(dfunc.input_info), collect(dfunc.param_info), expression=Val{true})
 
     state_func_expr = :((i, p) -> begin
-        ($(state_input_names...),) = i
+        ($(input_names...),) = i
         ($(total_param_names...),) = p
-        $flux_exprs
-        return $(state_func)([$(state_input_names)...], [$(state_param_names)...])
+        $(flux_exprs...)
+        return $(state_func)([$(state_input_names...)], [$(state_param_names...)])
     end)
 
-    func = @RuntimeGeneratedFunction(state_func_expr)
-    func
-end
-
-"""
-$(SIGNATURES)
-
-A macro for building and registering interpolation functions
-"""
-macro itpfn(name, data, ts)
-    fn = Symbol(name, :_itp)
-    quote
-        $(esc(fn))(t) = LinearInterpolation($(esc(data)), $(esc(ts)))(t)
-        $(esc(fn))(t::Num) = SymbolicUtils.term($(esc(fn)), Symbolics.unwrap(t))
-        $(esc(fn))(t)
-    end
-end
-
-"""
-$(SIGNATURES)
-
-Build an interpolation system through input data and couple it with the system 
-initialized by hydrological element to form a complete system
-"""
-function setup_input(
-    ele_system::ODESystem,
-    input::NamedTuple,
-    timeidx::Vector,
-    input_names::Vector,
-    name::Symbol,
-)
-    #* 构建data的插值系统
-    #! 这个语句会影响zygote的优化计算
-    itp_eqs = Equation[getproperty(ele_system, nm) ~ @itpfn(nm, input[nm], timeidx) for nm in input_names]
-    compose_sys = complete(ODESystem(itp_eqs, t; name=Symbol(name, :comp_sys), systems=[ele_system]))
-    structural_simplify(compose_sys)
-end
-
-"""
-$(SIGNATURES)
-
-Used to construct the initialization problem based on the complete system, after constructing the complete system,
-taking into account that systems with neurohydrological fluxes often have special requirements for problem initialization
-used for hydrological element
-"""
-function init_prob(
-    build_system::ODESystem,
-    prebuild_system::ODESystem,
-    nfunc_ntp::NamedTuple,
-    time::AbstractVector,
-)
-    #* 设置系统初始值并构建problem
-    build_u0 = Pair[]
-    for k in keys(nfunc_ntp)
-        func_nn_sys = getproperty(prebuild_system, k)
-        push!(build_u0, getproperty(getproperty(func_nn_sys, :input), :u) => zeros(length(nfunc_ntp[k])))
-    end
-    prob = ODEProblem(build_system, build_u0, (time[1], time[end]), Pair[], warn_initialize_determined=false)
-    prob
-end
-
-"""
-$(SIGNATURES)
-
-Obtain initialization state for problem `remake`
-based on the re-entered initial state combined with the constructed problem
-"""
-function get_mtk_initstates(
-    prebuild_systems::Vector{ODESystem},
-    sol_0::NamedTuple,
-    ele_state_names::Vector,
-    nfunc_ntps::Vector,
-)
-    #* setup init states
-    u0 = Pair[]
-    for (prebuild_system, state_names, nfunc_ntp) in zip(prebuild_systems, ele_state_names, nfunc_ntps)
-        for nm in state_names
-            push!(u0, getproperty(prebuild_system, nm) => sol_0[nm])
-        end
-        for k in keys(nfunc_ntp)
-            func_nn_sys = getproperty(prebuild_system, k)
-            for (idx, nm) in enumerate(nfunc_ntp[k])
-                push!(u0, getproperty(getproperty(func_nn_sys, :input), :u)[idx] => sol_0[nm])
-            end
-        end
-    end
-    u0
-end
-
-"""
-$(SIGNATURES)
-
-Obtain update parameters for problem `remake`
-based on the re-entered parameters combined with the constructed problem
-"""
-function get_mtk_params(
-    prebuild_systems::Vector{ODESystem},
-    params::NamedTuple,
-)
-    #* setup parameters
-    p = Pair[]
-    for prebuild_system in prebuild_systems
-        for nm in ModelingToolkit.parameters(prebuild_system)
-            if contains(string(nm), "₊")
-                tmp_nn = split(string(nm), "₊")[1]
-                push!(p, getproperty(getproperty(prebuild_system, Symbol(tmp_nn)), :p) => Vector(params[Symbol(tmp_nn)]))
-            else
-                push!(p, getproperty(prebuild_system, Symbol(nm)) => params[Symbol(nm)])
-            end
-        end
-    end
-    p
+    merged_state_func = @RuntimeGeneratedFunction(state_func_expr)
+    merged_state_func
 end

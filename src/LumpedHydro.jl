@@ -22,6 +22,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkitNeuralNets
 using Symbolics
 using SymbolicUtils
+using SymbolicUtils.Code
 
 # graph compute
 using Graphs

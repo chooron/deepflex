@@ -36,9 +36,8 @@ flow_vec = df[ts, "flow(mm)"]
 
 # parameters optimization
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
-output = (soilwater=flow_vec,)
+output = (flow=flow_vec,)
 
-#! NOTE: 
 best_pas = LumpedHydro.param_grad_optim(
     model,
     tunable_pas=tunable_pas,

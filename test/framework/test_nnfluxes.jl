@@ -29,3 +29,14 @@ exprs = LuxCore.stateless_apply(nn, v, lazyconvert_p)[1]
 temp_func = build_function(exprs, [v], [p, ptype], expression=Val{false})
 
 temp_func([[3, 2, 1, 2]], [ComponentVector(init_params), typeof(ComponentVector(init_params))])
+
+
+temp_func = build_function(v, [v], expression=Val{true})[2]
+
+f = eval(temp_func)
+f([[1,2,2,3]])
+
+
+expr1 = v2 * 2
+expr2 = v3 + 1
+

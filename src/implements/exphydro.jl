@@ -15,7 +15,7 @@ function SurfaceStorage(; name::Symbol)
     ]
 
     dfluxes = [
-        StateFlux([:snowfall] => [:melt], :snowwater, flux_funcs=fluxes),
+        StateFlux([:snowfall] => [:melt], :snowwater),
     ]
 
     HydroElement(
@@ -36,7 +36,7 @@ function SoilStorage(; name::Symbol)
     ]
 
     dfluxes = [
-        StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater, flux_funcs=fluxes)
+        StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
     HydroElement(
@@ -52,7 +52,7 @@ Inner Route Function in Exphydro
 function FreeWater(; name::Symbol)
 
     fluxes = [
-        SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] .+ i[2]])
+        SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] + i[2]])
     ]
 
     HydroElement(

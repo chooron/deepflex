@@ -20,6 +20,6 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = collect(1:100)
+ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-results = ele(input, pas, timeidx=ts)
+@btime results = ele(input, pas, timeidx=ts)
