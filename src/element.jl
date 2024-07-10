@@ -97,8 +97,6 @@ function solve_prob(
     params = ComponentVector(params)
     params_idx = [getaxes(params)[1][nm].idx for nm in ele.nameinfo[:param]]
 
-    ptypes = [Vector{eltype(params)}, Vector{eltype(params)}]
-
     itpfunc_ntp = NamedTuple{Tuple(ele_input_names)}(
         [LinearInterpolation(input[nm], timeidx, extrapolate=true) for nm in ele_input_names]
     )
@@ -106,7 +104,7 @@ function solve_prob(
     ode_input_func = (t, u) -> vcat([itpfunc_ntp[nm](t) for nm in ele_input_names], u)
 
     function singel_ele_ode_func!(du, u, p, t)
-        du[:] = [ode_func(ode_input_func(t, u), [p[idx] for idx in params_idx], ptypes) for ode_func in ele.ode_funcs]
+        du[:] = [ode_func(ode_input_func(t, u), [p[idx] for idx in params_idx]) for ode_func in ele.ode_funcs]
     end
 
     prob = ODEProblem(
@@ -146,8 +144,7 @@ function build_state_func(
 
     func_args = [
         DestructuredArgs(collect(fluxes_vars_ntp[input_names])),
-        DestructuredArgs(collect(funcs_params_ntp)),
-        DestructuredArgs([func.nn_info[:chain_ptype] for func in funcs if func isa AbstractNeuralFlux])
+        DestructuredArgs(collect(funcs_params_ntp))
     ]
 
     merged_state_func = @RuntimeGeneratedFunction(

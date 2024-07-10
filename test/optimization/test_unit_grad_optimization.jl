@@ -3,7 +3,6 @@ using CSV
 using DataFrames
 # using CairoMakie
 using ComponentArrays
-using StructArrays
 using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
