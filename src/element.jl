@@ -68,7 +68,7 @@ function (ele::HydroElement)(
     end
     for ele_func in ele.funcs
         tmp_mtr = reduce(hcat, collect(fluxes[get_input_names(ele_func)]))
-        tmp_params_vec = eltype(params)[params[get_param_names(ele_func)]...]
+        tmp_params_vec = [params[nm] for nm in get_param_names(ele_func) if nm != :ptype]
         tmp_output = ele_func(tmp_mtr, tmp_params_vec)
         tmp_output_ntp = NamedTuple{Tuple(get_output_names(ele_func))}(eachcol(tmp_output))
         fluxes = merge(fluxes, tmp_output_ntp)
@@ -105,7 +105,6 @@ function solve_prob(
         function singel_ele_ode_func!(du, u, p, t)
             du[:] = [ode_func(dfuncs_input_func(t, u), p) for ode_func in ele.ode_funcs]
         end
-
         prob = ODEProblem(
             singel_ele_ode_func!,
             collect(init_states[ele_state_names]),

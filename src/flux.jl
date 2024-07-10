@@ -34,10 +34,24 @@ struct SimpleFlux <: AbstractSimpleFlux
     It requires the input format to be (i::Vector, p::Vector)
     """
     inner_func::Function
-    """
-    flux equations
-    """
+    "flux expressions"
     flux_exprs::Vector{Num}
+
+    function SimpleFlux(
+        input_info::NamedTuple,
+        output_info::NamedTuple,
+        param_info::NamedTuple,
+        inner_func::Function,
+        flux_exprs::Vector{Num}
+    )
+        return new(
+            input_info,
+            output_info,
+            param_info,
+            inner_func,
+            flux_exprs
+        )
+    end
 
     function SimpleFlux(
         flux_names::Pair{Vector{Symbol},Vector{Symbol}},
@@ -90,16 +104,12 @@ struct SimpleFlux <: AbstractSimpleFlux
         flux_exprs::Vector{Num}
     )
         inputs, outputs = fluxes[1], fluxes[2]
-
         input_names = Symbolics.tosymbol.(inputs, escape=false)
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = Symbolics.tosymbol.(params)
 
         #* 得到计算函数
         flux_funcs = [build_function(flux_expr, inputs, params, expression=Val{false}) for flux_expr in flux_exprs]
-
-        #* 得到计算公式
-        flux_eqs = [output ~ flux_expr for (output, flux_expr) in zip(outputs, flux_exprs)]
 
         function inner_flux_func(input::AbstractVector, params::AbstractVector)
             [func(input, params) for func in flux_funcs]
@@ -114,7 +124,7 @@ struct SimpleFlux <: AbstractSimpleFlux
             NamedTuple{(Tuple(output_names))}(outputs),
             NamedTuple{(Tuple(param_names))}(params),
             inner_flux_func,
-            flux_eqs,
+            flux_exprs,
         )
     end
 end
@@ -334,21 +344,21 @@ struct NeuralFlux <: AbstractNeuralFlux
 
         #* 根据chain构建计算函数
         func = (x, p) -> LuxCore.stateless_apply(chain_model, x, p)
-        flux_expr = func(input_vars, lazyconvert_params)
+        flux_expr = func(nn_input, lazyconvert_params)
 
         function inner_flux_func(input::AbstractVector, params::AbstractVector)
             func(input, params[chain_name])
         end
 
         function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
-            output = func(input', params[chain_name])
-            eachrow(output)
+            output = func(input', params[1])
+            output'
         end
 
         new(
             NamedTuple{Tuple(input_names)}(input_vars),
             NamedTuple{Tuple(output_names)}(output_vars),
-            NamedTuple{(chain_name, :ptype)}([chain_params, chain_params_type_var]),
+            NamedTuple{(chain_name,:ptype)}([chain_params,chain_params_type_var]),
             (input=nn_input, output=nn_output),
             inner_flux_func,
             flux_expr

@@ -10,6 +10,10 @@ function get_param_names(func::AbstractFlux)
     keys(func.param_info)
 end
 
+function get_param_names(func::AbstractNeuralFlux)
+    keys(func.param_info)
+end
+
 function get_input_output_names(funcs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()

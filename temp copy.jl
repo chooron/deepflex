@@ -33,12 +33,12 @@ lazyconvert_params = Symbolics.array_term(convert, ptype, chain_params, size=siz
 @variables nn_out[1:2]
 
 expr = LuxCore.stateless_apply(chain, nn_in, lazyconvert_params)
-ass = [Assignment(nn_out, expr)]
-let_ = Let(ass, nn_out, false)
+ass = [Assignment(nn_in, MakeArray([a, b], Vector)), Assignment(nn_out, expr), Assignment(c, nn_out[1]), Assignment(d, nn_out[2])]
+let_ = Let(ass, c + d, false)
 func = @RuntimeGeneratedFunction(
-    toexpr(Func([nn_in, ptype, p], [], let_))
+    toexpr(Func([a, b, ptype, p], [], let_))
 )
 nnf = (x, p) -> LuxCore.stateless_apply(chain, x, p)
 nnf([1, 2], init_params)
 
-func([1, 2], typeof((init_params)), (init_params))
+func(1, 2, typeof((init_params)), (init_params))

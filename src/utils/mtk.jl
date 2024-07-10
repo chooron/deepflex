@@ -1,21 +1,3 @@
-# """
-# $(SIGNATURES)
-
-# Based on all ordinary hydrological calculation fluxes and state hydrological fluxes in the hydrological calculation module,
-# constructing a system of ordinary differential equations based on ModelingToolkit.jl.
-# """
-function build_ele_system(
-    funcs::Vector{<:AbstractFlux},
-    dfuncs::Vector{<:AbstractFlux};
-    name::Symbol,
-)
-    funcs_eqs = reduce(vcat, [func.flux_eqs for func in funcs])
-    dfuncs_eqs = reduce(vcat, [dfunc.state_eq for dfunc in dfuncs])
-    sub_sys = reduce(vcat, [nfunc.sub_sys for nfunc in filter(f -> f isa AbstractNeuralFlux, funcs)])
-    base_sys = ODESystem(vcat(funcs_eqs, dfuncs_eqs), t; name=Symbol(name, :_base_sys), systems=sub_sys)
-    base_sys
-end
-
 function build_state_func(
     funcs::Vector{<:AbstractFlux},
     dfunc::AbstractStateFlux,
@@ -50,18 +32,14 @@ function build_state_funcv2(
 )
     fluxes_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, [dfunc])])
     funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, [dfunc])])
-
+    
     assign_list = Assignment[]
     for func in funcs
         if func isa AbstractNeuralFlux
             push!(assign_list, Assignment(func.nn_info[:input], MakeArray(collect(func.input_info), Vector)))
             push!(assign_list, Assignment(func.nn_info[:output], func.flux_expr))
-            if length(func.output_info) > 1
-                for (idx, output) in enumerate(collect(func.output_info))
-                    push!(assign_list, Assignment(output, v[idx]))
-                end
-            else
-                push!(assign_list, Assignment(func.output_info[1], v))
+            for (idx, output) in enumerate(collect(func.output_info))
+                push!(assign_list, Assignment(output, func.nn_info[:output][idx]))
             end
         else
             for (output, expr) in zip(collect(func.output_info), func.flux_exprs)
