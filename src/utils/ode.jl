@@ -1,4 +1,4 @@
-function build_state_func(
+function build_state_funcv1(
     funcs::Vector{<:AbstractFlux},
     dfunc::AbstractStateFlux,
     input_names::Vector{Symbol},
@@ -25,6 +25,7 @@ function build_state_func(
     state_func
 end
 
+
 function build_state_funcv2(
     funcs::Vector{<:AbstractFlux},
     dfunc::AbstractStateFlux,
@@ -32,7 +33,7 @@ function build_state_funcv2(
 )
     fluxes_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, [dfunc])])
     funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, [dfunc])])
-    
+
     assign_list = Assignment[]
     for func in funcs
         if func isa AbstractNeuralFlux
@@ -48,12 +49,18 @@ function build_state_funcv2(
         end
     end
 
-    func_args = [DestructuredArgs(collect(fluxes_vars_ntp[input_names])), DestructuredArgs(collect(funcs_params_ntp))]
+    func_args = [
+        DestructuredArgs(collect(fluxes_vars_ntp[input_names])),
+        DestructuredArgs(collect(funcs_params_ntp)),
+        DestructuredArgs([func.nn_info[:chain_ptype] for func in funcs if func isa AbstractNeuralFlux])
+    ]
+
     merged_state_func = @RuntimeGeneratedFunction(
         toexpr(Func(func_args, [], Let(assign_list, dfunc.state_expr, false)))
     )
     merged_state_func
 end
+
 
 function build_state_funcv3(
     funcs::Vector{<:AbstractFlux},

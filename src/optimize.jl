@@ -12,7 +12,6 @@ function predict_func(x::AbstractVector{T}, p) where {T}
     component(input, tmp_pas, timeidx=timeidx, solver=solver)
 end
 
-
 """
 $(SIGNATURES)
 

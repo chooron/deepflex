@@ -122,7 +122,7 @@ params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)
 norm_params = NamedTuple{Tuple([Symbol(nm, :_norm_param) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(
     [[mean, std] for (mean, std) in zip(means, stds)]
 )
-nn_params = (etnn=et_nn_p, qnn=q_nn_p)
+nn_params = (etnn_params=et_nn_p, qnn_params=q_nn_p)
 params = reduce(merge, [params, norm_params, nn_params])
 pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=params))
 timeidx = collect(1:length(prcp_vec))
@@ -133,27 +133,27 @@ result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
 q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
 
-# et_nn_p_trained = LumpedHydro.nn_param_optim(
-#     et_nn_flux,
-#     input=et_nn_input,
-#     target=(log_evap_div_lday=log.(df[!, :evap] ./ df[!, :lday]),),
-#     init_params=ComponentVector(etnn=et_nn_p),
-#     maxiters=100,
-# )
-# q_nn_p_trained = LumpedHydro.nn_param_optim(
-#     q_nn_flux,
-#     input=q_nn_input,
-#     target=(log_flow=log.(df[!, :flow]),),
-#     init_params=ComponentVector(qnn=q_nn_p),
-#     maxiters=100,
-# )
+et_nn_p_trained = LumpedHydro.nn_param_optim(
+    et_nn_flux,
+    input=et_nn_input,
+    target=(log_evap_div_lday=log.(df[!, :evap] ./ df[!, :lday]),),
+    init_params=ComponentVector(etnn=et_nn_p),
+    maxiters=100,
+)
+q_nn_p_trained = LumpedHydro.nn_param_optim(
+    q_nn_flux,
+    input=q_nn_input,
+    target=(log_flow=log.(df[!, :flow]),),
+    init_params=ComponentVector(qnn=q_nn_p),
+    maxiters=100,
+)
 
 #! set the tunable parameters and constant parameters
 tunable_pas = ComponentVector(params=merge(params, nn_params))
 const_pas = ComponentVector(params=norm_params, initstates=(snowpack=0.1, soilwater=1303.00))
 
 #! prepare flow
-output = (flow=qobs_vec,)
+output = (log_flow=qobs_vec,)
 #! model calibration
 best_pas = LumpedHydro.param_grad_optim(
     m50_model,
@@ -164,6 +164,7 @@ best_pas = LumpedHydro.param_grad_optim(
     timeidx=ts,
     adtype=Optimization.AutoZygote()
 )
+
 # #! use the optimized parameters for model simulation
 # result_opt = exphydro_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)
 # pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]

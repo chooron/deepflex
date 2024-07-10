@@ -121,7 +121,7 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
 include("utils/lossfunc.jl")
 include("utils/name.jl")
-include("utils/mtk.jl")
+include("utils/ode.jl")
 include("utils/solver.jl")
 include("utils/special_fluxes.jl")
 include("utils/smoother.jl")

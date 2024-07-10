@@ -328,11 +328,14 @@ struct NeuralFlux <: AbstractNeuralFlux
     )
         input_vars, output_vars = fluxes[1], fluxes[2]
         chain_name, chain_model = chain[1], chain[2]
-        init_params = Lux.initialparameters(StableRNG(42), chain_model)
+        init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain_model))
 
-        chain_params = first(@parameters $chain_name[1:length(init_params)] = Vector(ComponentVector(init_params)))
-        chain_params_type_var = first(@parameters ptype::typeof(typeof(init_params)) = typeof(init_params) [tunable = false])
-        lazyconvert_params = Symbolics.array_term(convert, chain_params_type_var, chain_params, size=size(chain_params))
+        chain_param_name = Symbol(chain_name, :_params)
+        chain_ptype_name = Symbol(chain_name, :_ptype)
+
+        chain_params = first(@parameters $chain_param_name[1:length(init_params)] = Vector(init_params))
+        chain_ptype = first(@parameters $chain_ptype_name::typeof(typeof(init_params)) = typeof(init_params) [tunable = false])
+        lazyconvert_params = Symbolics.array_term((x, axes) -> ComponentVector(x, axes), chain_params, getaxes(init_params), size=size(chain_params))
 
         input_names = Symbolics.tosymbol.(input_vars, escape=false)
         output_names = Symbolics.tosymbol.(output_vars, escape=false)
@@ -344,7 +347,7 @@ struct NeuralFlux <: AbstractNeuralFlux
 
         #* 根据chain构建计算函数
         func = (x, p) -> LuxCore.stateless_apply(chain_model, x, p)
-        flux_expr = func(nn_input, lazyconvert_params)
+        flux_expr = LuxCore.stateless_apply(chain_model, nn_input, lazyconvert_params)
 
         function inner_flux_func(input::AbstractVector, params::AbstractVector)
             func(input, params[chain_name])
@@ -358,8 +361,8 @@ struct NeuralFlux <: AbstractNeuralFlux
         new(
             NamedTuple{Tuple(input_names)}(input_vars),
             NamedTuple{Tuple(output_names)}(output_vars),
-            NamedTuple{(chain_name,:ptype)}([chain_params,chain_params_type_var]),
-            (input=nn_input, output=nn_output),
+            NamedTuple{(chain_param_name,)}([chain_params]),
+            (input=nn_input, output=nn_output, chain_ptype=chain_ptype),
             inner_flux_func,
             flux_expr
         )
