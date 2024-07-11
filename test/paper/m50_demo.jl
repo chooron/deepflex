@@ -12,6 +12,7 @@ using CairoMakie
 using BenchmarkTools
 using StableRNGs
 using RecursiveArrayTools
+using Optimization
 include("../../src/LumpedHydro.jl")
 
 # load data
@@ -122,31 +123,31 @@ params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)
 norm_params = NamedTuple{Tuple([Symbol(nm, :_norm_param) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(
     [[mean, std] for (mean, std) in zip(means, stds)]
 )
-nn_params = (etnn_params=et_nn_p, qnn_params=q_nn_p)
+nn_params = (etnn=et_nn_p, qnn=q_nn_p)
 params = reduce(merge, [params, norm_params, nn_params])
 pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=params))
 timeidx = collect(1:length(prcp_vec))
 solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
 result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 
-#! pretrain each NN
-et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
-q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
+# #! pretrain each NN
+# et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
+# q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
 
-et_nn_p_trained = LumpedHydro.nn_param_optim(
-    et_nn_flux,
-    input=et_nn_input,
-    target=(log_evap_div_lday=log.(df[!, :evap] ./ df[!, :lday]),),
-    init_params=ComponentVector(etnn=et_nn_p),
-    maxiters=100,
-)
-q_nn_p_trained = LumpedHydro.nn_param_optim(
-    q_nn_flux,
-    input=q_nn_input,
-    target=(log_flow=log.(df[!, :flow]),),
-    init_params=ComponentVector(qnn=q_nn_p),
-    maxiters=100,
-)
+# et_nn_p_trained = LumpedHydro.nn_param_optim(
+#     et_nn_flux,
+#     input=et_nn_input,
+#     target=(log_evap_div_lday=log.(df[!, :evap] ./ df[!, :lday]),),
+#     init_params=ComponentVector(etnn=et_nn_p),
+#     maxiters=100,
+# )
+# q_nn_p_trained = LumpedHydro.nn_param_optim(
+#     q_nn_flux,
+#     input=q_nn_input,
+#     target=(log_flow=log.(df[!, :flow]),),
+#     init_params=ComponentVector(qnn=q_nn_p),
+#     maxiters=100,
+# )
 
 #! set the tunable parameters and constant parameters
 tunable_pas = ComponentVector(params=merge(params, nn_params))

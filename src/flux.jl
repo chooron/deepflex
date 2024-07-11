@@ -38,22 +38,9 @@ struct SimpleFlux <: AbstractSimpleFlux
         input_info::NamedTuple,
         output_info::NamedTuple,
         param_info::NamedTuple,
-        flux_funcs::Vector{<:Function},
+        inner_func::Function,
         flux_exprs::Vector{Num}
     )
-        #* Constructing a function for step-by-step calculation 
-        function inner_func(input::AbstractVector, params::AbstractVector)
-            #* The length of the returned vector is consistent with the number of SimpleFlux outputs
-            [flux_func(input, params) for flux_func in flux_funcs]
-        end
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_func(input::AbstractMatrix, params::AbstractVector)
-            #* The output type is Vector{Vector{T, variable dimension}, sequence length},
-            #* To support subsequent calculations, convert the calculation results into Matrix{sequence length,variable dimension} type
-            reduce(hcat, [flux_func.(eachrow(input), Ref(params)) for flux_func in flux_funcs])
-        end
-
         return new(
             input_info,
             output_info,
@@ -88,12 +75,19 @@ struct SimpleFlux <: AbstractSimpleFlux
             flux_funcs = [build_function(hydro_expr, inputs, params, expression=Val{false}) for hydro_expr in flux_exprs]
         end
 
+        #* Constructing a function for the entire sequence calculation
+        function inner_func(input::AbstractMatrix, params::AbstractVector)
+            #* The output type is Vector{Vector{T, variable dimension}, sequence length},
+            #* To support subsequent calculations, convert the calculation results into Matrix{sequence length,variable dimension} type
+            reduce(hcat, [flux_func.(eachrow(input), Ref(params)) for flux_func in flux_funcs])
+        end
+
         #* Building the struct
         return SimpleFlux(
             NamedTuple{Tuple(input_names)}(inputs),
             NamedTuple{Tuple(output_names)}(outputs),
             NamedTuple{Tuple(param_names)}(params),
-            flux_funcs,
+            inner_func,
             flux_exprs
         )
     end
@@ -114,11 +108,18 @@ struct SimpleFlux <: AbstractSimpleFlux
         #* According to the expression, the calculation function is obtained
         flux_funcs = [build_function(flux_expr, inputs, params, expression=Val{false}) for flux_expr in flux_exprs]
 
+        #* Constructing a function for the entire sequence calculation
+        function inner_func(input::AbstractMatrix, params::AbstractVector)
+            #* The output type is Vector{Vector{T, variable dimension}, sequence length},
+            #* To support subsequent calculations, convert the calculation results into Matrix{sequence length,variable dimension} type
+            reduce(hcat, [flux_func.(eachrow(input), Ref(params)) for flux_func in flux_funcs])
+        end
+
         return SimpleFlux(
             NamedTuple{(Tuple(input_names))}(inputs),
             NamedTuple{(Tuple(output_names))}(outputs),
             NamedTuple{(Tuple(param_names))}(params),
-            flux_funcs,
+            inner_func,
             flux_exprs,
         )
     end
@@ -337,16 +338,11 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* so it cannot be defined based on input_vars and output_vars
         nn_input = first(@variables $(nn_input_name)(t)[1:length(input_names)])
         nn_output = first(@variables $(nn_output_name)(t)[1:length(output_names)])
-
+        
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain_model, nn_input, lazy_params)
         #* Constructing a calculation function based on a neural network
         func = (x, p) -> LuxCore.stateless_apply(chain_model, x, p)
-
-        #* Constructing a function for step-by-step calculation 
-        function inner_flux_func(input::AbstractVector, params::AbstractVector)
-            func(input, params[chain_name])
-        end
 
         #* Constructing a function for the entire sequence calculation
         function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
@@ -363,7 +359,7 @@ struct NeuralFlux <: AbstractNeuralFlux
             flux_expr
         )
     end
-    
+
     function NeuralFlux(
         flux_names::Pair{Vector{Symbol},Vector{Symbol}},
         chain::Pair{Symbol,<:Lux.AbstractExplicitContainerLayer},
