@@ -2,7 +2,7 @@ function mae(predict::AbstractArray, target::AbstractArray)
     sum(abs(target .- predict)) / length(target)
 end
 
-function mse(predict::AbstractArray, target)
+function mse(predict::AbstractArray, target::AbstractArray)
     sum((target .- predict) .^ (2)) / length(target)
 end
 

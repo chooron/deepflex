@@ -1,6 +1,12 @@
-itp_Lday = LinearInterpolation(dayl_vec, timeidx)
-itp_P = LinearInterpolation(prcp_vec, timeidx)
-itp_T = LinearInterpolation(temp_vec, timeidx)
+using DataInterpolations
+using OrdinaryDiffEq
+
+dayl_vec=df[ts, "dayl(day)"]
+temp_vec=df[ts, "tmean(C)"]
+prcp_vec=df[ts, "prcp(mm/day)"]
+itp_Lday = LinearInterpolation(dayl_vec, ts)
+itp_P = LinearInterpolation(prcp_vec, ts)
+itp_T = LinearInterpolation(temp_vec, ts)
 
 function basic_bucket_incl_states(p_, t_out)
     step_fct(x) = (tanh(5.0 * x) + 1.0) * 0.5
@@ -49,4 +55,5 @@ function basic_bucket_incl_states(p_, t_out)
 
 end
 
-@btime q_sim_vec, sol = basic_bucket_incl_states(pas, timeidx);
+pas = [0.0, 1303.004248, 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084]
+@btime q_sim_vec, sol = basic_bucket_incl_states(pas, ts);

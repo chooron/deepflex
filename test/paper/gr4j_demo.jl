@@ -5,7 +5,6 @@ using ComponentArrays
 using OrdinaryDiffEq
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using CairoMakie
 using OptimizationBBO
 using BenchmarkTools
 include("../../src/LumpedHydro.jl")
@@ -60,7 +59,7 @@ prod_funcs = [
     SimpleFlux([ps, es, perc, soilwater] => [new_soilwater],
         flux_exprs=[soilwater + ps - es - perc])
 ]
-prod_dfuncs = [StateFlux(soilwater => new_soilwater, flux_funcs=prod_funcs)]
+prod_dfuncs = [StateFlux(soilwater => new_soilwater)]
 prod_lfuncs = [
     LagFlux(slowflow => slowflow_routed, x4, LumpedHydro.uh_1_half),
     LagFlux(fastflow => fastflow_routed, x4, LumpedHydro.uh_2_full)
@@ -77,18 +76,19 @@ rst_funcs = [
     SimpleFlux([slowflow_routed, exch, routedflow, routingstore] => [new_routingstore],
         flux_exprs=[routingstore + slowflow_routed + exch - routedflow])
 ]
-rst_dfuncs = [StateFlux(routingstore => new_routingstore, flux_funcs=rst_funcs)]
+rst_dfuncs = [StateFlux(routingstore => new_routingstore)]
 rst_ele = HydroElement(:gr4j_rst, funcs=rst_funcs, dfuncs=rst_dfuncs)
 #* define the gr4j model
 gr4j_model = HydroUnit(:gr4j, components=[prod_ele, rst_ele])
 # load data
 df = DataFrame(CSV.File("data/gr4j/sample.csv"));
-# for col in names(df)[3:end]
-#     df[ismissing.(df[:, col]), col] .= 0.0
-# end
+for col in names(df)[3:end]
+    df[ismissing.(df[:, col]), col] .= 0.0
+end
 prcp_vec = df[!, "prec"]
 et_vec = df[!, "pet"]
 qobs_vec = df[!, "qobs"]
+ts = collect(qobs_vec)
 
 # prepare args
 input = (prcp=prcp_vec, ep=et_vec)
@@ -98,13 +98,7 @@ pas = ComponentVector(
 )
 timeidx = collect(1:length(prcp_vec))
 solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
-result = gr4j_model(input, pas, timeidx=timeidx, solver=solver)
-
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, timeidx, result.flow, color=:red)
-lines!(ax, timeidx, df[!, "qsim"], color=:blue)
-fig
+@benchmark result = gr4j_model(input, pas, timeidx=timeidx, solver=solver); 
 
 # #! set the tunable parameters and constant parameters
 # tunable_pas = ComponentVector(params=(x1=320.11, x2=2.42, x3=69.63, x4=1.39))
@@ -121,14 +115,13 @@ fig
 #     const_pas=const_pas,
 #     input=input,
 #     target=output,
-#     target_name=:flow,
 #     timeidx=timeidx,
 #     lb=tunable_param_lb,
 #     ub=tunable_param_ub,
 #     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
-#     maxiters=10000,
-#     loss_func=LumpedHydro.nse,
-#     solver=sovler
+#     maxiters=100,
+#     loss_func=LumpedHydro.mse,
+#     solver=solver
 # )
 # #! use the optimized parameters for model simulation
 # result_opt = gr4j_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)

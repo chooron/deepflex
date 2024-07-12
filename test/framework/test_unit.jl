@@ -3,7 +3,6 @@ using ModelingToolkit
 using CSV
 using DataFrames
 using ComponentArrays
-using StructArrays
 using BenchmarkTools
 using NamedTupleTools
 include("../../src/LumpedHydro.jl")

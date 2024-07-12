@@ -5,9 +5,6 @@
 #
 # marvin.hoege@eawag.ch, Nov. 2023 (v1.2.0)
 # --------------------------------------------------
-
-
-
 function load_data(basin_id, data_path, source_data_set::String="daymet")
     # function to load and preprocess camels data
 
@@ -116,8 +113,6 @@ function load_data(basin_id, data_path, source_data_set::String="daymet")
 
     return df
 end
-
-
 
 function prepare_data(df, train_test_windows::NTuple{4,Date}, x_var=names(df)[2:end-1], y_var=names(df)[end])
     # format data

@@ -48,7 +48,7 @@ snow_funcs = [
     SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
         flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
-snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack, flux_funcs=snow_funcs)]
+snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
 snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the soil water reservoir
@@ -62,7 +62,7 @@ soil_funcs = [
     SimpleFlux([baseflow, surfaceflow] => [flow],
         flux_exprs=[baseflow + surfaceflow]),
 ]
-soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater, flux_funcs=soil_funcs)]
+soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
 soil_ele = HydroElement(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the Exp-Hydro model
@@ -83,7 +83,7 @@ timeidx = collect(1:length(prcp_vec))
 solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
 result = exphydro_model(input, pas, timeidx=timeidx, solver=solver);
 
-# @info 1 - LumpedHydro.nse(result.flow, qobs_vec)
+@info 1 - LumpedHydro.nse(result.flow, qobs_vec)
 
 fig = Figure(size=(400, 300))
 ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
@@ -91,31 +91,29 @@ lines!(ax, timeidx, result.flow, color=:red)
 lines!(ax, timeidx, qobs_vec, color=:blue)
 fig
 
-# #! set the tunable parameters and constant parameters
-# tunable_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00),
-#     params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09))
-# const_pas = ComponentVector()
-# #! set the tunable parameters boundary
-# lower_bounds = [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
-# upper_bounds = [1500.0, 1500.0, 0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
-# #! prepare flow
-# output = (flow=qobs_vec,)
-# #! model calibration
-# best_pas = LumpedHydro.param_box_optim(
-#     exphydro_model,
-#     tunable_pas=tunable_pas,
-#     const_pas=const_pas,
-#     input=input,
-#     target=output,
-#     target_name=:flow,
-#     timeidx=timeidx,
-#     lb=lower_bounds,
-#     ub=upper_bounds,
-#     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
-#     maxiters=1000,
-#     loss_func=LumpedHydro.nse,
-#     solver=solver
-# )
+#! set the tunable parameters and constant parameters
+tunable_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09))
+const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00))
+#! set the tunable parameters boundary
+lower_bounds = [0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
+upper_bounds = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
+#! prepare flow
+output = (flow=qobs_vec,)
+#! model calibration
+best_pas = LumpedHydro.param_box_optim(
+    exphydro_model,
+    tunable_pas=tunable_pas,
+    const_pas=const_pas,
+    input=input,
+    target=output,
+    timeidx=timeidx,
+    lb=lower_bounds,
+    ub=upper_bounds,
+    solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+    maxiters=1000,
+    loss_func=LumpedHydro.nse,
+    solver=solver
+)
 # #! use the optimized parameters for model simulation
 # result_opt = exphydro_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)
 # pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]

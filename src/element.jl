@@ -41,8 +41,11 @@ struct HydroElement <: AbstractElement
         ele_param_names = get_param_names(vcat(funcs, dfuncs))
         #* Setup the name information of the hydroelement
         nameinfo = (input=ele_input_names, output=ele_output_names, state=ele_state_names, param=ele_param_names)
+        #* Construct a NamedTuple of all func's variables and parameters
+        funcs_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, dfuncs)])
+        funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, dfuncs)])
         #* Construct a function for ordinary differential calculation based on dfunc and funcs
-        ode_funcs = [build_state_func(funcs, dfunc, vcat(ele_input_names, ele_state_names)) for dfunc in dfuncs]
+        ode_funcs = [build_state_func(funcs, dfunc, funcs_vars_ntp[vcat(ele_input_names, ele_state_names)], funcs_params_ntp) for dfunc in dfuncs]
 
         return new(
             name,
@@ -74,7 +77,7 @@ function (ele::HydroElement)(
         fluxes = merge(fluxes, NamedTuple{Tuple(ele.nameinfo[:state])}(solved_states))
     end
     #* After solving the ode problem, calculate other funcs
-    for ele_func in ele.funcs
+    for ele_func in vcat(ele.funcs, ele.lfuncs)
         #* AbstractLagFlux and AbstractSimpleFlux have different solutions.
         if ele_func isa AbstractLagFlux
             #* Extracting variables for routing (Vector{sequence length})
@@ -144,35 +147,40 @@ function solve_prob(
     solve_u
 end
 
-
 function build_state_func(
     funcs::Vector{<:AbstractFlux},
     dfunc::AbstractStateFlux,
-    input_names::Vector{Symbol},
+    funcs_input_ntp::NamedTuple,
+    funcs_params_ntp::NamedTuple
 )
-    fluxes_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, [dfunc])])
-    funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, [dfunc])])
-
+    #* Call the method in SymbolicUtils.jl to build the ODE Function
     assign_list = Assignment[]
     for func in funcs
         if func isa AbstractNeuralFlux
+            #* For NeuralFlux, use nn_input to match the input variable
             push!(assign_list, Assignment(func.nn_info[:input], MakeArray(collect(func.input_info), Vector)))
+            #* For NeuralFlux, use nn_output to match the calculation result of nn expr
             push!(assign_list, Assignment(func.nn_info[:output], func.flux_expr))
+            #* According to the output variable name, match each index of nn_output
             for (idx, output) in enumerate(collect(func.output_info))
                 push!(assign_list, Assignment(output, func.nn_info[:output][idx]))
             end
         else
+            #* According to the output variable name, match each result of the flux exprs
             for (output, expr) in zip(collect(func.output_info), func.flux_exprs)
                 push!(assign_list, Assignment(output, expr))
             end
         end
     end
-
+    #* Set the input argument of ODE Function
     func_args = [
-        DestructuredArgs(collect(fluxes_vars_ntp[input_names])),
+        #* argument 1: Function input variables
+        DestructuredArgs(collect(funcs_input_ntp)),
+        #* argument 2: Function calculation parameters
         DestructuredArgs(collect(funcs_params_ntp))
     ]
 
+    #* Construct ODE Function: Func(args, kwargs, body), where body represents the matching formula between each variable and expression
     merged_state_func = @RuntimeGeneratedFunction(
         toexpr(Func(func_args, [], Let(assign_list, dfunc.state_expr, false)))
     )

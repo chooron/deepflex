@@ -13,7 +13,7 @@ function update_lag_state!(lag_state::Array{T}, input::Number) where {T<:Number}
     lag_state[2, end] = 0
 end
 
-function solve_lag_flux(input::Vector, lag_time::Number, lag_func::Function; kwargs...)
+function solve_lag_flux(input::AbstractArray, lag_time::Number, lag_func::Function; kwargs...)
     delta_t = 1.0
     # ts = 1:(ceil(lag_time / delta_t)|>Int)
     ts = 0:200

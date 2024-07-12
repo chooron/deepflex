@@ -2,7 +2,6 @@
 using CSV
 using DataFrames
 using ComponentArrays
-using StructArrays
 using BenchmarkTools
 using NamedTupleTools
 using OrdinaryDiffEq
@@ -22,4 +21,4 @@ data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-@btime results = ele(input, pas, timeidx=ts)
+results = ele(input, pas, timeidx=ts)

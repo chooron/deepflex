@@ -7,13 +7,11 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
-# using LumpedHydro
 
 # test exphydro model
 include("../../src/LumpedHydro.jl")
 
 # predefine the parameters
-# init_parameter = [0.0, 100.0, 0.01, 20, 1.0, 1.0, -1.0]
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
 tunable_pas = ComponentVector(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin))

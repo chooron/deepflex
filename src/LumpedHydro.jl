@@ -2,19 +2,14 @@ module LumpedHydro
 ## External packages
 # common packages
 using TOML
+using Reexport
+using StableRNGs
 using Statistics
 using ComponentArrays
 using NamedTupleTools
-using RecursiveArrayTools
-using Reexport
-using StableRNGs
 using DocStringExtensions
-using BenchmarkTools
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
-
-# Multitreading and parallel computing
-using Base.Threads
 
 # ModelingToolkit building
 using ModelingToolkit
@@ -35,9 +30,6 @@ using SciMLBase
 using OrdinaryDiffEq
 using DiffEqFlux
 
-# solver NonlinearProblem
-using NonlinearSolve
-
 # deep learning
 using Lux
 using Zygote
@@ -56,12 +48,12 @@ abstract type AbstractSolver end
 abstract type AbstractEquation end
 
 # merge ComponentArray:https://github.com/jonniedie/ComponentArrays.jl/issues/186
-function merge_ca(ca::ComponentArray{T}, ca2::ComponentArray{T}) where T
+function merge_ca(ca::ComponentArray{T1}, ca2::ComponentArray{T2}) where {T1,T2}
     ax = getaxes(ca)
     ax2 = getaxes(ca2)
     vks = valkeys(ax[1])
     vks2 = valkeys(ax2[1])
-    _p = Vector{T}()
+    _p = Vector{T2}()
     for vk in vks
         if vk in vks2
             _p = vcat(_p, ca2[vk])
@@ -121,6 +113,7 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
 include("utils/lossfunc.jl")
 include("utils/name.jl")
+include("utils/show.jl")
 include("utils/ode.jl")
 include("utils/solver.jl")
 include("utils/special_fluxes.jl")

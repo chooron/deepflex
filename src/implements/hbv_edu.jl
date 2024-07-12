@@ -8,7 +8,7 @@ using ..LumpedHydro.ModelingToolkit: t_nounits as t
 """
 SnowWaterReservoir in HBV_EDU
 """
-function SnowStorage(; name::Symbol, mtk::Bool=true)
+function SnowStorage(; name::Symbol)
     @variables snowwater(t) = 0.0
     @variables liquidwater(t) = 0.0
     @variables prcp(t) = 0.0
@@ -25,21 +25,20 @@ function SnowStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux([snowfall] => [melt], snowwater, funcs=funcs),
+        StateFlux([snowfall] => [melt], snowwater),
     ]
 
     HydroElement(
         Symbol(name, :_snow_),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk
     )
 end
 
 """
 SoilWaterReservoir in HBV_EDU
 """
-function SoilStorage(; name::Symbol, mtk::Bool=true)
+function SoilStorage(; name::Symbol)
     @variables soilwater(t) = 0.0
     @variables prcpeff(t) = 0.0
     @variables liquidwater(t) = 0.0
@@ -55,18 +54,17 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux([liquidwater] => [prcpeff, evap], soilwater, funcs=funcs),
+        StateFlux([liquidwater] => [prcpeff, evap], soilwater),
     ]
 
     HydroElement(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk
     )
 end
 
-function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
+function FreeWaterStorage(; name::Symbol)
     @variables s1(t) = 0.0
     @variables s2(t) = 0.0
     @variables q0(t) = 0.0
@@ -91,23 +89,22 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux([prcpeff] => [q0, q1, qp], s1, funcs=funcs),
-        StateFlux([qp] => [q2], s2, funcs=funcs),
+        StateFlux([prcpeff] => [q0, q1, qp], s1),
+        StateFlux([qp] => [q2], s2),
     ]
 
     HydroElement(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true, )
+function Unit(; name::Symbol)
     elements = [
-        SnowStorage(name=name, mtk=mtk),
-        SoilStorage(name=name, mtk=mtk),
-        FreeWaterStorage(name=name, mtk=mtk),
+        SnowStorage(name=name),
+        SoilStorage(name=name),
+        FreeWaterStorage(name=name),
     ]
 
     HydroUnit(

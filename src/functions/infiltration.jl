@@ -11,18 +11,18 @@ function expr(eq::HydroEquation{(:snowwater, :liquidwater, :rainfall, :melt),(:i
     snowwater, liquidwater, rainfall, melt = eq.inputs
     whc = first(eq.params)
 
-    @.[sf(liquidwater - whc * snowwater) *
+    [sf(liquidwater - whc * snowwater) *
      (rainfall + melt + liquidwater - whc * snowwater)]
 end
 
 function expr(eq::HydroEquation{(:rainfall, :melt),(:infiltration,),()}; kw...)
     rainfall, melt = eq.inputs
 
-    @.[rainfall + melt]
+    [rainfall + melt]
 end
 
 function expr(eq::HydroEquation{(:rainfall,),(:infiltration,),()}; kw...)
     rainfall = first(eq.inputs)
 
-    @.[rainfall]
+    [rainfall]
 end
