@@ -153,9 +153,10 @@ solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=tim
 
 #! set the tunable parameters and constant parameters
 #! 当仅优化部分参数如nn_params时就会出错
-tunable_pas = ComponentVector(params=reduce(merge, [params, norm_params, nn_params]))
-const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00))
-
+tunable_pas = ComponentVector(params=nn_params)
+const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00),params=reduce(merge, [params, norm_params]))
+default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
+new_pas = LumpedHydro.merge_ca(tunable_pas, default_model_pas)
 #! prepare flow
 output = (log_flow=qobs_vec,)
 #! model calibration

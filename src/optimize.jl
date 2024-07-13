@@ -8,11 +8,9 @@ end
 function predict_func(x::AbstractVector{T}, p) where {T}
     #* Optimization arguments: hydro component, input data, time index, ode solver,
     #*                         tunable parameters axes and default model params
-    component, input, timeidx, solver, tunable_pas_axes, default_model_pas = p
-    #* Use tunable parameters axes to build ComponentVector type of x
-    tmp_tunable_pas = ComponentVector(x, tunable_pas_axes)
+    component, input, timeidx, solver, default_model_pas = p
     #* Use merge_ca to replace the tunable parameters inner the model parameters
-    tmp_pas = merge_ca(default_model_pas, tmp_tunable_pas)
+    tmp_pas = merge_ca(default_model_pas, x)
     #* Call the hydro component to calculate the simulation results
     component(input, tmp_pas, timeidx=timeidx, solver=solver)
 end
@@ -85,8 +83,8 @@ function param_grad_optim(
 
     #* Construct default model parameters based on tunbale parameters and constant parameters for subsequent merging
     default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
-    #* Get the axes of the tunbale parameters
-    tunable_pas_axes = getaxes(tunable_pas)
+    # #* Get the axes of the tunbale parameters
+    # tunable_pas_axes = getaxes(tunable_pas)
 
     #* Constructing the objective function for optimization
     function objective(x::AbstractVector{T}, p) where {T}
@@ -97,11 +95,11 @@ function param_grad_optim(
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(objective, adtype)
-    prob_args = (component, input, timeidx, solver, tunable_pas_axes, default_model_pas)
-    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
+    prob_args = (component, input, timeidx, solver, default_model_pas)
+    optprob = Optimization.OptimizationProblem(optf, tunable_pas, prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     #* Returns the optimized model parameters
-    ComponentVector(sol.u, tunable_pas_axes)
+    sol.u
 end
 
 function nn_param_optim(
