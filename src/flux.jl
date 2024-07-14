@@ -319,13 +319,14 @@ struct NeuralFlux <: AbstractNeuralFlux
         chain_name, chain_model = chain[1], chain[2]
         #* Initialize model parameter type for model parameter dimension definition
         init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain_model))
+        init_params_axes = getaxes(init_params)
 
         #* Define parameter variables according to initialization parameters: Define type as Vector{parameter length}
         chain_params = first(@parameters $chain_name[1:length(init_params)] = Vector(init_params))
         #* Use Symbolics.array_term to define the slow-building parameter variables:
         #* when the model is called, it is rebuilt into the ComponentVector type according to
         #* the axes of `init_params` and the Vector type of the parameter as the calculation parameter input
-        lazy_params = Symbolics.array_term((x, axes) -> ComponentVector(x, axes), chain_params, getaxes(init_params), size=size(chain_params))
+        lazy_params = Symbolics.array_term((x, axes) -> ComponentVector(x, axes), chain_params, init_params_axes, size=size(chain_params))
 
         #* Convert to a symbol based on the variable
         input_names = Symbolics.tosymbol.(input_vars, escape=false)
@@ -338,11 +339,11 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* so it cannot be defined based on input_vars and output_vars
         nn_input = first(@variables $(nn_input_name)(t)[1:length(input_names)])
         nn_output = first(@variables $(nn_output_name)(t)[1:length(output_names)])
-        
+
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain_model, nn_input, lazy_params)
         #* Constructing a calculation function based on a neural network
-        func = (x, p) -> LuxCore.stateless_apply(chain_model, x, p)
+        func = (x, p) -> LuxCore.stateless_apply(chain_model, x, ComponentVector(p, init_params_axes))
 
         #* Constructing a function for the entire sequence calculation
         function inner_flux_func(input::AbstractMatrix, params::AbstractVector)

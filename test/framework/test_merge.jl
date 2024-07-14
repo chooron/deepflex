@@ -8,17 +8,20 @@ function merge_ca(ca::ComponentArray{T1}, ca2::ComponentArray{T2}) where {T1,T2}
     vks2 = valkeys(ax2[1])
     _p = Vector{T2}()
     for vk in vks
-        if vk in vks2
-            _p = vcat(_p, ca2[vk])
+        if length(getaxes(ca[vk])) > 0
+            _p = vcat(_p, collect(merge_ca(ca[vk], vk in vks2 ? getproperty(ca2, vk) : ComponentVector())))
         else
-            _p = vcat(_p, ca[vk])
+            if vk in vks2
+                _p = vcat(_p, ca2[vk])
+            else
+                _p = vcat(_p, ca[vk])
+            end
         end
     end
     ComponentArray(_p, ax)
 end
 
-a1 = ComponentVector(a=1, b=(c=3, d=4), c=3)
-a2 = ComponentVector(a=2, b=(c=2, d=5))
+a1 = ComponentVector(a=1, b=(c=3, d=(e=3, f=1, d=3)), c=3)
+a2 = ComponentVector(a=2, b=(c=2, d=(e=4, f=2)))
 
-merge_ca(a1, a2)
- 
+collect(merge_ca(a1, a2))
