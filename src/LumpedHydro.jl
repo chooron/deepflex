@@ -14,7 +14,6 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 # ModelingToolkit building
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using ModelingToolkitNeuralNets
 using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
@@ -161,12 +160,11 @@ include("implements/simhyd.jl")
 include("implements/m50.jl")
 
 # export abstract structs
-export AbstractComponent, AbstractSolver, AbstractOptimizer,
-    AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractLagFlux,
-    AbstractElement, AbstractUnit, AbstractNode
+export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit
+export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractLagFlux
 
 # export model
-export ExpHydro, M50, GR4J, HyMOD, HBV
+export ExpHydro, M50, GR4J, HyMOD, HBV_EDU
 
 # export special flux
 export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux

@@ -144,7 +144,7 @@ struct StateFlux <: AbstractStateFlux
         #* Convert to a symbol based on the variable
         state_input_names = Symbolics.tosymbol.(fluxes, escape=false)
         state_name = Symbolics.tosymbol(state, escape=false)
-        state_param_names = Symbolics.tosymbol(params, escape=false)
+        state_param_names = Symbolics.tosymbol.(params, escape=false)
         return new(
             NamedTuple{Tuple(state_input_names)}(fluxes),
             NamedTuple{tuple(state_name)}([state]),
@@ -311,14 +311,14 @@ struct NeuralFlux <: AbstractNeuralFlux
 
     function NeuralFlux(
         fluxes::Pair{Vector{Num},Vector{Num}},
-        chain::Pair{Symbol,<:Lux.AbstractExplicitContainerLayer},
+        chain::Lux.AbstractExplicitContainerLayer,
     )
         #* Get input and output variables
         input_vars, output_vars = fluxes[1], fluxes[2]
         #* Get the neural network name (neural flux param name) and object
-        chain_name, chain_model = chain[1], chain[2]
+        chain_name = chain.name
         #* Initialize model parameter type for model parameter dimension definition
-        init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain_model))
+        init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain))
         init_params_axes = getaxes(init_params)
 
         #* Define parameter variables according to initialization parameters: Define type as Vector{parameter length}
@@ -341,9 +341,9 @@ struct NeuralFlux <: AbstractNeuralFlux
         nn_output = first(@variables $(nn_output_name)(t)[1:length(output_names)])
 
         #* Constructing a calculation expression based on a neural network
-        flux_expr = LuxCore.stateless_apply(chain_model, nn_input, lazy_params)
+        flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
         #* Constructing a calculation function based on a neural network
-        func = (x, p) -> LuxCore.stateless_apply(chain_model, x, ComponentVector(p, init_params_axes))
+        func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
 
         #* Constructing a function for the entire sequence calculation
         function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
@@ -363,7 +363,7 @@ struct NeuralFlux <: AbstractNeuralFlux
 
     function NeuralFlux(
         flux_names::Pair{Vector{Symbol},Vector{Symbol}},
-        chain::Pair{Symbol,<:Lux.AbstractExplicitContainerLayer},
+        chain::Lux.AbstractExplicitContainerLayer,
     )
         input_names, output_names = flux_names[1], flux_names[2]
 

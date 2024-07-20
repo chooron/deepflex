@@ -15,7 +15,6 @@ end
 function (solver::ODESolver)(
     ode_prob::ODEProblem,
 )
-
     sol = solve(
         ode_prob,
         solver.alg,
