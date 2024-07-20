@@ -156,7 +156,7 @@ solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=tim
 #! 当仅优化部分参数如nn_params时就会出错
 tunable_pas = ComponentVector(params=(etnn=collect(ComponentVector(et_nn_p)), qnn=collect(ComponentVector(q_nn_p))))
 const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00), params=reduce(merge, [params, norm_params]))
-# default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
+default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
 # new_pas = merge_ca(default_model_pas, tunable_pas)
 #! prepare flow
 output = (log_flow=qobs_vec,)
@@ -171,11 +171,11 @@ best_pas = LumpedHydro.param_grad_optim(
     adtype=Optimization.AutoZygote()
 )
 
-# #! use the optimized parameters for model simulation
-# result_opt = exphydro_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)
-# pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
-# pas = ComponentVector(pas_list, getaxes(tunable_pas))
+#! use the optimized parameters for model simulation
+result_opt = m50_model(input, LumpedHydro.merge_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)
+pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
+pas = ComponentVector(pas_list, getaxes(tunable_pas))
 
-# 1 - LumpedHydro.nse(result_opt.flow, qobs_vec)
-# 1 - LumpedHydro.nse(result.flow, qobs_vec)
+LumpedHydro.mse(result_opt.log_flow, qobs_vec)
+1 - LumpedHydro.nse(result.flow, qobs_vec)
 

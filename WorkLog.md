@@ -55,13 +55,12 @@
 
 - [X] 根据计算网络结构迭代计算模型
 - [X] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
-- [ ] stateflux生成临时函数时存在问题
+- [X] stateflux生成临时函数时存在问题
 - [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
-- [ ] 新增dPL-HBV, ENN, PRNN
-- [ ] **NeuralFlux嵌入到dfunc无法生成耦合函数**
+- [X] 新增dPL-HBV, ENN, PRNN
+- [X] **NeuralFlux嵌入到dfunc无法生成耦合函数**
   - 当前输入变量只能是@varaibles (v(t))[1:4]这种类型，但这种类型或无法实现变量的替换
   - 考虑的方法是将nnflux前所有flux套入至nnflux中，但这种方式不行，因为nnflux前面可能还有nnflux
-  - 
 
 # 暑假工作计划
 
@@ -72,6 +71,32 @@
 - [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
 - [ ] ~~记得本来采用StructArray，能够有效的避免反复计算带来的问题~~
 - [ ] 自定义base.show
+- [ ] Zygote虽然不能用于mutable array, 但是可以通过chainrule执行自定义的rrule规则
+- [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码如下：
+
+```julia
+is_variable(x::Num) = is_variable(x.val)
+function is_variable(x)
+    if x isa ModelingToolkit.SymbolicUtils.Symbolic
+        if haskey(x.metadata, ModelingToolkit.Symbolics.VariableSource)
+            src = x.metadata[ModelingToolkit.Symbolics.VariableSource]
+            return first(src) == :variables
+        end
+    end
+    return false
+end
+
+@parameters a1
+@variables a2
+@variables b
+
+eq1 = b ~ a1 + a2^2 + 1
+eq1.lhs
+Equation
+get_variables(eq1)
+nn = Lux.Chain(layer_1 = Dense(2 => 3, relu), name=:ann)
+
+```
 
 # 关键功能和实现技术
 

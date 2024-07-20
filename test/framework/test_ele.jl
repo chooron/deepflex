@@ -5,6 +5,9 @@ using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
 using OrdinaryDiffEq
+using Zygote
+using ModelingToolkit
+using Lux
 
 include("../../src/LumpedHydro.jl")
 
@@ -22,3 +25,8 @@ df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 results = ele(input, pas, timeidx=ts)
+
+# f2 = input -> ele((lday=input[1] .* ones(10), temp=input[2].* ones(10), prcp=input[3].* ones(10)), pas, timeidx=collect(1:10))[:infiltration]
+# v1  =jacobian(f2, [0.4,2.0,1.0])
+
+
