@@ -67,43 +67,13 @@ function merge_ca(ca::ComponentArray{T1}, ca2::ComponentArray{T2}) where {T1,T2}
     ComponentArray(_p, ax)
 end
 
-struct HydroEquation{input_names,output_names,param_names} <: AbstractEquation
-    inputs::Vector{Num}
-    outputs::Vector{Num}
-    params::Vector{Num}
-
-    function HydroEquation(
-        input_names::Vector{Symbol},
-        output_names::Vector{Symbol},
-        param_names::Vector{Symbol},
-    )
-        inputs = vcat([@variables $var(t) = 0.0 for var in input_names]...)
-        outputs = vcat([@variables $var(t) = 0.0 for var in output_names]...)
-        params = vcat([@parameters $p = 0.0 [tunable = true] for p in param_names]...)
-        return new{Tuple(input_names),Tuple(output_names),Tuple(param_names)}(inputs, outputs, params)
-    end
-
-    function HydroEquation(
-        inputs::Vector{Num},
-        outputs::Vector{Num},
-        params::Vector{Num},
-    )
-        input_names = Symbolics.tosymbol.(inputs, escape=false)
-        output_names = Symbolics.tosymbol.(outputs, escape=false)
-        param_names = Symbolics.tosymbol.(params, escape=false)
-        return new{Tuple(input_names),Tuple(output_names),Tuple(param_names)}(inputs, outputs, params)
-    end
-end
-
 abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractSimpleFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractLagFlux <: AbstractFlux end
 
-function (flux::AbstractFlux)(input::AbstractArray, params::AbstractArray)
-    flux.inner_func(input, params)
-end
+(flux::AbstractFlux)(input::AbstractArray, params::AbstractArray) = flux.inner_func(input, params)
 
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
@@ -117,17 +87,19 @@ const default_ode_sensealg = ForwardDiffSensitivity()
 include("utils/lossfunc.jl")
 include("utils/name.jl")
 include("utils/show.jl")
-include("utils/ode.jl")
-include("utils/solver.jl")
-include("utils/special_fluxes.jl")
 include("utils/smoother.jl")
 include("utils/graph.jl")
 include("utils/unithydro.jl")
 export step_func, ifelse_func
 
 # framework build
+include("equation.jl")
+
 include("flux.jl")
 export SimpleFlux, StateFlux, LagFlux, NeuralFlux
+# special flux
+include("utils/normalize.jl")
+export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 include("element.jl")
 export HydroElement, solve_prob # , add_inputflux!, add_outputflux!, 
@@ -136,7 +108,10 @@ include("unit.jl")
 export HydroUnit #, update_unit!, add_elements!, remove_elements!
 
 include("optimize.jl")
-export param_grad_optim, param_box_optim
+export param_grad_optim, param_box_optim, nn_param_optim
+
+include("solver.jl")
+export ODESolver, DiscreteSolver, ManualSolver
 
 # Implement Flux
 include("functions/evap.jl")
@@ -150,7 +125,6 @@ include("functions/recharge.jl")
 include("functions/saturation.jl")
 include("functions/snowfall.jl")
 # Implements Models
-# include("implements/PRNN.jl")
 include("implements/cemaneige.jl")
 include("implements/exphydro.jl")
 include("implements/gr4j.jl")
@@ -165,8 +139,4 @@ export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, 
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV_EDU
-
-# export special flux
-export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
-
 end

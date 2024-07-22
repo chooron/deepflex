@@ -41,14 +41,27 @@ dtype = eltype(input[1]);
         @test melt0 == result.melt[1]
     end
 
-    # todo
     @testset "test build state function" begin
-        
+        @variables routingstore(t) exch(t) slowflow_routed(t) routedflow(t)
+        @parameters x2, x3
+        funcs = [
+            SimpleFlux([routingstore] => [exch], [x2, x3],
+                flux_exprs=[x2 * abs(routingstore / x3)^3.5]),
+            SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
+                flux_exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
+        ]
+        dfunc = LumpedHydro.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
+        var_ntp = (routingstore=routingstore, slowflow_routed=slowflow_routed)
+        param_ntp = (x2=x2, x3=x3)
+        state_func = LumpedHydro.build_state_func(funcs, dfunc, var_ntp, param_ntp)
+        rgt, slg = 10.0, 20.0
+        exch = 2.42 * abs(rgt / 69.63)^3.5
+        @test state_func([rgt, slg], [2.42, 69.63]) == exch + slg - 69.63^(-4) / 4 * (rgt + slg + exch)^5
     end
 
     # todo
     @testset "test modify element" begin
-        
+
     end
 
     @testset "test ode solved results" begin

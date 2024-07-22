@@ -1,4 +1,4 @@
-function ifelse_func(x::Union{Num,T}) where {T<:Number}
+function ifelse_func(x)
     if x > 0.0
         return 1.0
     else
@@ -8,7 +8,7 @@ end
 
 @register_symbolic ifelse_func(x)
 
-function step_func(x::Union{Num,T}) where {T<:Number}
+function step_func(x)
     (tanh(5.0 * x) + 1.0) * 0.5
 end
 

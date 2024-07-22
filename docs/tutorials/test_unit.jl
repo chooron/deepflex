@@ -20,5 +20,5 @@ df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = LumpedHydro.ODESolver()
-@btime results = unit(input, pas, timeidx=ts, solver=solver)
+results = unit(input, pas, timeidx=ts, solver=solver)
 

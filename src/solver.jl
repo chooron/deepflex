@@ -58,3 +58,7 @@ function (solver::DiscreteSolver)(
     num_u = length(ode_prob.u0)
     [sol[i, :] for i in 1:num_u]
 end
+
+@kwdef struct ManualSolver <: AbstractSolver
+    # todo impletement the manual solver for state at each step
+end
