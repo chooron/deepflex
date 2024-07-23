@@ -37,7 +37,7 @@ end
 function Unit(; name::Symbol)
     build_unit(
         name=name,
-        elements=[M100_ELE(name=name, mtk=mtk)]
+        components=[M100_ELE(name=name, mtk=mtk)]
     )
 end
 

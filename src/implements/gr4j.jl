@@ -58,7 +58,7 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
     ]
 
     dfluxes = [
-        StateFlux([:slowflow_routed, :recharge] => [:routedflow], :routingstore, funcs=fluxes),
+        StateFlux([:slowflow_routed, :recharge] => [:routedflow], :routingstore),
     ]
 
     HydroElement(

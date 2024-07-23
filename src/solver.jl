@@ -5,7 +5,7 @@ A custom ODEProblem solver
 $(FIELDS)
 """
 @kwdef struct ODESolver <: AbstractSolver
-    alg::OrdinaryDiffEqAlgorithm = Tsit5()
+    alg = Tsit5()
     sensealg = InterpolatingAdjoint()
     reltol = 1e-3
     abstol = 1e-3

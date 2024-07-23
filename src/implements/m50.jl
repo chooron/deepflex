@@ -69,7 +69,7 @@ end
 function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
     HydroUnit(
         name,
-        elements=[SurfaceStorage(name=name, mtk=mtk), SoilStorage(name=name, mtk=mtk)],
+        components=[SurfaceStorage(name=name, mtk=mtk), SoilStorage(name=name, mtk=mtk)],
         step=step,
     )
 end

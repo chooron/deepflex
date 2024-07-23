@@ -229,6 +229,29 @@ struct LagFlux <: AbstractLagFlux
     "Callable function for output variable calculation, It requires the input format to be (i::Vector, p::Vector)"
     inner_func::Function
 
+    function solve_lag_flux(input::AbstractArray, lag_time::Number, lag_func::Function; kwargs...)
+        delta_t = 1.0
+        # ts = 1:(ceil(lag_time / delta_t)|>Int)
+        ts = 0:200
+        #* 将weight作为param输入到prob中
+        lag_weights = [lag_func(t, lag_time) for t in ts]
+        lag_weights = vcat((circshift(lag_weights, -1).-lag_weights)[1:end-1])
+
+        #* 首先将lagflux转换为discrete problem
+        function discrete_prob(u, p, t)
+            u = circshift(u, -1)
+            u[end] = 0.0
+            tmp_u = input[Int(t)] .* p .+ u
+            tmp_u
+        end
+
+        prob = DiscreteProblem(discrete_prob, lag_weights, (1.0, length(input)), lag_weights)
+        #* 求解这个问题
+        sol = solve(prob, FunctionMap())
+        #* 得到权重计算结果
+        sol[1, :]
+    end
+    
     function LagFlux(
         flux_names::Pair{Symbol,Symbol},
         lag_time_name::Symbol,
@@ -280,6 +303,7 @@ struct LagFlux <: AbstractLagFlux
         )
     end
 end
+
 
 """
 $(TYPEDEF)

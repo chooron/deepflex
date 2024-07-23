@@ -109,7 +109,7 @@ function Unit(; name::Symbol)
 
     HydroUnit(
         name,
-        elements=elements
+        components=elements
     )
 end
 end

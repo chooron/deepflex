@@ -64,8 +64,8 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        LumpedHydro.StateFlux(new_snowwater => snowwater, funcs=funcs),
-        LumpedHydro.StateFlux(new_thermal => thermal, funcs=funcs),
+        LumpedHydro.StateFlux(new_snowwater => snowwater),
+        LumpedHydro.StateFlux(new_thermal => thermal),
     ]
 
     HydroElement(

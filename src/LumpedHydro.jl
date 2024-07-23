@@ -38,34 +38,15 @@ using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
 
+# HydroEquations
+using HydroEquations
+
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
 ## Abstract Component Types
 abstract type AbstractComponent end
 abstract type AbstractSolver end
-abstract type AbstractEquation end
-
-# merge ComponentArray:https://github.com/jonniedie/ComponentArrays.jl/issues/186
-function merge_ca(ca::ComponentArray{T1}, ca2::ComponentArray{T2}) where {T1,T2}
-    ax = getaxes(ca)
-    ax2 = getaxes(ca2)
-    vks = valkeys(ax[1])
-    vks2 = valkeys(ax2[1])
-    _p = Vector{T2}()
-    for vk in vks
-        if length(getaxes(ca[vk])) > 0
-            _p = vcat(_p, collect(merge_ca(ca[vk], vk in vks2 ? getproperty(ca2, vk) : ComponentVector())))
-        else
-            if vk in vks2
-                _p = vcat(_p, ca2[vk])
-            else
-                _p = vcat(_p, ca[vk])
-            end
-        end
-    end
-    ComponentArray(_p, ax)
-end
 
 abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractSimpleFlux <: AbstractFlux end
@@ -84,17 +65,12 @@ abstract type AbstractUnit <: AbstractComponent end
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
-include("utils/lossfunc.jl")
+include("utils/ca.jl")
 include("utils/name.jl")
 include("utils/show.jl")
-include("utils/smoother.jl")
 include("utils/graph.jl")
-include("utils/unithydro.jl")
-export step_func, ifelse_func
 
 # framework build
-include("equation.jl")
-
 include("flux.jl")
 export SimpleFlux, StateFlux, LagFlux, NeuralFlux
 # special flux
@@ -113,17 +89,6 @@ export param_grad_optim, param_box_optim, nn_param_optim
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
 
-# Implement Flux
-include("functions/evap.jl")
-include("functions/flow.jl")
-include("functions/infiltration.jl")
-include("functions/melt.jl")
-include("functions/percolation.jl")
-include("functions/pet.jl")
-include("functions/rainfall.jl")
-include("functions/recharge.jl")
-include("functions/saturation.jl")
-include("functions/snowfall.jl")
 # Implements Models
 include("implements/cemaneige.jl")
 include("implements/exphydro.jl")

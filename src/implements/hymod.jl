@@ -37,7 +37,7 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux(new_soilwater => soilwater, funcs=funcs)
+        StateFlux(new_soilwater => soilwater)
     ]
 
     HydroElement(
@@ -90,10 +90,10 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux(new_slowwater => slowwater, funcs=funcs),
-        StateFlux(new_fastwater1 => fastwater1, funcs=funcs),
-        StateFlux(new_fastwater2 => fastwater2, funcs=funcs),
-        StateFlux(new_fastwater3 => fastwater3, funcs=funcs),
+        StateFlux(new_slowwater => slowwater),
+        StateFlux(new_fastwater1 => fastwater1),
+        StateFlux(new_fastwater2 => fastwater2),
+        StateFlux(new_fastwater3 => fastwater3),
     ]
 
     HydroElement(
@@ -112,7 +112,7 @@ function Unit(; name::Symbol, mtk::Bool=true)
 
     HydroUnit(
         name,
-        elements=elements,
+        components=elements,
     )
 end
 

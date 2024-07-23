@@ -56,8 +56,8 @@ function SIMHYD_ELE(; name::Symbol, mtk::Bool=true)
     ]
 
     dfuncs = [
-        StateFlux([SMF] => [EVAP, GWF], SMS, funcs=funcs),
-        StateFlux([REC, GWF] => [BAS], GW, funcs=funcs)
+        StateFlux([SMF] => [EVAP, GWF], SMS),
+        StateFlux([REC, GWF] => [BAS], GW)
     ]
 
     HydroElement(
@@ -75,7 +75,7 @@ function Unit(; name::Symbol, mtk::Bool=true)
 
     HydroUnit(
         name,
-        elements=elements,
+        components=elements,
     )
 end
 end
