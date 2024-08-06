@@ -7,12 +7,12 @@
 - [X] LAG Element无法参与整体ode的计算(可以参与计算但是兼容性很差,lagflux需要中间状态的缓冲计算)
 - [X] SimpleFlux和HydroFlux无明显差异性
 - [X] 构建多个function时，系统无法实现根据不同参数实现function的参数分配
-- [ ] 计算成本相对于普通计算成本显著加大
+- [X] 计算成本相对于普通计算成本显著加大
   - [X] 原element计算产生的时间成本为2s, 直接构建一个简单的方程为38ms左右, 采用mtk.jl为40ms左右,另加mtk系统构建时间8ms
 - [X] 各种ODE如何各自进行计算的话会加大插值产生的计算成本多余
   - [X] 采用mtk.jl对element公式进行整合
-- [ ] lagflux如何改造成mtk.jl
-  - [ ] lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变
+- [ ] ~~lagflux如何改造成mtk.jl~~
+  - [ ] ~~lagflux改造成mtk的equations,在计算过程中其公式会不断发生改变~~
 - [X] mtk.jl貌似只能支持一对一输入输出(已解决)
 - [X] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
 - [X] 当前需要找出ODEProblem在用ForwardDifferetial求解时存在的问题，需要构建一个demo来重现这个问题，猜测这个问题应该是可调参数与不可调参数引起的问题
@@ -25,13 +25,13 @@
 - [X] 针对之前的模型进行ComponentArrays改造
 - [X] 0实参构建模型
 - [ ] 构建模型中，应该有构建合理性的校验和提示功能，主要的提示功能就是对模型各层计算数据是否存在缺失的功能，并对于缺失的模块提出增加建议
-- [ ] 复现当前部分模型
+- [X] 复现当前部分模型
 - [ ] web端口构造
 - [X] 在julia 1.10上完成部署
-- [ ] StaticArrays或能够将性能进一步提升
+- [ ] ~~StaticArrays或能够将性能进一步提升~~
 - [ ] routing function的weight使用GuadGK.jl求解
 - [X] 针对之前的模型进行ModelingToolkit改造
-- [ ] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
+- [X] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
 - [X] 将lag function嵌入至Node模块中
 - [ ] Node中添加参数共享的设置
@@ -57,7 +57,7 @@
 - [X] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
 - [X] stateflux生成临时函数时存在问题
 - [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
-- [X] 新增dPL-HBV, ENN, PRNN
+- [X] 新增dPL-HBV, ENN, ~~PRNN~~
 - [X] **NeuralFlux嵌入到dfunc无法生成耦合函数**
   - 当前输入变量只能是@varaibles (v(t))[1:4]这种类型，但这种类型或无法实现变量的替换
   - 考虑的方法是将nnflux前所有flux套入至nnflux中，但这种方式不行，因为nnflux前面可能还有nnflux
@@ -71,7 +71,10 @@
 - [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
 - [ ] ~~记得本来采用StructArray，能够有效的避免反复计算带来的问题~~
 - [ ] 自定义base.show
-- [ ] Zygote虽然不能用于mutable array, 但是可以通过chainrule执行自定义的rrule规则
+- [ ] ~~Zygote虽然不能用于mutable array, 但是可以通过chainrule执行自定义的rrule规则~~（不能对矩阵内部进行替换）
+- [X] optimize需要提供多组数据训练的功能
+- [ ] 当前optimization只针对于参数率定功能，后续可能会考虑
+- [ ] 提供实时更新、添加、删除以及提示信息（包括当前element的输入输出）
 - [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码如下：
 
 ```julia
@@ -85,6 +88,11 @@ function is_variable(x)
     end
     return false
 end
+
+- [ ] 当前DataInterpolations.jl在v5.0.0版本才兼容，其他版本存在问题
+- [ ] DiscreteProblem似乎无法通过梯度优化
+- [X] 构建了flux的计算匿名函数与state一致，**这时候就需要额外构建针对lag flux的element了**
+- [ ] 中间计算转为matrix合并的方式存储信息,效率显著提高
 
 @parameters a1
 @variables a2

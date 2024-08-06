@@ -9,18 +9,18 @@ using ..LumpedHydro.ModelingToolkit: Num
 SoilWaterReservoir in HYMOD
 """
 function SoilStorage(; name::Symbol, mtk::Bool=true)
-    @variables prcp(t) = 0.0
-    @variables pet(t) = 0.0
+    @variables prcp = 0.0
+    @variables pet = 0.0
 
-    @variables soilwater(t) = 0.0
-    @variables tmp_soilwater(t) = 0.0
-    @variables new_soilwater(t) = 0.0
-    @variables raineff1(t) = 0.0
-    @variables raineff2(t) = 0.0
-    @variables raineff(t) = 0.0
-    @variables ct_prev(t) = 0.0
-    @variables dummy(t) = 0.0
-    @variables evap(t) = 0.0
+    @variables soilwater = 0.0
+    @variables tmp_soilwater = 0.0
+    @variables new_soilwater = 0.0
+    @variables raineff1 = 0.0
+    @variables raineff2 = 0.0
+    @variables raineff = 0.0
+    @variables ct_prev = 0.0
+    @variables dummy = 0.0
+    @variables evap = 0.0
 
     @parameters cmax = 0.0
     @parameters bexp = 0.0
@@ -49,25 +49,25 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
 end
 
 function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
-    @variables raineff(t) = 0.0
+    @variables raineff = 0.0
 
-    @variables slowwater(t) = 0.0 [description = "This is my input"]
-    @variables fastwater1(t) = 0.0
-    @variables fastwater2(t) = 0.0
-    @variables fastwater3(t) = 0.0
+    @variables slowwater = 0.0
+    @variables fastwater1 = 0.0
+    @variables fastwater2 = 0.0
+    @variables fastwater3 = 0.0
 
-    @variables new_slowwater(t) = 0.0
-    @variables new_fastwater1(t) = 0.0
-    @variables new_fastwater2(t) = 0.0
-    @variables new_fastwater3(t) = 0.0
+    @variables new_slowwater = 0.0
+    @variables new_fastwater1 = 0.0
+    @variables new_fastwater2 = 0.0
+    @variables new_fastwater3 = 0.0
 
-    @variables slow_q0(t) = 0.0
-    @variables slow_q1(t) = 0.0
-    @variables fast_q0(t) = 0.0
-    @variables fast_q1(t) = 0.0
-    @variables fast_q2(t) = 0.0
-    @variables fast_q3(t) = 0.0
-    @variables flow(t) = 0.0
+    @variables slow_q0 = 0.0
+    @variables slow_q1 = 0.0
+    @variables fast_q0 = 0.0
+    @variables fast_q1 = 0.0
+    @variables fast_q2 = 0.0
+    @variables fast_q3 = 0.0
+    @variables flow = 0.0
 
     @parameters alpha = 0.0
     @parameters ks = 0.0

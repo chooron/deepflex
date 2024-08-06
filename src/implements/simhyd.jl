@@ -9,28 +9,29 @@ using ..LumpedHydro.ModelingToolkit: Num
 elements in SIMHYD
 """
 function SIMHYD_ELE(; name::Symbol, mtk::Bool=true)
-    @variables prcp(t) = 0.0
-    @variables pet(t) = 0.0
+    @variables prcp = 0.0
+    @variables pet = 0.0
 
-    @variables U(t) = 0.0
-    @variables IMAX(t) = 0.0
-    @variables INT(t) = 0.0
-    @variables INR(t) = 0.0
-    @variables RMO(t) = 0.0
-    @variables IRUN(t) = 0.0
-    @variables EVAP(t) = 0.0
-    @variables SRUN(t) = 0.0
-    @variables REC(t) = 0.0
-    @variables SMF(t) = 0.0
-    @variables POT(t) = 0.0
-    @variables BAS(t) = 0.0
-    @variables GWF(t) = 0.0
-    @variables SMS(t) = 0.0
-    @variables GW(t) = 0.0
+    @variables U = 0.0
+    @variables IMAX = 0.0
+    @variables INT = 0.0
+    @variables INR = 0.0
+    @variables RMO = 0.0
+    @variables IRUN = 0.0
+    @variables EVAP = 0.0
+    @variables SRUN = 0.0
+    @variables REC = 0.0
+    @variables SMF = 0.0
+    @variables POT = 0.0
+    @variables BAS = 0.0
+    @variables GWF = 0.0
+    @variables SMS = 0.0
+    @variables GW = 0.0
 
     @parameters INSC = 0.0
     @parameters COEFF = 0.0
     @parameters SQ = 0.0
+    
     @parameters SMSC = 0.0
     @parameters SUB = 0.0
     @parameters CRAK = 0.0

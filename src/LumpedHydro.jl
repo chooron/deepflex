@@ -2,18 +2,21 @@ module LumpedHydro
 ## External packages
 # common packages
 using TOML
+using Dates
 using Reexport
 using StableRNGs
 using Statistics
 using ComponentArrays
+using ComponentArrays: indexmap, getval
 using NamedTupleTools
 using DocStringExtensions
+using IterTools: ncycle
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # ModelingToolkit building
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkit: D_nounits as D
 using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
@@ -23,6 +26,7 @@ using Graphs
 
 # data interpolataion
 using DataInterpolations
+# using Interpolations
 
 # solve ODEProblem
 using SciMLBase
@@ -40,6 +44,7 @@ using OptimizationOptimisers
 
 # HydroEquations
 using HydroEquations
+using HydroEquations: ifelse_func
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])

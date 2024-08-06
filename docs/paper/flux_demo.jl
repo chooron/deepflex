@@ -8,8 +8,8 @@ perc_flux = SimpleFlux(
 )
 
 #! construction method 2
-@variables soilwater(t) = 0.0 [description = "current soil moisture storage"]
-@variables percolation(t) = 0.0 [description = "percolation to deeper soil layer"]
+@variables soilwater = 0.0 [description = "current soil moisture storage"]
+@variables percolation = 0.0 [description = "percolation to deeper soil layer"]
 @parameters x1 = 0.0 [tunable = true, description = "maximum soil moisture storage"]
 perc_flux_v2 = SimpleFlux(
     [soilwater] => [percolation], [x1],

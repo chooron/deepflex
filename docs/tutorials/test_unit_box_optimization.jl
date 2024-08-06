@@ -3,10 +3,10 @@ using CSV
 using DataFrames
 # using CairoMakie
 using ComponentArrays
-using StructArrays
-using OptimizationOptimisers
+using OptimizationBBO
 using BenchmarkTools
 using NamedTupleTools
+using HydroEquations
 # using LumpedHydro
 # test exphydro model
 
@@ -28,7 +28,7 @@ ts = collect(1:10000)
 tunable_param_lb = ComponentVector(lb_list, getaxes(tunable_pas))
 tunable_param_ub = ComponentVector(ub_list, getaxes(tunable_pas))
 
-model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false)
+model = LumpedHydro.ExpHydro.Unit(name=:exphydro)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
@@ -47,13 +47,13 @@ best_pas = LumpedHydro.param_box_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
-    input=input,
-    target=output,
+    input=[input],
+    target=[output],
     target_name=:flow,
-    timeidx=ts,
+    timeidx=[ts],
     lb=tunable_param_lb,
     ub=tunable_param_ub,
     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
-    maxiters=1000,
-    loss_func=mse,
+    maxiters=100,
+    loss_func=HydroEquations.mse,
 )

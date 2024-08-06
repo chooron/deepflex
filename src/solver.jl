@@ -6,14 +6,14 @@ $(FIELDS)
 """
 @kwdef struct ODESolver <: AbstractSolver
     alg = Tsit5()
-    sensealg = InterpolatingAdjoint()
+    sensealg = GaussAdjoint()
     reltol = 1e-3
     abstol = 1e-3
     saveat = 1.0
 end
 
 function (solver::ODESolver)(
-    ode_prob::ODEProblem,
+    ode_prob::ODEProblem
 )
     sol = solve(
         ode_prob,
@@ -23,12 +23,11 @@ function (solver::ODESolver)(
         abstol=solver.abstol,
         sensealg=solver.sensealg
     )
-    num_u = length(ode_prob.u0)
+    sol_arr = Array(sol)
     if SciMLBase.successful_retcode(sol)
-        return [sol[i, :] for i in 1:num_u]
+        return sol_arr
     else
-        println("solve fail")
-        return [zeros(length(solver.saveat)) for _ in 1:num_u]
+        return false
     end
 end
 
@@ -42,21 +41,26 @@ $(FIELDS)
     alg = FunctionMap()
     reltol = 1e-3
     abstol = 1e-3
-    sensealg = InterpolatingAdjoint()
+    sensealg = GaussAdjoint()
 end
 
 function (solver::DiscreteSolver)(
-    ode_prob::DiscreteProblem
+    disc_prob::DiscreteProblem,
 )
     sol = solve(
-        ode_prob,
+        disc_prob,
         solver.alg,
         reltol=solver.reltol,
         abstol=solver.abstol,
-        sensealg=solver.sensealg
+        # sensealg=solver.sensealg
     )
-    num_u = length(ode_prob.u0)
-    [sol[i, :] for i in 1:num_u]
+    num_u = length(disc_prob.u0)
+    if SciMLBase.successful_retcode(sol)
+        return [sol[i, :] for i in 1:num_u]
+    else
+        println("solve fail")
+        return [zeros(length(timeidx)) for _ in 1:num_u]
+    end
 end
 
 @kwdef struct ManualSolver <: AbstractSolver

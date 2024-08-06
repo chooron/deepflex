@@ -5,6 +5,7 @@ using DataFrames
 using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
+using Plots
 include("../../src/LumpedHydro.jl")
 
 unit = LumpedHydro.ExpHydro.Unit(name=:exphydro)
@@ -17,8 +18,10 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = collect(1:10000)
+ts = collect(1:100)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = LumpedHydro.ODESolver()
-results = unit(input, pas, timeidx=ts, solver=solver)
+result = unit(input, pas, timeidx=ts, solver=solver)
 
+plot(result.soilwater)
+# plot!(df[ts,"flow(mm)"])

@@ -41,3 +41,11 @@ function Base.show(io::IO, flux::AbstractNeuralFlux)
         println(io, first(collect(flux.output_info)) ~ flux.state_expr)
     end
 end
+
+function Base.show(io::IO, ele::AbstractElement)
+    println("hydro element name: $(ele.name)")
+    println("hydro element input: $(collect(ele.nameinfo[:input]))")
+    println("hydro element output: $(collect(ele.nameinfo[:output]))")
+    println("hydro element state: $(collect(ele.nameinfo[:state]))")
+    println("hydro element params: $(collect(ele.nameinfo[:param]))")
+end

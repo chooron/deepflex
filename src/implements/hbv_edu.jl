@@ -1,6 +1,7 @@
 @reexport module HBV_EDU
 #* convert from https://github.com/kratzert/RRMPG/blob/master/rrmpg/models/hbvedu_model.py
 using ..LumpedHydro
+using ..LumpedHydro: step_func
 using ..LumpedHydro.Symbolics: @variables
 using ..LumpedHydro.ModelingToolkit: @parameters
 using ..LumpedHydro.ModelingToolkit: t_nounits as t
@@ -9,12 +10,12 @@ using ..LumpedHydro.ModelingToolkit: t_nounits as t
 SnowWaterReservoir in HBV_EDU
 """
 function SnowStorage(; name::Symbol)
-    @variables snowwater(t) = 0.0
-    @variables liquidwater(t) = 0.0
-    @variables prcp(t) = 0.0
-    @variables temp(t) = 0.0
-    @variables snowfall(t) = 0.0
-    @variables melt(t) = 0.0
+    @variables snowwater = 0.0
+    @variables liquidwater = 0.0
+    @variables prcp = 0.0
+    @variables temp = 0.0
+    @variables snowfall = 0.0
+    @variables melt = 0.0
     @parameters tt = 0.0
     @parameters dd = 0.0
 
@@ -39,11 +40,11 @@ end
 SoilWaterReservoir in HBV_EDU
 """
 function SoilStorage(; name::Symbol)
-    @variables soilwater(t) = 0.0
-    @variables prcpeff(t) = 0.0
-    @variables liquidwater(t) = 0.0
-    @variables pet(t) = 0.0
-    @variables evap(t) = 0.0
+    @variables soilwater = 0.0
+    @variables prcpeff = 0.0
+    @variables liquidwater = 0.0
+    @variables pet = 0.0
+    @variables evap = 0.0
     @parameters FC = 0.0
     @parameters Beta = 0.0
     @parameters PWP = 0.0
@@ -65,14 +66,14 @@ function SoilStorage(; name::Symbol)
 end
 
 function FreeWaterStorage(; name::Symbol)
-    @variables s1(t) = 0.0
-    @variables s2(t) = 0.0
-    @variables q0(t) = 0.0
-    @variables q1(t) = 0.0
-    @variables q2(t) = 0.0
-    @variables qp(t) = 0.0
-    @variables prcpeff(t) = 0.0
-    @variables flow(t) = 0.0
+    @variables s1 = 0.0
+    @variables s2 = 0.0
+    @variables q0 = 0.0
+    @variables q1 = 0.0
+    @variables q2 = 0.0
+    @variables qp = 0.0
+    @variables prcpeff = 0.0
+    @variables flow = 0.0
     @parameters L = 0.0
     @parameters k0 = 0.0
     @parameters k1 = 0.0

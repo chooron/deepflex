@@ -28,11 +28,33 @@ struct HydroUnit <: AbstractUnit
     name::Symbol
     "hydrological computation elements"
     components::Vector{<:AbstractComponent}
+    "input idx for each components"
+    input_idx::Vector
+    "unit var names"
+    input_names::Vector{Symbol}
+    "unit var names"
+    var_ntp::NamedTuple
 
     function HydroUnit(name; components::Vector{<:AbstractComponent})
+        #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
+        unit_input_names = unit_var_names = get_input_names(components)
+        input_idx = Vector[]
+        for component in components
+            tmp_input_idx = map(get_input_names(component)) do nm
+                findfirst(varnm -> varnm == nm, unit_var_names)
+            end
+            #* 更新unit_var_names
+            unit_var_names = reduce(vcat, [unit_var_names, get_state_names(component), get_output_names(component)])
+            push!(input_idx, tmp_input_idx)
+        end
+        var_ntp = NamedTuple{Tuple(unit_var_names)}(collect(1:length(unit_var_names)))
+
         new(
             name,
             components,
+            input_idx,
+            unit_input_names,
+            var_ntp
         )
     end
 end
@@ -40,14 +62,47 @@ end
 # 求解并计算
 function (unit::HydroUnit)(
     input::NamedTuple,
-    pas::Union{ComponentVector,NamedTuple};
+    pas::ComponentVector;
     timeidx::Vector,
     solver::AbstractSolver=ODESolver()
 )
-    fluxes = input
-    for tmp_ele in unit.components
-        tmp_fluxes = tmp_ele(fluxes, pas, timeidx=timeidx, solver=solver)
-        fluxes = merge(fluxes, tmp_fluxes)
+    fluxes = reduce(hcat, [input[nm] for nm in unit.input_names])'
+    for (tmp_ele, idx) in zip(unit.components, unit.input_idx)
+        tmp_fluxes = tmp_ele(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
+        fluxes = cat(fluxes, tmp_fluxes, dims=1)
+    end
+    NamedTuple{keys(unit.var_ntp)}(eachrow(fluxes))
+end
+
+#* 多输入构建大型方程求解并计算
+function (unit::HydroUnit)(
+    inputs::Vector{<:NamedTuple},
+    pas::ComponentVector;
+    timeidx::Vector,
+    solver::AbstractSolver=ODESolver()
+)
+    fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in unit.input_names]) for input in inputs])
+    fluxes = permutedims(fluxes, (2, 3, 1))
+    params, init_states = pas[:params], pas[:initstates]
+    for (ele, idx) in zip(unit.components, unit.input_idx)
+        fluxes_input = fluxes[idx, :, :]
+        if !isnothing(ele.ode_func)
+            #* Call the solve_prob method to solve the state of element at the specified timeidx
+            solved_states = solve_multi_prob(ele, input=fluxes_input, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
+            if solved_states == false
+                solved_states = zeros(length(ele.nameinfo[:state]), length(inputs), length(timeidx))
+            end
+            fluxes_input = cat(fluxes_input, solved_states, dims=1)
+        else
+            solved_states = nothing
+        end
+        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, params=params)
+        fluxes_outputs_perm = permutedims(fluxes_outputs, (1, 3, 2))
+        if isnothing(solved_states)
+            fluxes = cat(fluxes, fluxes_outputs_perm, dims=1)
+        else
+            fluxes = cat(fluxes, solved_states, fluxes_outputs_perm, dims=1)
+        end
     end
     fluxes
 end

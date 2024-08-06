@@ -1,37 +1,37 @@
 @reexport module Cemaneige
 
 using ..LumpedHydro
+using ..LumpedHydro: ifelse_func
 using ..LumpedHydro.Symbolics: @variables
 using ..LumpedHydro.ModelingToolkit: @parameters
-using ..LumpedHydro.ModelingToolkit: t_nounits as t
 using ..LumpedHydro.ModelingToolkit: Num
 
 """
 SoilWaterReservoir in GR4J
 """
 function SurfaceStorage(; name::Symbol, mtk::Bool=true)
-    @variables snowfall(t) = 0.0
-    @variables rainfall(t) = 0.0
+    @variables snowfall = 0.0
+    @variables rainfall = 0.0
 
-    @variables prcp(t) = 0.0
-    @variables mean_temp(t) = 0.0
-    @variables max_temp(t) = 0.0
-    @variables min_temp(t) = 0.0
+    @variables prcp = 0.0
+    @variables mean_temp = 0.0
+    @variables max_temp = 0.0
+    @variables min_temp = 0.0
 
-    @variables prcp_(t) = 0.0
-    @variables mean_temp_(t) = 0.0
-    @variables max_temp_(t) = 0.0
-    @variables min_temp_(t) = 0.0
+    @variables prcp_ = 0.0
+    @variables mean_temp_ = 0.0
+    @variables max_temp_ = 0.0
+    @variables min_temp_ = 0.0
 
-    @variables melt(t) = 0.0
-    @variables solid_frac(t) = 0.0
-    @variables infiltration(t) = 0.0
-    @variables d_thermal(t) = 0.0
+    @variables melt = 0.0
+    @variables solid_frac = 0.0
+    @variables infiltration = 0.0
+    @variables d_thermal = 0.0
 
-    @variables snowwater(t) = 0.0
-    @variables new_snowwater(t) = 0.0
-    @variables thermal(t) = 0.0
-    @variables new_thermal(t) = 0.0
+    @variables snowwater = 0.0
+    @variables new_snowwater = 0.0
+    @variables thermal = 0.0
+    @variables new_thermal = 0.0
 
     @parameters height = 0.0
     @parameters altitude = 0.0
@@ -52,7 +52,7 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
         LumpedHydro.SimpleFlux(
             [prcp, mean_temp, max_temp, min_temp] => [solid_frac], [altitude, zthresh],
             flux_exprs=@.[ifelse_func(zthresh - altitude) * (ifelse_func(max_temp) * ifelse_func(-min_temp) * (1.0 - max_temp / (max_temp - min_temp)) + ifelse_func(-max_temp)) +
-                     ifelse_func(altitude - zthresh) * (ifelse_func(-mean_temp) + ifelse_func(3 - mean_temp) * ifelse_func(mean_temp) * (1 - (mean_temp + 1) / 4.0))]
+                          ifelse_func(altitude - zthresh) * (ifelse_func(-mean_temp) + ifelse_func(3 - mean_temp) * ifelse_func(mean_temp) * (1 - (mean_temp + 1) / 4.0))]
         ),
         LumpedHydro.SimpleFlux([prcp, solid_frac] => [snowfall, rainfall], flux_exprs=@.[prcp * solid_frac, prcp * (1 - solid_frac)]),
         LumpedHydro.SimpleFlux([thermal, mean_temp] => [new_thermal], [CTG], flux_exprs=@.[min(0.0, CTG * thermal + (1 - CTG) * mean_temp)]),

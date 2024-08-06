@@ -7,7 +7,6 @@ using Symbolics
 using ComponentArrays
 using OrdinaryDiffEq
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using BenchmarkTools
 using StableRNGs
 using Optimization
@@ -27,36 +26,36 @@ qobs_vec = df[ts, "flow(mm)"]
 @parameters TT CFMAX CFR CWH FC beta LP PERC k0 k1 k2 UZL
 
 #! hydrological flux in the Exp-Hydro model
-@variables prcp(t) = 0.0 [description = "precipitation", unit = "mm"]
-@variables temp(t) = 0.0 [description = "precipitation", unit = "°C"]
-@variables lday(t) = 0.0 [description = "length of day", unit = "-"]
-@variables pet(t) = 0.0 [description = "potential evapotranspiration", unit = "mm"]
-@variables rainfall(t) = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
-@variables snowfall(t) = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
-@variables refreeze(t) = 0.0 [description = "Refreeze of ponding water"]
-@variables melt(t) = 0.0 [description = "snow melt", unit = "mm"]
-@variables snowinfil(t) = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables snowpack(t) = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables meltwater(t) = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables soilwater(t) = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
+@variables prcp = 0.0 [description = "precipitation", unit = "mm"]
+@variables temp = 0.0 [description = "precipitation", unit = "°C"]
+@variables lday = 0.0 [description = "length of day", unit = "-"]
+@variables pet = 0.0 [description = "potential evapotranspiration", unit = "mm"]
+@variables rainfall = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
+@variables snowfall = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
+@variables refreeze = 0.0 [description = "Refreeze of ponding water"]
+@variables melt = 0.0 [description = "snow melt", unit = "mm"]
+@variables snowinfil = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
+@variables snowpack = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
+@variables meltwater = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
+@variables soilwater = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
 
-@variables soilwetfrac(t) = 0.0
-@variables recharge(t) = 0.0
-@variables excess(t) = 0.0
-@variables evapfrac(t) = 0.0
-@variables evap(t) = 0.0
+@variables soilwetfrac = 0.0
+@variables recharge = 0.0
+@variables excess = 0.0
+@variables evapfrac = 0.0
+@variables evap = 0.0
 
-@variables upperzone(t) = 0.0
-@variables lowerzone(t) = 0.0
-@variables perc(t) = 0.0
-@variables q0(t) = 0.0
-@variables q1(t) = 0.0
-@variables q2(t) = 0.0
-@variables flow(t) = 0.0
+@variables upperzone = 0.0
+@variables lowerzone = 0.0
+@variables perc = 0.0
+@variables q0 = 0.0
+@variables q1 = 0.0
+@variables q2 = 0.0
+@variables flow = 0.0
 
 #* dynamic parameters
-@variables beta(t) = 0.0
-@variables gamma(t) = 0.0
+@variables beta = 0.0
+@variables gamma = 0.0
 
 
 SimpleFlux = LumpedHydro.SimpleFlux
@@ -105,7 +104,7 @@ soil_funcs = [
     NeuralFlux([prcp, temp, pet, soilwater] => [beta, gamma], :thetas => thetas_nn),
     SimpleFlux([soilwater, beta] => [soilwetfrac], [FC],
         flux_exprs=[clamp(abs(soilwater / FC)^beta, 0.0, 1.0)]),
-    NeuralFlux([rainfall, snowinfil, soilwetfrac] => [recharge], :recharge => recharge_nn)
+    NeuralFlux([rainfall, snowinfil, soilwetfrac] => [recharge], :recharge => recharge_nn),
     SimpleFlux([soilwater] => [excess], [FC],
         flux_exprs=[max(0.0, soilwater - FC)]),
     SimpleFlux([soilwater] => [evapfrac], [LP, FC],

@@ -4,7 +4,6 @@ using DataFrames
 using ComponentArrays
 using OrdinaryDiffEq
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using CairoMakie
 using OptimizationBBO
 using BenchmarkTools
@@ -19,19 +18,19 @@ include("../../src/LumpedHydro.jl")
 @parameters f = 0.0 [description = "runoff decline rate", unit = "mm^(-1)"]
 @parameters Qmax = 0.0 [description = "maximum subsurface runoff", unit = "mm/d"]
 #! hydrological flux in the Exp-Hydro model
-@variables prcp(t) = 0.0 [description = "precipitation", unit = "mm"]
-@variables temp(t) = 0.0 [description = "precipitation", unit = "°C"]
-@variables lday(t) = 0.0 [description = "length of day", unit = "-"]
-@variables pet(t) = 0.0 [description = "potential evapotranspiration", unit = "mm"]
-@variables snowpack(t) = 0.0 [description = "snow storage", unit = "mm"]
-@variables soilwater(t) = 0.0 [description = "catchment water storage", unit = "mm"]
-@variables rainfall(t) = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
-@variables snowfall(t) = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
-@variables evap(t) = 0.0 [description = "evapotranspiration", unit = "mm"]
-@variables melt(t) = 0.0 [description = "melting", unit = "mm"]
-@variables baseflow(t) = 0.0 [description = "discharge", unit = "mm"]
-@variables surfaceflow(t) = 0.0 [description = "discharge", unit = "mm"]
-@variables flow(t) = 0.0 [description = "discharge", unit = "mm"]
+@variables prcp = 0.0 [description = "precipitation", unit = "mm"]
+@variables temp = 0.0 [description = "precipitation", unit = "°C"]
+@variables lday = 0.0 [description = "length of day", unit = "-"]
+@variables pet = 0.0 [description = "potential evapotranspiration", unit = "mm"]
+@variables snowpack = 0.0 [description = "snow storage", unit = "mm"]
+@variables soilwater = 0.0 [description = "catchment water storage", unit = "mm"]
+@variables rainfall = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
+@variables snowfall = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
+@variables evap = 0.0 [description = "evapotranspiration", unit = "mm"]
+@variables melt = 0.0 [description = "melting", unit = "mm"]
+@variables baseflow = 0.0 [description = "discharge", unit = "mm"]
+@variables surfaceflow = 0.0 [description = "discharge", unit = "mm"]
+@variables flow = 0.0 [description = "discharge", unit = "mm"]
 SimpleFlux = LumpedHydro.SimpleFlux
 LagFlux = LumpedHydro.LagFlux
 StateFlux = LumpedHydro.StateFlux

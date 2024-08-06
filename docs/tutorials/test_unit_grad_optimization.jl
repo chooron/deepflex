@@ -31,14 +31,15 @@ flow_vec = df[ts, "flow(mm)"]
 
 # parameters optimization
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
+input_matrix = reduce(hcat, collect(input))'
 output = (flow=flow_vec,)
 
 best_pas = LumpedHydro.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
-    input=input,
-    target=output,
-    timeidx=ts,
+    input=repeat([input], 10),
+    target=repeat([output], 10),
+    timeidx=repeat([ts], 10),
     adtype=Optimization.AutoZygote()
 )

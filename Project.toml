@@ -4,14 +4,22 @@ authors = ["jingx <50790703+chooron@users.noreply.github.com>"]
 version = "0.1.0"
 
 [deps]
-Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ArrayPadding = "fe5ef43c-4912-423d-9170-4bd5cb6a013a"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+DynamicalSystems = "61744808-ddfa-5f27-97ff-6e42cc95d634"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+HydroEquations = "60e84f97-6d46-4372-ab01-b01625c76cd4"
+IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
 LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
@@ -20,6 +28,7 @@ Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
 OptimizationBBO = "3e6eede4-6085-4f62-9a71-46d9bc1eb92b"
 OptimizationOptimisers = "42dfb2eb-d2b4-4451-abcd-913932933ac1"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
@@ -34,8 +43,9 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
 [target]
-test = ["CSV", "DataFrames"]
+test = ["CSV", "DataFrames", "Aqua"]

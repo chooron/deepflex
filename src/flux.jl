@@ -61,8 +61,8 @@ struct SimpleFlux <: AbstractSimpleFlux
 
         if length(flux_funcs) > 0
             #* Create variables by names
-            inputs = [first(@variables $var(t) = 0.0) for var in input_names]
-            outputs = [first(@variables $var(t) = 0.0) for var in output_names]
+            inputs = [first(@variables $var = 0.0) for var in input_names]
+            outputs = [first(@variables $var = 0.0) for var in output_names]
             params = [first(@parameters $var = 0.0) for var in param_names]
             #* When a calculation function is provided, exprs are constructed based on the calculation function and variables
             flux_exprs = [flux_func(inputs, params) for flux_func in flux_funcs]
@@ -70,7 +70,7 @@ struct SimpleFlux <: AbstractSimpleFlux
             #* Get the corresponding calculation formula according to the input and output parameter names
             hydro_equation = HydroEquation(input_names, output_names, param_names)
             inputs, outputs, params = hydro_equation.inputs, hydro_equation.outputs, hydro_equation.params
-            flux_exprs = expr(hydro_equation; kwargs...)
+            flux_exprs = HydroEquations.expr(hydro_equation; kwargs...)
             #* Get the calculation function according to exprs
             flux_funcs = [build_function(hydro_expr, inputs, params, expression=Val{false}) for hydro_expr in flux_exprs]
         end
@@ -179,8 +179,8 @@ struct StateFlux <: AbstractStateFlux
         state_func::Function
     )
         #* Create variables by names
-        fluxes = [first(@variables $nm(t) = 0.0) for nm in flux_names]
-        state = first(@variables $state_name(t) = 0.0)
+        fluxes = [first(@variables $nm = 0.0) for nm in flux_names]
+        state = first(@variables $state_name = 0.0)
         params = [first(@parameters $nm = 0.0) for nm in param_names]
         state_expr = state_func(fluxes, params)
         return StateFlux(fluxes, state, params, state_expr=state_expr)
@@ -202,8 +202,8 @@ struct StateFlux <: AbstractStateFlux
     )
         ori_state_name, new_state_name = state_names[1], state_names[2]
         #* Create variables by names
-        ori_state = first(@variables $ori_state_name(t) = 0.0)
-        new_state = first(@variables $new_state_name(t) = 0.0)
+        ori_state = first(@variables $ori_state_name = 0.0)
+        new_state = first(@variables $new_state_name = 0.0)
         return StateFlux(ori_state => new_state)
     end
 end
@@ -241,7 +241,7 @@ struct LagFlux <: AbstractLagFlux
         function discrete_prob(u, p, t)
             u = circshift(u, -1)
             u[end] = 0.0
-            tmp_u = input[Int(t)] .* p .+ u
+            tmp_u = input[Int] .* p .+ u
             tmp_u
         end
 
@@ -259,7 +259,7 @@ struct LagFlux <: AbstractLagFlux
         kwargs...,
     )
         #* Create variables by names
-        fluxes = [first(@variables $nm(t) = 0.0) for nm in flux_names]
+        fluxes = [first(@variables $nm = 0.0) for nm in flux_names]
         lag_time = first(@parameters $lag_time_name = 0.0)
 
         #* Constructing a function for the entire sequence calculation
@@ -361,8 +361,8 @@ struct NeuralFlux <: AbstractNeuralFlux
         nn_output_name = Symbol(chain_name, :_output)
         #* The input and output of the model can only be of type Symbolics.Arr{Num, 1},
         #* so it cannot be defined based on input_vars and output_vars
-        nn_input = first(@variables $(nn_input_name)(t)[1:length(input_names)])
-        nn_output = first(@variables $(nn_output_name)(t)[1:length(output_names)])
+        nn_input = first(@variables $(nn_input_name)[1:length(input_names)])
+        nn_output = first(@variables $(nn_output_name)[1:length(output_names)])
 
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
@@ -391,8 +391,8 @@ struct NeuralFlux <: AbstractNeuralFlux
     )
         input_names, output_names = flux_names[1], flux_names[2]
 
-        input_vars = [first(@variables $input_name(t) = 0.0) for input_name in input_names]
-        output_vars = [first(@variables $output_name(t) = 0.0) for output_name in output_names]
+        input_vars = [first(@variables $input_name = 0.0) for input_name in input_names]
+        output_vars = [first(@variables $output_name = 0.0) for output_name in output_names]
 
         return NeuralFlux(input_vars => output_vars, chain)
     end

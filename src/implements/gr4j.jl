@@ -32,12 +32,12 @@ function Soil(; name::Symbol, mtk::Bool=true)
         SimpleFlux([:outflow] => [:slowflow, :fastflow]),]
 
     lfluxes = [
-        LagFlux(:slowflow => :slowflow_routed, :x4, LumpedHydro.uh_1_half),
-        LagFlux(:fastflow => :fastflow_routed, :x4, LumpedHydro.uh_2_full),
+        LagFlux(:slowflow => :slowflow_routed, :x4, HydroEquations.uh_1_half),
+        LagFlux(:fastflow => :fastflow_routed, :x4, HydroEquations.uh_2_full),
     ]
 
     dfluxes = [
-        StateFlux([:saturation] => [:evap, :percolation], :soilwater, funcs=fluxes)
+        StateFlux([:saturation] => [:evap, :percolation], :soilwater)
     ]
 
     HydroElement(

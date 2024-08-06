@@ -1,6 +1,8 @@
 @reexport module M100
 
+using ..LumpedHydro
 using ..LumpedHydro.Lux
+using ..LumpedHydro: step_func
 
 function M100_ELE(; name::Symbol, mtk::Bool=true)
     ann = Lux.Chain(
