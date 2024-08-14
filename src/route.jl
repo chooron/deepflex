@@ -8,14 +8,11 @@ struct UnitHydroRoute <: AbstractRoute
     combined with ordinary hydrological flux to construct ordinary differential equations
     """
     lfuncs::Vector
-    "common hydrological fluxes, used to provide calculation results for state fluxes"
-    funcs::Vector
 
-
-    function UnitHydroRoute(
-        name::Symbol;
+    function UnitHydroRoute(;
+        name::Symbol,
+        inputs::Vector{Num},
         lfuncs::Vector{<:AbstractLagFlux},
-
     )
         #* Extract all variable names of funcs and dfuncs
         ele_input_names, ele_output_names = reduce(union, get_input_names.(lfuncs)), reduce(union, get_output_names.(lfuncs))

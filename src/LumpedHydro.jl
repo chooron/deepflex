@@ -17,6 +17,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 # ModelingToolkit building
 using ModelingToolkit
 using ModelingToolkit: D_nounits as D
+using ModelingToolkit: @variables, @parameters
 using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
@@ -26,7 +27,6 @@ using Graphs
 
 # data interpolataion
 using DataInterpolations
-# using Interpolations
 
 # solve ODEProblem
 using SciMLBase

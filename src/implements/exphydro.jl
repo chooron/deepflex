@@ -1,21 +1,27 @@
 @reexport module ExpHydro
 
 using ..LumpedHydro
+using ..LumpedHydro: @variables, @parameters
+using ..LumpedHydro: step_func
 
 """
 SoilWaterReservoir in Exp-Hydro
 """
 function SurfaceStorage(; name::Symbol)
+    @variables temp lday pet prcp snowfall rainfall snowpack melt
+    @parameters Tmin Tmax Df
+
     fluxes = [
-        SimpleFlux([:temp, :lday] => [:pet]),
-        SimpleFlux([:prcp, :temp] => [:snowfall], [:Tmin]),
-        SimpleFlux([:snowwater, :temp] => [:melt], [:Tmax, :Df]),
-        SimpleFlux([:prcp, :temp] => [:rainfall], [:Tmin]),
-        SimpleFlux([:rainfall, :melt] => [:infiltration])
+        SimpleFlux([temp, lday] => [pet],
+            flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+        SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
+            flux_exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+        SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
+            flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
 
     dfluxes = [
-        StateFlux([:snowfall] => [:melt], :snowwater),
+        StateFlux([snowfall] => [melt], snowpack),
     ]
 
     HydroElement(
@@ -29,14 +35,21 @@ end
 SoilWaterReservoir in Exp-Hydro
 """
 function SoilStorage(; name::Symbol)
+    @variables soilwater pet evap baseflow surfaceflow flow
+    @parameters Smax Qmax f
     fluxes = [
-        SimpleFlux([:soilwater, :pet] => [:evap], [:Smax]),
-        SimpleFlux([:soilwater] => [:baseflow], [:Smax, :Qmax, :f]),
-        SimpleFlux([:soilwater] => [:surfaceflow], [:Smax]),
+        SimpleFlux([soilwater, pet] => [evap], [Smax],
+            flux_exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
+        SimpleFlux([soilwater] => [baseflow], [Smax, Qmax, f],
+            flux_exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
+        SimpleFlux([soilwater] => [surfaceflow], [Smax],
+            flux_exprs=[max(0.0, soilwater - Smax)]),
+        SimpleFlux([baseflow, surfaceflow] => [flow],
+            flux_exprs=[baseflow + surfaceflow]),
     ]
 
     dfluxes = [
-        StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater)
+        StateFlux([rainfall, melt] => [evap, flow], soilwater)
     ]
 
     HydroElement(
@@ -46,27 +59,11 @@ function SoilStorage(; name::Symbol)
     )
 end
 
-"""
-Inner Route Function in Exphydro
-"""
-function FreeWater(; name::Symbol)
-
-    fluxes = [
-        SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] + i[2]])
-    ]
-
-    HydroElement(
-        Symbol(name, :_zone),
-        funcs=fluxes,
-    )
-end
-
 function Unit(; name::Symbol)
 
     elements = [
         SurfaceStorage(name=name),
         SoilStorage(name=name),
-        FreeWater(name=name)
     ]
 
     HydroUnit(
@@ -74,5 +71,4 @@ function Unit(; name::Symbol)
         components=elements,
     )
 end
-
 end
