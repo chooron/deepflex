@@ -2,7 +2,6 @@
 using CSV
 using DataFrames
 using ComponentArrays
-
 using BenchmarkTools
 using NamedTupleTools
 using OrdinaryDiffEq
@@ -18,7 +17,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 ps = [f, Smax, Qmax, Df, Tmax, Tmin]
 params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 init_states = ComponentVector(snowwater=0.0, soilwater=1303.004248)
-pas = ComponentVector(params=params, initstates=init_states)
+pas = ComponentVector(param=params, state=init_states)
 
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);

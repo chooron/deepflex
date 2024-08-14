@@ -117,10 +117,24 @@ soil_ele = HydroElement(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 #! define the Exp-Hydro model
 m50_model = HydroUnit(:m50, components=[snow_ele, soil_ele]);
 
-
 #! pretrain each NN
 et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
 q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
+
+et_nn_p = LuxCore.initialparameters(StableRNG(42), et_nn)
+q_nn_p = LuxCore.initialparameters(StableRNG(42), q_nn)
+
+input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
+params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)
+norm_params = NamedTuple{Tuple([Symbol(nm, :_norm_param) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(
+    [[mean, std] for (mean, std) in zip(means, stds)]
+)
+nn_params = (etnn=et_nn_p, qnn=q_nn_p)
+pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=reduce(merge, [params, norm_params]), nn=nn_params))
+timeidx = collect(1:length(prcp_vec))
+solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
+result = m50_model(input, pas, timeidx=timeidx, solver=solver)
+
 
 # et_nn_p_trained = LumpedHydro.nn_param_optim(
 #     et_nn_flux,
@@ -138,46 +152,31 @@ q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
 #     maxiters=100,
 # )
 
-# prepare args
-et_nn_p = LuxCore.initialparameters(StableRNG(42), et_nn)
-q_nn_p = LuxCore.initialparameters(StableRNG(42), q_nn)
+# #! set the tunable parameters and constant parameters
+# #! 当仅优化部分参数如nn_params时就会出错
+# tunable_pas = ComponentVector(params=(etnn=collect(ComponentVector(et_nn_p)), qnn=collect(ComponentVector(q_nn_p))))
+# const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00), params=reduce(merge, [params, norm_params]))
+# default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
+# # new_pas = merge_ca(default_model_pas, tunable_pas)
+# #! prepare flow
+# output = (log_flow=qobs_vec,)
+# #! model calibration
+# best_pas = LumpedHydro.param_grad_optim(
+#     m50_model,
+#     tunable_pas=tunable_pas,
+#     const_pas=const_pas,
+#     input=[input],
+#     target=[output],
+#     timeidx=[ts],
+#     adtype=Optimization.AutoZygote(),
+#     maxiters=10000
+# )
 
-input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
-params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)
-norm_params = NamedTuple{Tuple([Symbol(nm, :_norm_param) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(
-    [[mean, std] for (mean, std) in zip(means, stds)]
-)
-nn_params = (etnn=et_nn_p, qnn=q_nn_p)
-pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=reduce(merge, [params, norm_params, nn_params])))
-timeidx = collect(1:length(prcp_vec))
-solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
-# result = m50_model(input, pas, timeidx=timeidx, solver=solver)
+# #! use the optimized parameters for model simulation
+# result_opt = m50_model(input, LumpedHydro.merge_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)
+# pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
+# pas = ComponentVector(pas_list, getaxes(tunable_pas))
 
-#! set the tunable parameters and constant parameters
-#! 当仅优化部分参数如nn_params时就会出错
-tunable_pas = ComponentVector(params=(etnn=collect(ComponentVector(et_nn_p)), qnn=collect(ComponentVector(q_nn_p))))
-const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00), params=reduce(merge, [params, norm_params]))
-default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
-# new_pas = merge_ca(default_model_pas, tunable_pas)
-#! prepare flow
-output = (log_flow=qobs_vec,)
-#! model calibration
-best_pas = LumpedHydro.param_grad_optim(
-    m50_model,
-    tunable_pas=tunable_pas,
-    const_pas=const_pas,
-    input=[input],
-    target=[output],
-    timeidx=[ts],
-    adtype=Optimization.AutoZygote(),
-    maxiters=10000
-)
-
-#! use the optimized parameters for model simulation
-result_opt = m50_model(input, LumpedHydro.merge_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)
-pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
-pas = ComponentVector(pas_list, getaxes(tunable_pas))
-
-LumpedHydro.mse(result_opt.log_flow, qobs_vec)
-1 - LumpedHydro.nse(result_opt.log_flow, qobs_vec)
+# LumpedHydro.mse(result_opt.log_flow, qobs_vec)
+# 1 - LumpedHydro.nse(result_opt.log_flow, qobs_vec)
 

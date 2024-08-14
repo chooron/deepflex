@@ -29,8 +29,6 @@ struct SimpleFlux <: AbstractSimpleFlux
     output_info::NamedTuple
     "A map of parameters names (Symbol) and its variables (Num)"
     param_info::NamedTuple
-    "Callable function for output variable calculation, It requires the input format to be (i::Vector, p::Vector)"
-    inner_func::Function
     "flux expressions to descripe the formula of the output variable"
     flux_exprs::Vector{Num}
 
@@ -38,14 +36,12 @@ struct SimpleFlux <: AbstractSimpleFlux
         input_info::NamedTuple,
         output_info::NamedTuple,
         param_info::NamedTuple,
-        inner_func::Function,
         flux_exprs::Vector{Num}
     )
         return new(
             input_info,
             output_info,
             param_info,
-            inner_func,
             flux_exprs
         )
     end
@@ -61,9 +57,9 @@ struct SimpleFlux <: AbstractSimpleFlux
 
         if length(flux_funcs) > 0
             #* Create variables by names
-            inputs = [first(@variables $var = 0.0) for var in input_names]
-            outputs = [first(@variables $var = 0.0) for var in output_names]
-            params = [first(@parameters $var = 0.0) for var in param_names]
+            inputs = [first(@variables $var) for var in input_names]
+            outputs = [first(@variables $var) for var in output_names]
+            params = [first(@parameters $var) for var in param_names]
             #* When a calculation function is provided, exprs are constructed based on the calculation function and variables
             flux_exprs = [flux_func(inputs, params) for flux_func in flux_funcs]
         else
@@ -71,15 +67,6 @@ struct SimpleFlux <: AbstractSimpleFlux
             hydro_equation = HydroEquation(input_names, output_names, param_names)
             inputs, outputs, params = hydro_equation.inputs, hydro_equation.outputs, hydro_equation.params
             flux_exprs = HydroEquations.expr(hydro_equation; kwargs...)
-            #* Get the calculation function according to exprs
-            flux_funcs = [build_function(hydro_expr, inputs, params, expression=Val{false}) for hydro_expr in flux_exprs]
-        end
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_func(input::AbstractMatrix, params::AbstractVector)
-            #* The output type is Vector{Vector{T, variable dimension}, sequence length},
-            #* To support subsequent calculations, convert the calculation results into Matrix{sequence length,variable dimension} type
-            reduce(hcat, [flux_func.(eachrow(input), Ref(params)) for flux_func in flux_funcs])
         end
 
         #* Building the struct
@@ -87,7 +74,6 @@ struct SimpleFlux <: AbstractSimpleFlux
             NamedTuple{Tuple(input_names)}(inputs),
             NamedTuple{Tuple(output_names)}(outputs),
             NamedTuple{Tuple(param_names)}(params),
-            inner_func,
             flux_exprs
         )
     end
@@ -105,21 +91,10 @@ struct SimpleFlux <: AbstractSimpleFlux
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = Symbolics.tosymbol.(params)
 
-        #* According to the expression, the calculation function is obtained
-        flux_funcs = [build_function(flux_expr, inputs, params, expression=Val{false}) for flux_expr in flux_exprs]
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_func(input::AbstractMatrix, params::AbstractVector)
-            #* The output type is Vector{Vector{T, variable dimension}, sequence length},
-            #* To support subsequent calculations, convert the calculation results into Matrix{sequence length,variable dimension} type
-            reduce(hcat, [flux_func.(eachrow(input), Ref(params)) for flux_func in flux_funcs])
-        end
-
         return SimpleFlux(
             NamedTuple{(Tuple(input_names))}(inputs),
             NamedTuple{(Tuple(output_names))}(outputs),
             NamedTuple{(Tuple(param_names))}(params),
-            inner_func,
             flux_exprs,
         )
     end
@@ -179,9 +154,9 @@ struct StateFlux <: AbstractStateFlux
         state_func::Function
     )
         #* Create variables by names
-        fluxes = [first(@variables $nm = 0.0) for nm in flux_names]
-        state = first(@variables $state_name = 0.0)
-        params = [first(@parameters $nm = 0.0) for nm in param_names]
+        fluxes = [first(@variables $nm) for nm in flux_names]
+        state = first(@variables $state_name)
+        params = [first(@parameters $nm) for nm in param_names]
         state_expr = state_func(fluxes, params)
         return StateFlux(fluxes, state, params, state_expr=state_expr)
     end
@@ -202,108 +177,11 @@ struct StateFlux <: AbstractStateFlux
     )
         ori_state_name, new_state_name = state_names[1], state_names[2]
         #* Create variables by names
-        ori_state = first(@variables $ori_state_name = 0.0)
-        new_state = first(@variables $new_state_name = 0.0)
+        ori_state = first(@variables $ori_state_name)
+        new_state = first(@variables $new_state_name)
         return StateFlux(ori_state => new_state)
     end
 end
-
-
-"""
-$(TYPEDEF)
-A flux used in hydrological unit-hydrograph calculations
-# Fields
-$(FIELDS)
-# Example
-```
-slowflow_lagflux = LagFlux(:slowflow, :slowflow_lag, lag_func=LumpedHydro.uh_1_half, lag_time=:x4)
-```
-"""
-struct LagFlux <: AbstractLagFlux
-    "A map of input names (Symbol) and its variables (Num)"
-    input_info::NamedTuple
-    "A map of output names (Symbol) and its variables (Num)"
-    output_info::NamedTuple
-    "A map of parameter names (Symbol) and its variables (Num)"
-    param_info::NamedTuple
-    "Callable function for output variable calculation, It requires the input format to be (i::Vector, p::Vector)"
-    inner_func::Function
-
-    function solve_lag_flux(input::AbstractArray, lag_time::Number, lag_func::Function; kwargs...)
-        delta_t = 1.0
-        # ts = 1:(ceil(lag_time / delta_t)|>Int)
-        ts = 0:200
-        #* 将weight作为param输入到prob中
-        lag_weights = [lag_func(t, lag_time) for t in ts]
-        lag_weights = vcat((circshift(lag_weights, -1).-lag_weights)[1:end-1])
-
-        #* 首先将lagflux转换为discrete problem
-        function discrete_prob(u, p, t)
-            u = circshift(u, -1)
-            u[end] = 0.0
-            tmp_u = input[Int] .* p .+ u
-            tmp_u
-        end
-
-        prob = DiscreteProblem(discrete_prob, lag_weights, (1.0, length(input)), lag_weights)
-        #* 求解这个问题
-        sol = solve(prob, FunctionMap())
-        #* 得到权重计算结果
-        sol[1, :]
-    end
-    
-    function LagFlux(
-        flux_names::Pair{Symbol,Symbol},
-        lag_time_name::Symbol,
-        lag_func::Function;
-        kwargs...,
-    )
-        #* Create variables by names
-        fluxes = [first(@variables $nm = 0.0) for nm in flux_names]
-        lag_time = first(@parameters $lag_time_name = 0.0)
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_func(i::AbstractArray, p::AbstractVector)
-            #* Call solve_lag_flux for flood routing calculations
-            lag_flux = solve_lag_flux(i, p[1], lag_func, kwargs...)
-            [lag_flux]
-        end
-
-        new(
-            NamedTuple{(flux_names[1],)}([fluxes[1]]),
-            NamedTuple{(flux_names[2],)}([fluxes[2]]),
-            NamedTuple{(lag_time_name,)}([lag_time]),
-            inner_func,
-        )
-    end
-
-    function LagFlux(
-        fluxes::Pair{Num,Num},
-        lag_time::Num,
-        lag_func::Function;
-        kwargs...,
-    )
-        #* Convert to a symbol based on the variable
-        flux_name_1 = Symbolics.tosymbol(fluxes[1], escape=false)
-        flux_name_2 = Symbolics.tosymbol(fluxes[2], escape=false)
-        lag_time_name = Symbolics.tosymbol(lag_time, escape=false)
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_func(i::AbstractArray, p::AbstractVector)
-            #* Call solve_lag_flux for flood routing calculations
-            lag_flux = solve_lag_flux(i, p[1], lag_func, kwargs...)
-            [lag_flux]
-        end
-
-        new(
-            NamedTuple{(flux_name_1,)}([fluxes[1]]),
-            NamedTuple{(flux_name_2,)}([fluxes[2]]),
-            NamedTuple{(lag_time_name,)}([lag_time]),
-            inner_func,
-        )
-    end
-end
-
 
 """
 $(TYPEDEF)
@@ -324,12 +202,8 @@ struct NeuralFlux <: AbstractNeuralFlux
     input_info::NamedTuple
     "A map of output names (Symbol) and its variables (Num)"
     output_info::NamedTuple
-    "A map of parameter names (Symbol) and its variables (Num)"
-    param_info::NamedTuple
     "nn input and output information"
     nn_info::NamedTuple
-    "predict function created by the chain"
-    inner_func::Function
     "flux expression"
     flux_expr
 
@@ -359,6 +233,7 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* Constructing neural network input and output variables
         nn_input_name = Symbol(chain_name, :_input)
         nn_output_name = Symbol(chain_name, :_output)
+
         #* The input and output of the model can only be of type Symbolics.Arr{Num, 1},
         #* so it cannot be defined based on input_vars and output_vars
         nn_input = first(@variables $(nn_input_name)[1:length(input_names)])
@@ -366,21 +241,11 @@ struct NeuralFlux <: AbstractNeuralFlux
 
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
-        #* Constructing a calculation function based on a neural network
-        func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
-
-        #* Constructing a function for the entire sequence calculation
-        function inner_flux_func(input::AbstractMatrix, params::AbstractVector)
-            output = func(input', params[1])
-            output'
-        end
 
         new(
             NamedTuple{Tuple(input_names)}(input_vars),
             NamedTuple{Tuple(output_names)}(output_vars),
-            NamedTuple{(chain_name,)}([chain_params]),
-            (input=nn_input, output=nn_output),
-            inner_flux_func,
+            (name=chain_name, input=nn_input, output=nn_output, params=chain_params),
             flux_expr
         )
     end
@@ -391,9 +256,67 @@ struct NeuralFlux <: AbstractNeuralFlux
     )
         input_names, output_names = flux_names[1], flux_names[2]
 
-        input_vars = [first(@variables $input_name = 0.0) for input_name in input_names]
-        output_vars = [first(@variables $output_name = 0.0) for output_name in output_names]
+        input_vars = [first(@variables $input_name) for input_name in input_names]
+        output_vars = [first(@variables $output_name) for output_name in output_names]
 
         return NeuralFlux(input_vars => output_vars, chain)
+    end
+end
+
+"""
+$(TYPEDEF)
+A flux used in hydrological unit-hydrograph calculations
+# Fields
+$(FIELDS)
+# Example
+```
+slowflow_lagflux = LagFlux(:slowflow, :slowflow_lag, lag_func=LumpedHydro.uh_1_half, lag_time=:x4)
+```
+"""
+struct LagFlux <: AbstractLagFlux
+    "A map of input names (Symbol) and its variables (Num)"
+    input_info::NamedTuple
+    "A map of output names (Symbol) and its variables (Num)"
+    output_info::NamedTuple
+    "A map of parameter names (Symbol) and its variables (Num)"
+    param_info::NamedTuple
+    "lag functions"
+    lag_func::Function
+    
+    function LagFlux(
+        flux_names::Pair{Symbol,Symbol},
+        lag_time_name::Symbol,
+        lag_func::Function;
+        kwargs...,
+    )
+        #* Create variables by names
+        fluxes = [first(@variables $nm) for nm in flux_names]
+        lag_time = first(@parameters $lag_time_name)
+
+        new(
+            NamedTuple{(flux_names[1],)}([fluxes[1]]),
+            NamedTuple{(flux_names[2],)}([fluxes[2]]),
+            NamedTuple{(lag_time_name,)}([lag_time]),
+            lag_func
+        )
+    end
+
+    function LagFlux(
+        fluxes::Pair{Num,Num},
+        lag_time::Num,
+        lag_func::Function;
+        kwargs...,
+    )
+        #* Convert to a symbol based on the variable
+        flux_name_1 = Symbolics.tosymbol(fluxes[1], escape=false)
+        flux_name_2 = Symbolics.tosymbol(fluxes[2], escape=false)
+        lag_time_name = Symbolics.tosymbol(lag_time, escape=false)
+
+        new(
+            NamedTuple{(flux_name_1,)}([fluxes[1]]),
+            NamedTuple{(flux_name_2,)}([fluxes[2]]),
+            NamedTuple{(lag_time_name,)}([lag_time]),
+            lag_func
+        )
     end
 end

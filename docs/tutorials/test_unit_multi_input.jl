@@ -25,7 +25,4 @@ input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm
 inputs = repeat([input], node_num)
 
 solver = LumpedHydro.ODESolver()
-results = unit(inputs, pas, timeidx=ts, solver=solver)
-# input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in unit.input_names]) for input in inputs])
-# results[1]
-# plot(results[1].flow)
+results = unit(inputs, pas, timeidx=ts, solver=solver,output_type=:namedtuple)

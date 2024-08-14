@@ -16,10 +16,11 @@ function param_box_optim(
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
     timeidx::AbstractVector,
+    run_kwargs::Dict=Dict(),
     kwargs...,
 )
     #* Get the argument for parameter optimization
-    loss_func = get(kwargs, :loss_func, mse)
+    loss_func = get(kwargs, :loss_func, HydroErr.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
@@ -39,7 +40,7 @@ function param_box_optim(
         tmp_pas = update_ca(default_model_pas, ComponentVector(x, tunable_axes))
         loss = mean(map(eachindex(input, target, timeidx)) do i
             inp, tar, tidx = input[i], target[i], timeidx[i]
-            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver)
+            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver; run_kwargs...)
             tmp_loss = mean([loss_func(tar[key], tmp_pred[key]) for key in keys(tar)])
             tmp_loss
         end)
@@ -60,11 +61,11 @@ function get_objective()
         #* Optimization arguments: hydro component, input data, time index, ode solver,
         #*                         tunable parameters axes and default model params
         #* Use merge_ca to replace the tunable parameters inner the model parameters
-        component, input, target, timeidx, solver, default_model_pas, loss_func = p
+        component, input, target, timeidx, solver, run_kwargs, default_model_pas, loss_func = p
         tmp_pas = update_ca(default_model_pas, x)
         loss = mean(map(eachindex(input, target, timeidx)) do i
             inp, tar, tidx = input[i], target[i], timeidx[i]
-            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver)
+            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver; run_kwargs...)
             tmp_loss = mean([loss_func(tar[key], tmp_pred[key]) for key in keys(tar)])
             tmp_loss
         end)
@@ -86,14 +87,16 @@ function param_grad_optim(
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
     timeidx::AbstractVector,
+    run_kwargs::Dict=Dict(),
     kwargs...,
 )
     #* Get the argument for parameter optimization
     solve_alg = get(kwargs, :solve_alg, Adam())
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
-    loss_func = get(kwargs, :loss_func, mse)
+    loss_func = get(kwargs, :loss_func, HydroErr.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
+    #* 把这个放到run kwargs里面, timeidx也是
     solver = get(kwargs, :solver, ODESolver())
 
     #* Construct default model parameters based on tunbale parameters and constant parameters for subsequent merging
@@ -101,7 +104,7 @@ function param_grad_optim(
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(objective_func, adtype)
-    prob_args = (component, input, target, timeidx, solver, default_model_pas, loss_func)
+    prob_args = (component, input, target, timeidx, solver, run_kwargs, default_model_pas, loss_func)
     optprob = Optimization.OptimizationProblem(optf, tunable_pas, prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     #* Returns the optimized model parameters
@@ -120,7 +123,7 @@ function batch_param_grad_optim(
     #* Get the argument for parameter optimization
     solve_alg = get(kwargs, :solve_alg, Adam())
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
-    loss_func = get(kwargs, :loss_func, mse)
+    loss_func = get(kwargs, :loss_func, HydroErr.mse)
     maxiters = get(kwargs, :maxiters, 10)
     solver = get(kwargs, :solver, ODESolver())
 
@@ -179,7 +182,7 @@ function nn_param_optim(
     solve_alg = get(kwargs, :solve_alg, Adam(0.01))
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
     maxiters = get(kwargs, :maxiters, 100)
-    loss_func = get(kwargs, :loss_func, mse)
+    loss_func = get(kwargs, :loss_func, HydroErr.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
 
     #* Integrate nn's input variables

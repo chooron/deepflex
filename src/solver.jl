@@ -6,7 +6,7 @@ $(FIELDS)
 """
 @kwdef struct ODESolver <: AbstractSolver
     alg = Tsit5()
-    sensealg = GaussAdjoint()
+    sensealg = InterpolatingAdjoint()
     reltol = 1e-3
     abstol = 1e-3
     saveat = 1.0

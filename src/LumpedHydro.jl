@@ -42,9 +42,11 @@ using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
 
+# HydroErr
+using HydroErr
+
 # HydroEquations
-using HydroEquations
-using HydroEquations: ifelse_func
+# using HydroEquations
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
@@ -59,10 +61,11 @@ abstract type AbstractNeuralFlux <: AbstractSimpleFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractLagFlux <: AbstractFlux end
 
-(flux::AbstractFlux)(input::AbstractArray, params::AbstractArray) = flux.inner_func(input, params)
-
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
+abstract type AbstractHydroElement <: AbstractElement end
+abstract type AbstractLagElement <: AbstractElement end
+abstract type AbstractRoute <: AbstractElement end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractUnit <: AbstractComponent end
 
@@ -70,10 +73,13 @@ abstract type AbstractUnit <: AbstractComponent end
 const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
 const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
+include("utils/attr.jl")
 include("utils/ca.jl")
 include("utils/name.jl")
 include("utils/show.jl")
 include("utils/graph.jl")
+include("utils/smooth.jl")
+include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
@@ -83,7 +89,7 @@ include("utils/normalize.jl")
 export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 include("element.jl")
-export HydroElement, solve_prob # , add_inputflux!, add_outputflux!, 
+export HydroElement, LagElement, solve_prob # , add_inputflux!, add_outputflux!, 
 
 include("unit.jl")
 export HydroUnit #, update_unit!, add_elements!, remove_elements!
@@ -99,6 +105,8 @@ include("implements/cemaneige.jl")
 include("implements/exphydro.jl")
 include("implements/gr4j.jl")
 include("implements/hbv_edu.jl")
+include("implements/hbv_maxbas.jl")
+include("implements/hbv_nn.jl")
 include("implements/hymod.jl")
 include("implements/simhyd.jl")
 include("implements/m50.jl")

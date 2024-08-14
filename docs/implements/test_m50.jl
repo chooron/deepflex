@@ -2,14 +2,12 @@
 using CSV
 using DataFrames
 using ComponentArrays
-using StructArrays
 using BenchmarkTools
 using NamedTupleTools
 using DataFrames
 using Lux, LuxCore
 using StableRNGs
 using OrdinaryDiffEq
-using ModelingToolkit
 # using LumpedHydro
 
 include("../../src/LumpedHydro.jl")
@@ -42,13 +40,12 @@ params = ComponentVector(
     mean_snowwater=mean_snowwater, std_snowwater=std_snowwater,
     mean_soilwater=mean_soilwater, std_soilwater=std_soilwater,
     mean_temp=mean_temp, std_temp=std_temp,
-    mean_prcp=mean_prcp, std_prcp=std_prcp,
-    etnn=et_ann_p, qnn=q_ann_p)
+    mean_prcp=mean_prcp, std_prcp=std_prcp)
 initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
-pas = ComponentVector(params=params, initstates=initstates) # , weight=1.0
+pas = ComponentVector(params=params, initstates=initstates, nn=(etnn=et_ann_p, qnn=q_ann_p)) # , weight=1.0
 
 solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
-@btime results = model(input, pas, timeidx=ts, solver=solver)
+results = model(input, pas, timeidx=ts, solver=solver)
 
 # q_ann = Lux.Chain(
 #     Lux.Dense(2 => 16, Lux.tanh),

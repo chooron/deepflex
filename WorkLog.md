@@ -75,6 +75,10 @@
 - [X] optimize需要提供多组数据训练的功能
 - [ ] 当前optimization只针对于参数率定功能，后续可能会考虑
 - [ ] 提供实时更新、添加、删除以及提示信息（包括当前element的输入输出）
+- [ ] 当前lagflux仅起到了信息记录作用，或可以删除
+- [ ] neuralflux的参数或需要与其他参数独立出来，在分布式计算中不能对每个单元格都分配一个神经网络参数，故一般是一个统一的神经网络，所以参数类型为（ps=..., st=...., nn=...,）
+- [ ] 模型输入的pas，三个主要键名：ps，st，nn
+- [ ] 参数输入校验工作
 - [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码如下：
 
 ```julia

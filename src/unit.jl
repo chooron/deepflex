@@ -64,14 +64,19 @@ function (unit::HydroUnit)(
     input::NamedTuple,
     pas::ComponentVector;
     timeidx::Vector,
-    solver::AbstractSolver=ODESolver()
+    solver::AbstractSolver=ODESolver(),
+    output_type::Symbol=:namedtuple
 )
     fluxes = reduce(hcat, [input[nm] for nm in unit.input_names])'
     for (tmp_ele, idx) in zip(unit.components, unit.input_idx)
         tmp_fluxes = tmp_ele(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
-    NamedTuple{keys(unit.var_ntp)}(eachrow(fluxes))
+    if output_type == :namedtuple
+        return NamedTuple{keys(unit.var_ntp)}(eachrow(fluxes))
+    elseif output_type == :array
+        return fluxes
+    end
 end
 
 #* 多输入构建大型方程求解并计算
@@ -79,16 +84,20 @@ function (unit::HydroUnit)(
     inputs::Vector{<:NamedTuple},
     pas::ComponentVector;
     timeidx::Vector,
-    solver::AbstractSolver=ODESolver()
+    ptypes::Vector{Symbol}=collect(keys(pas[:params])),
+    solver::AbstractSolver=ODESolver(),
+    output_type::Symbol=:array
 )
     fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in unit.input_names]) for input in inputs])
     fluxes = permutedims(fluxes, (2, 3, 1))
-    params, init_states = pas[:params], pas[:initstates]
     for (ele, idx) in zip(unit.components, unit.input_idx)
         fluxes_input = fluxes[idx, :, :]
-        if !isnothing(ele.ode_func)
+        if !isnothing(get_ode_func(ele))
             #* Call the solve_prob method to solve the state of element at the specified timeidx
-            solved_states = solve_multi_prob(ele, input=fluxes_input, params=params, init_states=init_states, timeidx=timeidx, solver=solver)
+            solved_states = solve_multi_prob(
+                ele, input=fluxes_input, pas=pas,
+                ptypes=ptypes, timeidx=timeidx, solver=solver
+            )
             if solved_states == false
                 solved_states = zeros(length(ele.nameinfo[:state]), length(inputs), length(timeidx))
             end
@@ -96,7 +105,7 @@ function (unit::HydroUnit)(
         else
             solved_states = nothing
         end
-        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, params=params)
+        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, pas=pas, ptypes=ptypes)
         fluxes_outputs_perm = permutedims(fluxes_outputs, (1, 3, 2))
         if isnothing(solved_states)
             fluxes = cat(fluxes, fluxes_outputs_perm, dims=1)
@@ -104,5 +113,9 @@ function (unit::HydroUnit)(
             fluxes = cat(fluxes, solved_states, fluxes_outputs_perm, dims=1)
         end
     end
-    fluxes
+    if output_type == :namedtuple
+        return [NamedTuple{keys(unit.var_ntp)}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
+    elseif output_type == :array
+        return fluxes
+    end
 end
