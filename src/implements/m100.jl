@@ -27,7 +27,7 @@ function M100_ELE(; name::Symbol, mtk::Bool=true)
         StateFlux([:new_soilwater] => [:soilwater], funcs=funcs),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_ele_),
         funcs=funcs,
         dfuncs=dfuncs,

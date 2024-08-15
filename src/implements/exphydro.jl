@@ -13,18 +13,18 @@ function SurfaceStorage(; name::Symbol)
 
     fluxes = [
         SimpleFlux([temp, lday] => [pet],
-            flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+            exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
         SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-            flux_exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+            exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
         SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-            flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+            exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
 
     dfluxes = [
         StateFlux([snowfall] => [melt], snowpack),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_surface),
         funcs=fluxes,
         dfuncs=dfluxes,
@@ -35,24 +35,24 @@ end
 SoilWaterReservoir in Exp-Hydro
 """
 function SoilStorage(; name::Symbol)
-    @variables soilwater pet evap baseflow surfaceflow flow
+    @variables soilwater pet evap baseflow surfaceflow flow rainfall melt
     @parameters Smax Qmax f
     fluxes = [
         SimpleFlux([soilwater, pet] => [evap], [Smax],
-            flux_exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
+            exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
         SimpleFlux([soilwater] => [baseflow], [Smax, Qmax, f],
-            flux_exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
+            exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
         SimpleFlux([soilwater] => [surfaceflow], [Smax],
-            flux_exprs=[max(0.0, soilwater - Smax)]),
+            exprs=[max(0.0, soilwater - Smax)]),
         SimpleFlux([baseflow, surfaceflow] => [flow],
-            flux_exprs=[baseflow + surfaceflow]),
+            exprs=[baseflow + surfaceflow]),
     ]
 
     dfluxes = [
         StateFlux([rainfall, melt] => [evap, flow], soilwater)
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil),
         funcs=fluxes,
         dfuncs=dfluxes,

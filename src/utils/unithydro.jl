@@ -2,8 +2,8 @@ function uh_1_half(lag; kw...)
     timeidx = 1:ceil(lag)
     sf = get(kw, :smooth_func, ifelse_func)
     value = @.(sf(timeidx - lag) +
-               sf(timeidx - tdx) * sf(timeidx) * (timeidx / lag)^2.5)
-    vcat(value[1], circshift(value, -1) - value[1:end-1])
+               sf(lag - timeidx) * sf(timeidx) * (timeidx / lag)^2.5)
+    vcat([value[1]], value[2:end] .- value[1:end-1])
 end
 
 function uh_2_full(lag; kw...)
@@ -20,7 +20,7 @@ end
 
 function uh_3_half(lag; kw...)
     sf = get(kw, :smooth_func, ifelse_func)
-    
+
     timeidx = 1:ceil(lag)
     ff = 1 / (0.5 * lag^2)
     value = @.(sf(lag - timeidx) * ff * (0.5 * timeidx^2 - 0.5 * (timeidx - 1)^2) +

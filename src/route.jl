@@ -1,115 +1,147 @@
 struct UnitHydroRoute <: AbstractRoute
-    "the name of hydrological computation element"
-    name::Symbol
-    "element information: keys contains: input, output, param, state"
+    "routement information: keys contains: input, output, param, state"
     nameinfo::NamedTuple
     """
     Hydrological lag fluxes, 
     combined with ordinary hydrological flux to construct ordinary differential equations
     """
-    lfuncs::Vector
+    uhfuncs::Vector
 
-    function UnitHydroRoute(;
-        name::Symbol,
+    function UnitHydroRoute(
         inputs::Vector{Num},
-        lfuncs::Vector{<:AbstractLagFlux},
+        params::Union{Num,Vector{Num}},
+        uhfuncs::Union{Function,Vector{Function}},
     )
-        #* Extract all variable names of funcs and dfuncs
-        ele_input_names, ele_output_names = reduce(union, get_input_names.(lfuncs)), reduce(union, get_output_names.(lfuncs))
-        #* Extract all parameters names of funcs and dfuncs
-        ele_param_names = unique(reduce(union, get_param_names.(lfuncs)))
-        #* Setup the name information of the hydroelement
-        nameinfo = (input=ele_input_names, output=ele_output_names, param=ele_param_names)
+        if !(params isa Vector)
+            params = repeat([params], length(inputs))
+        end
+        if !(uhfuncs isa Vector)
+            uhfuncs = repeat([uhfuncs], length(inputs))
+        end
+        @assert length(params) == length(uhfuncs) "number of the params should be equal with the number of uhfuncs"
+        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        output_names = map(s -> Symbol(s, :_routed), input_names)
+        param_names = Symbolics.tosymbol.(params, escape=false)
+        #* Setup the name information of the hydroroutement
+        nameinfo = (input=input_names, output=output_names, param=param_names)
 
         return new(
-            name,
             nameinfo,
-            lfuncs,
+            uhfuncs,
         )
     end
 end
 
-
-struct LagElement <: AbstractLagElement
-    "the name of hydrological computation element "
-    name::Symbol
-    "element information: keys contains: input, output, param, state"
-    nameinfo::NamedTuple
-    "lag hydrological fluxes, used to flood routing"
-    lfuncs::Vector
-
-    function LagElement(
-        name::Symbol;
-        lfuncs::Vector{<:AbstractLagFlux},
-    )
-        #* Extract all variable names of funcs and dfuncs
-        ele_input_names, ele_output_names = reduce(union, get_input_names.(lfuncs)), reduce(union, get_output_names.(lfuncs))
-        #* Extract all parameters names of funcs and dfuncs
-        ele_param_names = unique(reduce(union, get_param_names.(lfuncs)))
-        #* Setup the name information of the hydroelement
-        nameinfo = (input=ele_input_names, output=ele_output_names, param=ele_param_names)
-
-        return new(
-            name,
-            nameinfo,
-            lfuncs,
-        )
+function solve_uhfunc(input_vec, uh_weight)
+    println(input_vec)
+    #* 首先将lagflux转换为discrete problem
+    function lag_prob(u, p, t)
+        u = circshift(u, -1)
+        u[end] = 0.0
+        input_vec[Int(t)] .* p[:weight] .+ u
     end
+
+    prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)),
+        ComponentVector(weight=uh_weight))
+    #* 求解这个问题
+    sol = solve(prob, FunctionMap())
+    Array(sol)[1, :]
 end
 
-function (ele::LagElement)(
+function (route::UnitHydroRoute)(
     input::AbstractMatrix,
     pas::ComponentVector;
-    timeidx::Vector,
 )
-    #* Extract the initial state of the parameters and element in the pas variable
+    #* Extract the initial state of the parameters and routement in the pas variable
     params = pas[:params]
-    lag_weights = [lfunc.lag_func(params[get_param_names(lfunc)[1]]) for lfunc in ele.lfuncs]
-
-    function solve_lag_flux(input_vec, lag_weight)
-        #* 首先将lagflux转换为discrete problem
-        function lag_prob(u, p, t)
-            u = circshift(u, -1)
-            u[end] = 0.0
-            input_vec[Int(t)] .* p[:weight] .+ u
-        end
-
-        prob = DiscreteProblem(lag_prob, lag_weight, (timeidx[1], timeidx[end]),
-            ComponentVector(weight=lag_weight))
-        #* 求解这个问题
-        sol = solve(prob, FunctionMap())
-        sol
-    end
-
-    sols = solve_lag_flux.(eachslice(input, dims=1), lag_weights)
-    reduce(hcat, [Array(sol)[1, :] for sol in sols])'
+    lag_weights = [uhfunc(params[pname]) for (uhfunc, pname) in zip(route.uhfuncs, route.nameinfo[:param])]
+    sol_arrs = solve_uhfunc.(eachslice(input, dims=1), lag_weights)
+    reduce(hcat, sol_arrs)'
 end
 
 function run_multi_fluxes(
-    ele::LagElement;
+    route::UnitHydroRoute;
     input::AbstractArray,
     params::ComponentVector,
     ptypes::Vector{Symbol}=collect(keys(params)),
 )
     #* array dims: (variable dim, num of node, sequence length)
-    #* Extract the initial state of the parameters and element in the pas variable
+    #* Extract the initial state of the parameters and routement in the pas variable
     #* var_name * [weight_len * node_num]
-    lag_weights = [[lfunc.lag_func(params[ptype][get_param_names(lfunc)[1]]) for ptype in ptypes] for lfunc in ele.lfuncs]
+    lag_weights = [[uhfunc(params[ptype][pname]) for ptype in ptypes] for (uhfunc, pname) in zip(route.uhfuncs, route.nameinfo[:param])]
 
-    function solve_lag_flux(input_vec, lag_weight)
-        #* 首先将lagflux转换为discrete problem
-        function lag_prob(u, p, t)
-            tmp_u = circshift(u, -1)
-            tmp_u[end] = 0.0
-            input_vec[Int(t)] .* p[:w] .+ tmp_u
-        end
-        prob = DiscreteProblem(lag_prob, lag_weight, (1, length(input_vec)), ComponentVector(w=lag_weight))
-        sol = solve(prob, FunctionMap())
-        Array(sol)[1, :]
+    sols = map(eachindex(route.lfuncs)) do idx
+        node_sols = reduce(hcat, solve_uhfunc.(eachslice(input[idx, :, :], dims=1), lag_weights[idx]))
+        node_sols
+    end
+    if length(sols) > 1
+        sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
+        return permutedims(sol_arr, (3, 1, 2))
+    else
+        return reshape(sols[1], 1, size(input)[3], size(input)[2])
+    end
+end
+
+struct MuskingumRoute <: AbstractRoute
+    "routement information: keys contains: input, output, param, state"
+    nameinfo::NamedTuple
+
+    function MuskingumRoute(
+        inputs::Vector{Num};
+    )
+        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        output_names = map(s -> Symbol(s, :_routed), input_names)
+        #* Setup the name information of the hydroroutement
+        nameinfo = (input=input_names, output=output_names, param=[:k, :x])
+
+        return new(
+            nameinfo,
+        )
+    end
+end
+
+function solve_mskfunc(input_vec, params)
+    k, x, dt = params.k, params.x, params.dt
+    c0 = ((dt / k) - (2 * x)) / ((2 * (1 - x)) + (dt / k))
+    c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
+    c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
+    println((c0, c1, c2))
+    function msk_prob(u, p, t)
+        println(t)
+        q0 = u[1]
+        c0, c1, c2 = p
+        input1 = input_vec[Int(t)]
+        input0 = input_vec[Int(t)-1]
+        new_q = (c0 * input1) + (c1 * input0) + (c2 * q0)
+        [new_q]
     end
 
-    sols = map(eachindex(ele.lfuncs)) do idx
-        node_sols = reduce(hcat, solve_lag_flux.(eachslice(input[idx, :, :], dims=1), lag_weights[idx]))
+    prob = DiscreteProblem(msk_prob, [input_vec[1]], (2, length(input_vec)), ComponentVector(c0=c0, c1=c1, c2=c2))
+    sol = solve(prob, FunctionMap())
+    reduce(vcat, sol.u)
+end
+
+function (::MuskingumRoute)(
+    input::AbstractMatrix,
+    params::ComponentVector;
+)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    sol_arrs = solve_mskfunc.(eachslice(input, dims=1), Ref(params))
+    reduce(hcat, sol_arrs)'
+end
+
+function run_multi_fluxes(
+    ::MuskingumRoute;
+    input::AbstractArray,
+    params::ComponentVector,
+    ptypes::Vector{Symbol}=collect(keys(params)),
+)
+    #* array dims: (variable dim, num of node, sequence length)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    #* var_name * [weight_len * node_num]
+    pytype_params = [params[ptype] for ptype in ptypes]
+    sols = map(eachindex(ptypes)) do (idx)
+        node_sols = reduce(hcat, solve_mskfunc.(eachslice(input[idx, :, :], dims=1), pytype_params[idx]))
         node_sols
     end
     if length(sols) > 1

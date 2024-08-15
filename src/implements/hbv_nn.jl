@@ -20,15 +20,15 @@ function SoilStorage(; name::Symbol)
     funcs = [
         #* 直接用prcp替换原模型中的liquidwater
         NeuralFlux([soilwater, prcp] => [W], Lux.Chain(Lux.Dense(2 => 16), Lux.Dense(16 => 1, Lux.sigmoid_fast), name=:wnn)),
-        SimpleFlux([soilwater, prcp, W] => [prcpeff], flux_exprs=@.[prcp * W]),
-        SimpleFlux([soilwater, pet] => [evap], [PWP], flux_exprs=@.[(pet * min(1.0, soilwater / PWP))]),
+        SimpleFlux([soilwater, prcp, W] => [prcpeff], exprs=@.[prcp * W]),
+        SimpleFlux([soilwater, pet] => [evap], [PWP], exprs=@.[(pet * min(1.0, soilwater / PWP))]),
     ]
 
     dfuncs = [
         StateFlux([prcp] => [prcpeff, evap], soilwater),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -41,12 +41,12 @@ function FreeWaterStorage(; name::Symbol)
 
     funcs = [
         NeuralFlux([s1, prcpeff] => [k0, k1], Lux.Chain(Lux.Dense(2 => 16), Lux.Dense(16 => 2, Lux.sigmoid_fast), name=:ksnn)),
-        SimpleFlux([s1, k0] => [q0], [L], flux_exprs=@.[max(0.0, s1 - L) * (k0 * 0.8 + 0.2)]),
-        SimpleFlux([s1, k1] => [q1], flux_exprs=@.[s1 * (k1 * 0.2 + 0.01)]),
-        SimpleFlux([s1] => [qp], [kp], flux_exprs=@.[s1 * kp]),
-        SimpleFlux([s2] => [q2], [k2], flux_exprs=@.[s2 * k2]),
+        SimpleFlux([s1, k0] => [q0], [L], exprs=@.[max(0.0, s1 - L) * (k0 * 0.8 + 0.2)]),
+        SimpleFlux([s1, k1] => [q1], exprs=@.[s1 * (k1 * 0.2 + 0.01)]),
+        SimpleFlux([s1] => [qp], [kp], exprs=@.[s1 * kp]),
+        SimpleFlux([s2] => [q2], [k2], exprs=@.[s2 * k2]),
         # todo 这个可以再根据q0, q1, q2构建预测模型
-        # SimpleFlux([q0, q1, q2] => [flow], flux_exprs=@.[q0 + q1 + q2]),
+        # SimpleFlux([q0, q1, q2] => [flow], exprs=@.[q0 + q1 + q2]),
         NeuralFlux([s1, prcpeff, q0, q1, q2] => [flow], Lux.Chain(Lux.Dense(5 => 32), Lux.Dense(32 => 1, Lux.leakyrelu), name=:qnn)),
     ]
 
@@ -55,7 +55,7 @@ function FreeWaterStorage(; name::Symbol)
         StateFlux([qp] => [q2], s2),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,

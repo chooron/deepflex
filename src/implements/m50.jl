@@ -19,7 +19,7 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
         StateFlux([:snowfall] => [:melt], :snowwater),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_surf_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -58,7 +58,7 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
         StateFlux([:infiltration], [:realevap, :realflow], :soilwater)
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,

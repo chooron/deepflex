@@ -24,20 +24,16 @@ HydroUnit(
 ```
 """
 struct HydroUnit <: AbstractUnit
-    "hydrological computation unit name"
-    name::Symbol
+    "hydrological computation unit information"
+    infos::NamedTuple
     "hydrological computation elements"
     components::Vector{<:AbstractComponent}
     "input idx for each components"
     input_idx::Vector
-    "unit var names"
-    input_names::Vector{Symbol}
-    "unit var names"
-    var_ntp::NamedTuple
 
     function HydroUnit(name; components::Vector{<:AbstractComponent})
         #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
-        unit_input_names = unit_var_names = get_input_names(components)
+        unit_input_names = unit_var_names = get_var_names(components)[1]
         input_idx = Vector[]
         for component in components
             tmp_input_idx = map(get_input_names(component)) do nm
@@ -47,14 +43,11 @@ struct HydroUnit <: AbstractUnit
             unit_var_names = reduce(vcat, [unit_var_names, get_state_names(component), get_output_names(component)])
             push!(input_idx, tmp_input_idx)
         end
-        var_ntp = NamedTuple{Tuple(unit_var_names)}(collect(1:length(unit_var_names)))
-
+        unit_infos = (name=name, input=unit_input_names, var=unit_var_names)
         new(
-            name,
+            unit_infos,
             components,
             input_idx,
-            unit_input_names,
-            var_ntp
         )
     end
 end
@@ -67,13 +60,13 @@ function (unit::HydroUnit)(
     solver::AbstractSolver=ODESolver(),
     output_type::Symbol=:namedtuple
 )
-    fluxes = reduce(hcat, [input[nm] for nm in unit.input_names])'
+    fluxes = reduce(hcat, [input[nm] for nm in get_input_names(unit)])'
     for (tmp_ele, idx) in zip(unit.components, unit.input_idx)
         tmp_fluxes = tmp_ele(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
     if output_type == :namedtuple
-        return NamedTuple{keys(unit.var_ntp)}(eachrow(fluxes))
+        return NamedTuple{Tuple(get_var_names(unit))}(eachrow(fluxes))
     elseif output_type == :array
         return fluxes
     end
@@ -88,7 +81,7 @@ function (unit::HydroUnit)(
     solver::AbstractSolver=ODESolver(),
     output_type::Symbol=:array
 )
-    fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in unit.input_names]) for input in inputs])
+    fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in get_input_names(unit)]) for input in inputs])
     fluxes = permutedims(fluxes, (2, 3, 1))
     for (ele, idx) in zip(unit.components, unit.input_idx)
         fluxes_input = fluxes[idx, :, :]
@@ -114,7 +107,7 @@ function (unit::HydroUnit)(
         end
     end
     if output_type == :namedtuple
-        return [NamedTuple{keys(unit.var_ntp)}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
+        return [NamedTuple{Tuple(get_var_names(unit))}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
     elseif output_type == :array
         return fluxes
     end

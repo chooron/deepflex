@@ -15,6 +15,6 @@ using Aqua
 
 @testset "LumpedHydro.jl" begin
     include("run_flux.jl")
-    include("run_element.jl")
+    include("run_bucket.jl")
     # Aqua.test_all(LumpedHydro; ambiguities = false)
 end

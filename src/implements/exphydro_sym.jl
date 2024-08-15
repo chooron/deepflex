@@ -18,7 +18,7 @@ function SurfaceStorage(; name::Symbol)
         StateFlux([:snowfall] => [:melt], :snowwater),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_surface),
         funcs=fluxes,
         dfuncs=dfluxes,
@@ -39,7 +39,7 @@ function SoilStorage(; name::Symbol)
         StateFlux([:infiltration] => [:evap, :baseflow, :surfaceflow], :soilwater)
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil),
         funcs=fluxes,
         dfuncs=dfluxes,
@@ -55,7 +55,7 @@ function FreeWater(; name::Symbol)
         SimpleFlux([:baseflow, :surfaceflow] => [:flow], flux_funcs=[(i, p) -> i[1] + i[2]])
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_zone),
         funcs=fluxes,
     )

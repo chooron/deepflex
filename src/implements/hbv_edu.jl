@@ -20,16 +20,16 @@ function SnowStorage(; name::Symbol)
     @parameters dd = 0.0
 
     funcs = [
-        SimpleFlux([prcp, temp] => [snowfall], [tt], flux_exprs=@.[step_func(tt - temp) * prcp]),
-        SimpleFlux([temp, snowwater] => [melt], [tt, dd], flux_exprs=@.[step_func(temp - tt) * min(snowwater, dd * (temp - tt))]),
-        SimpleFlux([prcp, temp, melt] => [liquidwater], [tt], flux_exprs=@.[step_func(temp - tt) * (prcp + melt)]),
+        SimpleFlux([prcp, temp] => [snowfall], [tt], exprs=@.[step_func(tt - temp) * prcp]),
+        SimpleFlux([temp, snowwater] => [melt], [tt, dd], exprs=@.[step_func(temp - tt) * min(snowwater, dd * (temp - tt))]),
+        SimpleFlux([prcp, temp, melt] => [liquidwater], [tt], exprs=@.[step_func(temp - tt) * (prcp + melt)]),
     ]
 
     dfuncs = [
         StateFlux([snowfall] => [melt], snowwater),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_snow_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -50,15 +50,15 @@ function SoilStorage(; name::Symbol)
     @parameters PWP = 0.0
 
     funcs = [
-        SimpleFlux([soilwater, liquidwater] => [prcpeff], [FC, Beta], flux_exprs=@.[liquidwater * abs(soilwater / FC)^Beta]),
-        SimpleFlux([soilwater, pet] => [evap], [PWP], flux_exprs=@.[(pet * min(1.0, soilwater / PWP))]),
+        SimpleFlux([soilwater, liquidwater] => [prcpeff], [FC, Beta], exprs=@.[liquidwater * abs(soilwater / FC)^Beta]),
+        SimpleFlux([soilwater, pet] => [evap], [PWP], exprs=@.[(pet * min(1.0, soilwater / PWP))]),
     ]
 
     dfuncs = [
         StateFlux([liquidwater] => [prcpeff, evap], soilwater),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -82,11 +82,11 @@ function FreeWaterStorage(; name::Symbol)
     @parameters PWP = 0.0
 
     funcs = [
-        SimpleFlux([s1] => [q0], [L, k0], flux_exprs=@.[max(0.0, s1 - L) * k0]),
-        SimpleFlux([s1] => [q1], [k1], flux_exprs=@.[s1 * k1]),
-        SimpleFlux([s1] => [qp], [kp], flux_exprs=@.[s1 * kp]),
-        SimpleFlux([s2] => [q2], [k2], flux_exprs=@.[s2 * k2]),
-        SimpleFlux([q0, q1, q2] => [flow], flux_exprs=@.[q0 + q1 + q2]),
+        SimpleFlux([s1] => [q0], [L, k0], exprs=@.[max(0.0, s1 - L) * k0]),
+        SimpleFlux([s1] => [q1], [k1], exprs=@.[s1 * k1]),
+        SimpleFlux([s1] => [qp], [kp], exprs=@.[s1 * kp]),
+        SimpleFlux([s2] => [q2], [k2], exprs=@.[s2 * k2]),
+        SimpleFlux([q0, q1, q2] => [flow], exprs=@.[q0 + q1 + q2]),
     ]
 
     dfuncs = [
@@ -94,7 +94,7 @@ function FreeWaterStorage(; name::Symbol)
         StateFlux([qp] => [q2], s2),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,

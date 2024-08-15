@@ -53,25 +53,20 @@ const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.t
 
 ## Abstract Component Types
 abstract type AbstractComponent end
+abstract type AbstractFlux end
 abstract type AbstractSolver end
 
-abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractSimpleFlux <: AbstractFlux end
-abstract type AbstractNeuralFlux <: AbstractSimpleFlux end
+abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
-abstract type AbstractLagFlux <: AbstractFlux end
 
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
-abstract type AbstractHydroElement <: AbstractElement end
-abstract type AbstractLagElement <: AbstractElement end
+abstract type AbstractHydroBucket <: AbstractElement end
 abstract type AbstractRoute <: AbstractElement end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractUnit <: AbstractComponent end
 
-# Sensealg type
-const default_node_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
-const default_ode_sensealg = ForwardDiffSensitivity()
 # utils
 include("utils/attr.jl")
 include("utils/ca.jl")
@@ -83,13 +78,16 @@ include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, LagFlux, NeuralFlux
+export SimpleFlux, StateFlux, NeuralFlux
 # special flux
 include("utils/normalize.jl")
 export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
-include("element.jl")
-export HydroElement, LagElement, solve_prob # , add_inputflux!, add_outputflux!, 
+include("bucket.jl")
+export HydroBucket # , add_inputflux!, add_outputflux!, 
+
+include("route.jl")
+export UnitHydroRoute, MuskingumRoute
 
 include("unit.jl")
 export HydroUnit #, update_unit!, add_elements!, remove_elements!
@@ -113,7 +111,7 @@ include("implements/m50.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit
-export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractLagFlux
+export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV_EDU

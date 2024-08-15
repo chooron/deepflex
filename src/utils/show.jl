@@ -22,16 +22,6 @@ function Base.show(io::IO, flux::AbstractStateFlux)
     end
 end
 
-# function Base.show(io::IO, flux::AbstractLagFlux)
-#     compact = get(io, :compact, false)
-#     # todo 创建用于展示lag flux的函数
-#     if compact
-#         println(io, first(collect(flux.output_info)) ~ flux.state_expr)
-#     else
-#         println(io, first(collect(flux.output_info)) ~ flux.state_expr)
-#     end
-# end
-
 function Base.show(io::IO, flux::AbstractNeuralFlux)
     compact = get(io, :compact, false)
     # todo 创建用于展示nn flux的函数
@@ -42,10 +32,6 @@ function Base.show(io::IO, flux::AbstractNeuralFlux)
     end
 end
 
-function Base.show(io::IO, ele::AbstractHydroElement)
-    println("hydro element name: $(ele.name)")
-    println("hydro element input: $(collect(ele.nameinfo[:input]))")
-    println("hydro element output: $(collect(ele.nameinfo[:output]))")
-    println("hydro element state: $(collect(ele.nameinfo[:state]))")
-    println("hydro element params: $(collect(ele.nameinfo[:param]))")
+function Base.show(io::IO, ele::AbstractHydroBucket)
+    println(io, ele.infos)
 end

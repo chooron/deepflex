@@ -26,21 +26,21 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     @parameters bexp = 0.0
 
     funcs = [
-        SimpleFlux([soilwater, prcp, pet] => [ct_prev], [cmax, bexp], flux_exprs=@.[cmax * (1 - abs((1 - ((bexp + 1) * (soilwater) / cmax)))^(1 / (bexp + 1)))]),
-        SimpleFlux([prcp, ct_prev] => [raineff1], [cmax], flux_exprs=@.[max((prcp - cmax + ct_prev), 0.0)]),
-        SimpleFlux([prcp, ct_prev, raineff1] => [dummy], [cmax], flux_exprs=@.[min(((ct_prev + prcp - raineff1) / cmax), 1.0)]),
-        SimpleFlux([dummy] => [tmp_soilwater], [cmax, bexp], flux_exprs=@.[(cmax / (bexp + 1)) * (1 - abs(1 - dummy)^(bexp + 1))]),
-        SimpleFlux([soilwater, tmp_soilwater, prcp, raineff1] => [raineff2], Num[], flux_exprs=@.[max(prcp - raineff1 - (tmp_soilwater - soilwater), 0.0)]),
-        SimpleFlux([tmp_soilwater, pet] => [evap], [cmax, bexp], flux_exprs=@.[(1 - (((cmax / (bexp + 1)) - tmp_soilwater) / (cmax / (bexp + 1)))) * pet]),
-        SimpleFlux([tmp_soilwater, evap] => [new_soilwater], Num[], flux_exprs=@.[max(tmp_soilwater - evap, 0.0)]),
-        SimpleFlux([raineff1, raineff2] => [raineff], Num[], flux_exprs=@.[raineff1 + raineff2])
+        SimpleFlux([soilwater, prcp, pet] => [ct_prev], [cmax, bexp], exprs=@.[cmax * (1 - abs((1 - ((bexp + 1) * (soilwater) / cmax)))^(1 / (bexp + 1)))]),
+        SimpleFlux([prcp, ct_prev] => [raineff1], [cmax], exprs=@.[max((prcp - cmax + ct_prev), 0.0)]),
+        SimpleFlux([prcp, ct_prev, raineff1] => [dummy], [cmax], exprs=@.[min(((ct_prev + prcp - raineff1) / cmax), 1.0)]),
+        SimpleFlux([dummy] => [tmp_soilwater], [cmax, bexp], exprs=@.[(cmax / (bexp + 1)) * (1 - abs(1 - dummy)^(bexp + 1))]),
+        SimpleFlux([soilwater, tmp_soilwater, prcp, raineff1] => [raineff2], Num[], exprs=@.[max(prcp - raineff1 - (tmp_soilwater - soilwater), 0.0)]),
+        SimpleFlux([tmp_soilwater, pet] => [evap], [cmax, bexp], exprs=@.[(1 - (((cmax / (bexp + 1)) - tmp_soilwater) / (cmax / (bexp + 1)))) * pet]),
+        SimpleFlux([tmp_soilwater, evap] => [new_soilwater], Num[], exprs=@.[max(tmp_soilwater - evap, 0.0)]),
+        SimpleFlux([raineff1, raineff2] => [raineff], Num[], exprs=@.[raineff1 + raineff2])
     ]
 
     dfuncs = [
         StateFlux(new_soilwater => soilwater)
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
@@ -74,19 +74,19 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
     @parameters kf = 0.0
 
     funcs = [
-        SimpleFlux([raineff] => [fast_q0, slow_q0], [alpha], flux_exprs=@.[alpha * raineff, (1 - alpha) * raineff]),
+        SimpleFlux([raineff] => [fast_q0, slow_q0], [alpha], exprs=@.[alpha * raineff, (1 - alpha) * raineff]),
         # slow reservoir route
-        SimpleFlux([slowwater, slow_q0] => [new_slowwater], [ks], flux_exprs=@.[(1 - ks) * (slowwater + slow_q0)]),
-        SimpleFlux([new_slowwater] => [slow_q1], [ks], flux_exprs=@.[(ks / (1 - ks)) * new_slowwater]),
+        SimpleFlux([slowwater, slow_q0] => [new_slowwater], [ks], exprs=@.[(1 - ks) * (slowwater + slow_q0)]),
+        SimpleFlux([new_slowwater] => [slow_q1], [ks], exprs=@.[(ks / (1 - ks)) * new_slowwater]),
         # fast reservoir route
-        SimpleFlux([fastwater1, fast_q0] => [new_fastwater1], [kf], flux_exprs=@.[(1 - kf) * (fastwater1 + fast_q0)]),
-        SimpleFlux([new_fastwater1] => [fast_q1], [kf], flux_exprs=@.[(kf / (1 - kf)) * new_fastwater1]),
-        SimpleFlux([fastwater2, fast_q1] => [new_fastwater2], [kf], flux_exprs=@.[(1 - kf) * (fastwater2 + fast_q1)]),
-        SimpleFlux([new_fastwater2] => [fast_q2], [kf], flux_exprs=@.[(kf / (1 - kf)) * new_fastwater2]),
-        SimpleFlux([fastwater3, fast_q2] => [new_fastwater3], [kf], flux_exprs=@.[(1 - kf) * (fastwater3 + fast_q2)]),
-        SimpleFlux([new_fastwater3] => [fast_q3], [kf], flux_exprs=@.[(kf / (1 - kf)) * new_fastwater3]),
+        SimpleFlux([fastwater1, fast_q0] => [new_fastwater1], [kf], exprs=@.[(1 - kf) * (fastwater1 + fast_q0)]),
+        SimpleFlux([new_fastwater1] => [fast_q1], [kf], exprs=@.[(kf / (1 - kf)) * new_fastwater1]),
+        SimpleFlux([fastwater2, fast_q1] => [new_fastwater2], [kf], exprs=@.[(1 - kf) * (fastwater2 + fast_q1)]),
+        SimpleFlux([new_fastwater2] => [fast_q2], [kf], exprs=@.[(kf / (1 - kf)) * new_fastwater2]),
+        SimpleFlux([fastwater3, fast_q2] => [new_fastwater3], [kf], exprs=@.[(1 - kf) * (fastwater3 + fast_q2)]),
+        SimpleFlux([new_fastwater3] => [fast_q3], [kf], exprs=@.[(kf / (1 - kf)) * new_fastwater3]),
         # get final output
-        SimpleFlux([slow_q1, fast_q3] => [flow], Num[], flux_exprs=@.[max(0.0, slow_q1 + fast_q3)])
+        SimpleFlux([slow_q1, fast_q3] => [flow], Num[], exprs=@.[max(0.0, slow_q1 + fast_q3)])
     ]
 
     dfuncs = [
@@ -96,7 +96,7 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
         StateFlux(new_fastwater3 => fastwater3),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,

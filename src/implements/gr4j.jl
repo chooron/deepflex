@@ -12,7 +12,7 @@ function Surface(; name::Symbol, mtk::Bool=true)
         SimpleFlux([:rainfall] => [:infiltration])
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_surface),
         funcs=funcs,
         mtk=mtk
@@ -40,7 +40,7 @@ function Soil(; name::Symbol, mtk::Bool=true)
         StateFlux([:saturation] => [:evap, :percolation], :soilwater)
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_soil_),
         funcs=fluxes,
         dfuncs=dfluxes,
@@ -61,7 +61,7 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
         StateFlux([:slowflow_routed, :recharge] => [:routedflow], :routingstore),
     ]
 
-    HydroElement(
+    HydroBucket(
         Symbol(name, :_zone_),
         funcs=fluxes,
         dfuncs=dfluxes,

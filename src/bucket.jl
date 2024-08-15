@@ -8,18 +8,9 @@ $(FIELDS)
 ```
 ```
 """
-struct HydroElement <: AbstractHydroElement
-    "the name of hydrological computation element"
-    name::Symbol
-    "element information: keys contains: input, output, param, state"
-    nameinfo::NamedTuple
-    "common hydrological fluxes, used to provide calculation results for state fluxes"
-    funcs::Vector
-    """
-    Hydrological state fluxes, 
-    combined with ordinary hydrological flux to construct ordinary differential equations
-    """
-    dfuncs::Vector
+struct HydroBucket <: AbstractHydroBucket
+    "bucket information: keys contains: input, output, param, state"
+    infos::NamedTuple
     """
     Hydrological flux functions
     """
@@ -29,38 +20,24 @@ struct HydroElement <: AbstractHydroElement
     """
     ode_func::Union{Nothing,Function}
 
-    function HydroElement(
+    function HydroBucket(
         name::Symbol;
         funcs::Vector,
         dfuncs::Vector=StateFlux[],
     )
         #* Extract all variable names of funcs and dfuncs
-        ele_input_names, ele_output_names, ele_state_names = get_var_names(funcs, dfuncs)
+        input_names, output_names, state_names = get_var_names(funcs, dfuncs)
         #* Extract all parameters names of funcs and dfuncs
-        ele_param_names = get_param_names(vcat(funcs, dfuncs))
+        param_names = get_param_names(vcat(funcs, dfuncs))
         #* Extract all neuralnetwork names of the funcs
-        ele_nn_names = get_nn_names(funcs)
-        #* Setup the name information of the hydroelement
-        nameinfo = (input=ele_input_names, output=ele_output_names, state=ele_state_names, param=ele_param_names, nn=ele_nn_names)
-        #* Construct a NamedTuple of all func's variables and parameters
-        funcs_vars_ntp = reduce(merge, [merge(func.input_info, func.output_info) for func in vcat(funcs, dfuncs)])
-        # todo 这块尽量不要包括
-        funcs_params_ntp = reduce(merge, [func.param_info for func in vcat(funcs, dfuncs) if !(func isa AbstractNeuralFlux)])
-        funcs_nn_params = collect([func.nn_info[:params] for func in funcs if func isa AbstractNeuralFlux])
+        nn_names = get_nn_names(funcs)
+        #* Setup the name information of the hydrobucket
+        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
         #* Construct a function for ordinary differential calculation based on dfunc and funcs
-        flux_func, ode_func = build_ele_func(
-            funcs, dfuncs,
-            collect(funcs_vars_ntp[ele_input_names]),
-            collect(funcs_vars_ntp[ele_state_names]),
-            collect(funcs_params_ntp),
-            funcs_nn_params
-        )
+        flux_func, ode_func = build_ele_func(funcs, dfuncs, infos)
 
         return new(
-            name,
-            nameinfo,
-            funcs,
-            dfuncs,
+            infos,
             flux_func,
             ode_func,
         )
@@ -70,29 +47,37 @@ end
 function build_ele_func(
     funcs::Vector{<:AbstractFlux},
     dfuncs::Vector{<:AbstractStateFlux},
-    funcs_inputs::AbstractVector,
-    funcs_states::AbstractVector,
-    funcs_params::AbstractVector,
-    funcs_nns::AbstractVector
+    infos::NamedTuple
 )
+    #* prepare variables namedtuple
+    funcs_vars = reduce(union, get_all_vars.(vcat(funcs, dfuncs)))
+    funcs_vars_names = Symbolics.tosymbol.(funcs_vars, escape=false)
+    funcs_vars_ntp = NamedTuple{Tuple(funcs_vars_names)}(funcs_vars)
+    #* prepare variables for function building
+    funcs_inputs = collect(funcs_vars_ntp[infos.input])
+    funcs_states = collect(funcs_vars_ntp[infos.state])
+    funcs_params = reduce(union, get_param_vars.(funcs))
+    funcs_nns = reduce(union, get_nnparam_vars.(funcs))
+
     #* Call the method in SymbolicUtils.jl to build the Flux Function
     assign_list = Assignment[]
     #* get all output flux
     output_list = Num[]
+
     for func in funcs
         if func isa AbstractNeuralFlux
             #* For NeuralFlux, use nn_input to match the input variable
-            push!(assign_list, Assignment(func.nn_info[:input], MakeArray(collect(func.input_info), Vector)))
+            push!(assign_list, Assignment(func.nnios[:input], MakeArray(func.inputs, Vector)))
             #* For NeuralFlux, use nn_output to match the calculation result of nn expr
-            push!(assign_list, Assignment(func.nn_info[:output], func.flux_expr))
+            push!(assign_list, Assignment(func.nnios[:output], get_exprs(func)))
             #* According to the output variable name, match each index of nn_output
-            for (idx, output) in enumerate(collect(func.output_info))
-                push!(assign_list, Assignment(output, func.nn_info[:output][idx]))
+            for (idx, output) in enumerate(get_output_vars(func))
+                push!(assign_list, Assignment(output, func.nnios[:output][idx]))
                 push!(output_list, output)
             end
         else
             #* According to the output variable name, match each result of the flux exprs
-            for (output, expr) in zip(collect(func.output_info), func.flux_exprs)
+            for (output, expr) in zip(get_output_vars(func), get_exprs(func))
                 push!(assign_list, Assignment(output, expr))
                 push!(output_list, output)
             end
@@ -118,7 +103,7 @@ function build_ele_func(
 
     if length(dfuncs) > 0
         #* convert diff state output to array
-        diffst_output_array = MakeArray([dfunc.state_expr for dfunc in dfuncs], Vector)
+        diffst_output_array = MakeArray(reduce(vcat, get_exprs.(dfuncs)), Vector)
         #* Set the input argument of ODE Function
         dfunc_args = [
             #* argument 1: Function input variables
@@ -139,47 +124,46 @@ function build_ele_func(
     merged_flux_func, merged_state_func
 end
 
-function (ele::HydroElement)(
+function (ele::HydroBucket)(
     input::AbstractMatrix,
     pas::ComponentVector;
     timeidx::Vector,
     solver::AbstractSolver=ODESolver(),
 )
     # todo 输入的pas检验是否满足要求
-    #* Extract the initial state of the parameters and element in the pas variable
-    # todo When there is an ode function, it is necessary to solve the ode problem and obtain the state after the solution.
+    #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
-        #* Call the solve_prob method to solve the state of element at the specified timeidx
+        #* Call the solve_prob method to solve the state of bucket at the specified timeidx
         solved_states = solve_single_prob(ele, input=input, pas=pas, timeidx=timeidx, solver=solver)
         if solved_states == false
-            solved_states = zeros(length(ele.nameinfo[:state]), length(timeidx))
+            solved_states = zeros(length(ele.infos[:state]), length(timeidx))
         end
-        #* Store the solved element state in fluxes
+        #* Store the solved bucket state in fluxes
         fluxes = cat(input, solved_states, dims=1)
     else
         fluxes = input
         solved_states = nothing
     end
     #* excute other fluxes formula
-    ele_output_matrix = run_fluxes(ele, input=fluxes, pas=pas)
+    flux_output_matrix = run_fluxes(ele, input=fluxes, pas=pas)
     #* merge output and state
     if isnothing(solved_states)
-        output_matrix = ele_output_matrix
+        output_matrix = flux_output_matrix
     else
-        output_matrix = cat(solved_states, ele_output_matrix, dims=1)
+        output_matrix = cat(solved_states, flux_output_matrix, dims=1)
     end
     output_matrix
 end
 
 function run_fluxes(
-    ele::HydroElement;
+    ele::HydroBucket;
     #* var num * ts len
     input::AbstractMatrix,
     pas::ComponentVector,
 )
-    params_vec = collect([pas[:params][nm] for nm in ele.nameinfo[:param]])
-    if length(ele.nameinfo[:nn]) > 0
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.nameinfo[:nn]])
+    params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
+    if length(ele.infos[:nn]) > 0
+        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
     else
         nn_params_vec = nothing
     end
@@ -190,7 +174,7 @@ function run_fluxes(
 end
 
 function solve_single_prob(
-    ele::HydroElement;
+    ele::HydroBucket;
     input::AbstractMatrix,
     pas::ComponentVector,
     timeidx::Vector=collect(1:length(input[1])),
@@ -208,19 +192,19 @@ function solve_single_prob(
 
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
-    params_idx = [getaxes(params)[1][nm].idx for nm in ele.nameinfo[:param]]
+    params_idx = [getaxes(params)[1][nm].idx for nm in ele.infos[:param]]
     # #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
     ode_param_func = (p) -> [p[:params][idx] for idx in params_idx]
 
-    if length(ele.nameinfo[:nn]) > 0
+    if length(ele.infos[:nn]) > 0
         nn_params = pas[:nn]
-        nn_params_idx = [getaxes(nn_params)[1][nm].idx for nm in ele.nameinfo[:nn]]
+        nn_params_idx = [getaxes(nn_params)[1][nm].idx for nm in ele.infos[:nn]]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
         ode_nn_param_func = (_) -> nothing
     end
 
-    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the element
+    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
     function singel_ele_ode_func!(du, u, p, t)
         ode_input = ode_input_func(t)
         ode_params = ode_param_func(p)
@@ -232,7 +216,7 @@ function solve_single_prob(
         #* Construct ODEProblem based on DifferentialEquations.jl from this temporary function `singel_ele_ode_func!`
         prob = ODEProblem(
             singel_ele_ode_func!,
-            collect(init_states[ele.nameinfo[:state]]),
+            collect(init_states[ele.infos[:state]]),
             (timeidx[1], timeidx[end]),
             pas
         )
@@ -240,7 +224,7 @@ function solve_single_prob(
         #* Construct ODEProblem based on DifferentialEquations.jl from this temporary function `singel_ele_ode_func!`
         prob = DiscreteProblem(
             singel_ele_ode_func!,
-            collect(init_states[ele.nameinfo[:state]]),
+            collect(init_states[ele.infos[:state]]),
             (timeidx[1], timeidx[end]),
             pas
         )
@@ -251,15 +235,15 @@ function solve_single_prob(
 end
 
 function run_multi_fluxes(
-    ele::HydroElement;
+    ele::HydroBucket;
     #* var num * node num * ts len
     input::AbstractArray,
     pas::ComponentVector,
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
 )
-    ele_param_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.nameinfo[:param]]) for ptype in ptypes])
-    if length(ele.nameinfo[:nn]) > 0
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.nameinfo[:nn]])
+    ele_param_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
+    if length(ele.infos[:nn]) > 0
+        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
     else
         nn_params_vec = nothing
     end
@@ -270,7 +254,7 @@ function run_multi_fluxes(
 end
 
 function solve_multi_prob(
-    ele::HydroElement;
+    ele::HydroBucket;
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector,
@@ -282,34 +266,32 @@ function solve_multi_prob(
     #* 这样每个步长的输入维度就是:节点个数*输入变量数
     #* 当前只针对unit相同的同步求解:
     params, init_states = pas[:params], pas[:initstates]
-    # todo 保证两者长度一致
-    # @assert length(ptypes) == length(input)
-    
+
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
     itpfunc_vecs = [LinearInterpolation.(eachslice(i, dims=1), Ref(timeidx), extrapolate=true) for i in eachslice(input, dims=2)]
     ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
-    
+
     #* 准备初始状态
-    init_states_vec = collect([collect(init_states[ptype][ele.nameinfo[:state]]) for ptype in ptypes])
+    init_states_vec = collect([collect(init_states[ptype][ele.infos[:state]]) for ptype in ptypes])
     init_states_matrix = reduce(hcat, init_states_vec)
 
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
-    params_idx = [getaxes(params[ptypes[1]])[1][nm].idx for nm in ele.nameinfo[:param]]
+    params_idx = [getaxes(params[ptypes[1]])[1][nm].idx for nm in ele.infos[:param]]
     #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
     #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
     ode_param_func = (p) -> [[p[:params][ptype][idx] for idx in params_idx] for ptype in ptypes]
 
     #* 准备神经网络的参数
-    if length(ele.nameinfo[:nn]) > 0
-        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.nameinfo[:nn]]
+    if length(ele.infos[:nn]) > 0
+        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
         ode_nn_param_func = (_) -> nothing
     end
 
-    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the element
+    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
     function multi_ele_ode_func!(du, u, p, t)
         ode_input = ode_input_func(t)
         ode_params = ode_param_func(p)
@@ -331,95 +313,3 @@ function solve_multi_prob(
     solver(prob)
 end
 
-
-struct LagElement <: AbstractLagElement
-    "the name of hydrological computation element "
-    name::Symbol
-    "element information: keys contains: input, output, param, state"
-    nameinfo::NamedTuple
-    "lag hydrological fluxes, used to flood routing"
-    lfuncs::Vector
-
-    function LagElement(
-        name::Symbol;
-        lfuncs::Vector{<:AbstractLagFlux},
-    )
-        #* Extract all variable names of funcs and dfuncs
-        ele_input_names, ele_output_names = reduce(union, get_input_names.(lfuncs)), reduce(union, get_output_names.(lfuncs))
-        #* Extract all parameters names of funcs and dfuncs
-        ele_param_names = unique(reduce(union, get_param_names.(lfuncs)))
-        #* Setup the name information of the hydroelement
-        nameinfo = (input=ele_input_names, output=ele_output_names, param=ele_param_names)
-
-        return new(
-            name,
-            nameinfo,
-            lfuncs,
-        )
-    end
-end
-
-function (ele::LagElement)(
-    input::AbstractMatrix,
-    pas::ComponentVector;
-    timeidx::Vector,
-    solver::AbstractSolver
-)
-    #* Extract the initial state of the parameters and element in the pas variable
-    params = pas[:params]
-    lag_weights = [lfunc.lag_func(params[get_param_names(lfunc)[1]]) for lfunc in ele.lfuncs]
-
-    function solve_lag_flux(input_vec, lag_weight)
-        #* 首先将lagflux转换为discrete problem
-        function lag_prob(u, p, t)
-            u = circshift(u, -1)
-            u[end] = 0.0
-            input_vec[Int(t)] .* p[:weight] .+ u
-        end
-
-        prob = DiscreteProblem(lag_prob, lag_weight, (timeidx[1], timeidx[end]),
-            ComponentVector(weight=lag_weight))
-        #* 求解这个问题
-        sol = solve(prob, FunctionMap())
-        sol
-    end
-
-    sols = solve_lag_flux.(eachslice(input, dims=1), lag_weights)
-    reduce(hcat, [Array(sol)[1, :] for sol in sols])'
-end
-
-function run_multi_fluxes(
-    ele::LagElement;
-    input::AbstractArray,
-    pas::ComponentVector,
-    ptypes::Vector{Symbol}=collect(keys(pas[:params])),
-)
-    #* array dims: (variable dim, num of node, sequence length)
-    #* Extract the initial state of the parameters and element in the pas variable
-    #* var_name * [weight_len * node_num]
-    params = pas[:params]
-    lag_weights = [[lfunc.lag_func(params[ptype][get_param_names(lfunc)[1]]) for ptype in ptypes] for lfunc in ele.lfuncs]
-
-    function solve_lag_flux(input_vec, lag_weight)
-        #* 首先将lagflux转换为discrete problem
-        function lag_prob(u, p, t)
-            tmp_u = circshift(u, -1)
-            tmp_u[end] = 0.0
-            input_vec[Int(t)] .* p[:w] .+ tmp_u
-        end
-        prob = DiscreteProblem(lag_prob, lag_weight, (1, length(input_vec)), ComponentVector(w=lag_weight))
-        sol = solve(prob, FunctionMap())
-        Array(sol)[1, :]
-    end
-
-    sols = map(eachindex(ele.lfuncs)) do idx
-        node_sols = reduce(hcat, solve_lag_flux.(eachslice(input[idx, :, :], dims=1), lag_weights[idx]))
-        node_sols
-    end
-    if length(sols) > 1
-        sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-        return permutedims(sol_arr, (3, 1, 2))
-    else
-        return reshape(sols[1], 1, size(input)[3], size(input)[2])
-    end
-end

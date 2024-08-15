@@ -8,19 +8,19 @@ input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm
 dtype = eltype(input[1]);
 
 @testset "test hydro element (basic element, Snowpack in Exp-Hydro)" begin
-    @variables temp(t) lday(t) prcp(t) pet(t) snowfall(t) rainfall(t) melt(t) snowpack(t)
+    @variables temp lday prcp pet snowfall rainfall melt snowpack
     @parameters Tmin Tmax Df
 
     snow_funcs = [
         SimpleFlux([temp, lday] => [pet],
-            flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+            exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
         SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-            flux_exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+            exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
         SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-            flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+            exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
     snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
     @testset "test hydro element info" begin
         @test Set(LumpedHydro.get_input_names(snow_ele)) == Set((:temp, :lday, :prcp))
         @test Set(LumpedHydro.get_param_names(snow_ele)) == Set((:Tmin, :Tmax, :Df))
@@ -42,13 +42,13 @@ dtype = eltype(input[1]);
     end
 
     @testset "test build state function" begin
-        @variables routingstore(t) exch(t) slowflow_routed(t) routedflow(t)
+        @variables routingstore exch slowflow_routed routedflow
         @parameters x2, x3
         funcs = [
             SimpleFlux([routingstore] => [exch], [x2, x3],
-                flux_exprs=[x2 * abs(routingstore / x3)^3.5]),
+                exprs=[x2 * abs(routingstore / x3)^3.5]),
             SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
-                flux_exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
+                exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
         ]
         dfunc = LumpedHydro.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
         var_ntp = (routingstore=routingstore, slowflow_routed=slowflow_routed)
@@ -71,7 +71,7 @@ dtype = eltype(input[1]);
         function snowpack_bucket!(du, u, p, t)
             snowpack_ = u[1]
             Df, Tmax, Tmin = p
-            prcp_, temp_ = prcp_itp(t), temp_itp(t)
+            prcp_, temp_ = prcp_itp, temp_itp
             snowfall_ = step_func(Tmin - temp_) * prcp_
             melt_ = step_func(temp_ - Tmax) * step_func(snowpack_) * min(snowpack_, Df * (temp_ - Tmax))
             du[1] = snowfall_ - melt_
@@ -94,5 +94,9 @@ dtype = eltype(input[1]);
         @test snowfall_vec == collect(result.snowfall)
         @test rainfall_vec == collect(result.rainfall)
         @test melt_vec == collect(result.melt)
+    end
+
+    #todo
+    @testset "test build bucket function" begin
     end
 end

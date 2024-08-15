@@ -22,5 +22,6 @@ ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 input_matrix = reduce(hcat, [input[1],input[2],input[3]])' # (var nm * ts len)
 solver = LumpedHydro.ODESolver()
-@btime results = ele(input_matrix, pas, timeidx=ts, solver=solver)
+results = ele(input_matrix, pas, timeidx=ts, solver=solver)
+
 # @btime [LumpedHydro.solve_single_prob(ele, input=input, params=params, init_states=init_states, timeidx=ts) for _ in 1:100]
