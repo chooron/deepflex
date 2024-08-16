@@ -270,7 +270,7 @@ struct NeuralFlux <: AbstractNeuralFlux
             chain_params,
             [flux_expr],
             infos,
-            (input=nn_input, output=nn_output),
+            (input=nn_input, output=nn_output,pslen=length(init_params)),
         )
     end
 

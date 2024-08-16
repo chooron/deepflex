@@ -80,8 +80,8 @@
 - [ ] 模型输入的pas，三个主要键名：ps，st，nn
 - [ ] 参数输入校验工作
 - [ ] Route 类型的构建
-  - [ ] 马斯京跟
-  - [ ] 单位线
+  - [X] 马斯京跟
+  - [X] 单位线
   - [ ] hydrodischarge
 - [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码如下：
 

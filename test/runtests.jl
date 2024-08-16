@@ -1,9 +1,10 @@
 using CSV
 using DataFrames
 using LumpedHydro
+using LumpedHydro: step_func
 using Test
 using ModelingToolkit
-using ModelingToolkit:t_nounits as t
+using ModelingToolkit: t_nounits as t
 using Symbolics
 using Lux
 using LuxCore

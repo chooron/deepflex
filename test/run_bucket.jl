@@ -4,7 +4,8 @@ pas = ComponentVector(params=params, initstates=init_states)
 
 ts = collect(1:100)
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
-input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]);
+input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]);
+input = reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))
 dtype = eltype(input[1]);
 
 @testset "test hydro element (basic element, Snowpack in Exp-Hydro)" begin
@@ -28,7 +29,7 @@ dtype = eltype(input[1]);
         @test Set(LumpedHydro.get_state_names(snow_ele)) == Set((:snowpack,))
     end
 
-    result = snow_ele(input, pas)
+    result = snow_ele(input, pas, timeidx=ts)
 
     @testset "test first output for hydro element" begin
         snowpack0 = init_states[:snowpack]
@@ -80,12 +81,12 @@ dtype = eltype(input[1]);
         sol = solve(prob, Tsit5(), saveat=ts, reltol=1e-3, abstol=1e-3)
         num_u = length(prob.u0)
         manual_result = [sol[i, :] for i in 1:num_u]
-        pkg_result = LumpedHydro.solve_prob(snow_ele, input=input, params=params, init_states=init_states)
+        pkg_result = LumpedHydro.solve_prob(snow_ele, input=input, pas=pas, timeidx=ts)
         @test manual_result == pkg_result
     end
 
     @testset "test all of the output" begin
-        snowpack_vec = LumpedHydro.solve_prob(snow_ele, input=input, params=params, init_states=init_states)[1]
+        snowpack_vec = LumpedHydro.solve_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1]
         pet_vec = snow_funcs[1](reduce(hcat, [input.temp, input.lday]), dtype[])[:, 1]
         snow_funcs_2_output = snow_funcs[2](reduce(hcat, [input.prcp, input.temp]), [params.Tmin])
         snowfall_vec, rainfall_vec = snow_funcs_2_output[:, 1], snow_funcs_2_output[:, 2]
