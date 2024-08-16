@@ -1,3 +1,4 @@
+@inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector) = flux.func(input, params)
 """
 $(TYPEDEF)
 A struct representing common hydrological fluxes
@@ -31,6 +32,8 @@ struct SimpleFlux <: AbstractSimpleFlux
     params::Vector{Num}
     "flux expressions to descripe the formula of the output variable"
     exprs::Vector{Num}
+    "flux expressions to descripe the formula of the output variable"
+    func::Function
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
@@ -41,11 +44,14 @@ struct SimpleFlux <: AbstractSimpleFlux
         exprs::Vector{Num},
         infos::NamedTuple
     )
+        flux_func = build_flux_func(inputs, outputs, params, exprs)
+
         return new(
             inputs,
             outputs,
             params,
             exprs,
+            flux_func,
             infos
         )
     end
@@ -121,6 +127,8 @@ struct StateFlux <: AbstractStateFlux
     params::Vector{Num}
     "flux expressions to descripe the formula of the state variable"
     expr::Num
+    "flux expressions to descripe the formula of the output variable"
+    func::Function
     "bucket information: keys contains: input, output, param, state"
     infos::NamedTuple
 
@@ -135,11 +143,13 @@ struct StateFlux <: AbstractStateFlux
         state_name = Symbolics.tosymbol(state, escape=false)
         param_names = length(params) > 0 ? Symbol.(Symbolics.tosymbol.(params, escape=false)) : Symbol[]
         infos = (input=input_names, state=state_name, param=param_names)
+        state_func = build_flux_func(fluxes, [state], params, [expr])
         return new(
             fluxes,
             state,
             params,
             expr,
+            state_func,
             infos
         )
     end
@@ -222,6 +232,8 @@ struct NeuralFlux <: AbstractNeuralFlux
     nnparam::Symbolics.Arr
     "flux expressions to descripe the formula of the output variable"
     exprs::Vector{Num}
+    "flux expressions to descripe the formula of the output variable"
+    func::Function
     "neural network  information: keys contains: input, output, param"
     infos::NamedTuple
     "neural network build information: keys contains: input, output, param"
@@ -262,6 +274,8 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
 
+        nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
+
         #* neuralflux infos
         infos = (input=input_names, output=output_names, param=[chain_name])
         new(
@@ -269,8 +283,9 @@ struct NeuralFlux <: AbstractNeuralFlux
             output_vars,
             chain_params,
             [flux_expr],
+            nn_func,
             infos,
-            (input=nn_input, output=nn_output,pslen=length(init_params)),
+            (input=nn_input, output=nn_output, paramlen=length(init_params)),
         )
     end
 

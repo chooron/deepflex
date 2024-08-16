@@ -5,7 +5,7 @@
     @test LumpedHydro.get_input_names(simple_flux_1) == [:a, :b]
     @test LumpedHydro.get_param_names(simple_flux_1) == [:p1, :p2]
     @test LumpedHydro.get_output_names(simple_flux_1) == [:c,]
-    # @test simple_flux_1([2.0 3.0], [3.0, 4.0]) == [2.0 * 3.0 + 3.0 * 4.0;;]
+    @test simple_flux_1([2.0, 3.0], [3.0, 4.0]) == [2.0 * 3.0 + 3.0 * 4.0]
 end
 
 @testset "test simple flux (build by symbol)" begin
@@ -14,7 +14,7 @@ end
     @test LumpedHydro.get_input_names(simple_flux_1) == [:a, :b]
     @test LumpedHydro.get_param_names(simple_flux_1) == [:p1, :p2]
     @test LumpedHydro.get_output_names(simple_flux_1) == [:c, :d]
-    # @test simple_flux_1([2.0 3.0], [3.0, 4.0]) == [2.0*3.0+3.0*4.0 2.0/3.0+3.0/4.0;]
+    @test simple_flux_1([2.0, 3.0], [3.0, 4.0]) == [2.0 * 3.0 + 3.0 * 4.0, 2.0 / 3.0 + 3.0 / 4.0]
 end
 
 @testset "test state flux (build by Symbolics.jl)" begin
@@ -41,19 +41,6 @@ end
     @test LumpedHydro.get_state_names(state_flux_3) == [:d,]
 end
 
-# @testset "test lag flux" begin
-#     @variables a a_lag
-#     @parameters lt
-#     lag_flux_1 = LagFlux(a => a_lag, lt, LumpedHydro.uh_1_half)
-#     @test LumpedHydro.get_input_names(lag_flux_1) == (:a,)
-#     @test LumpedHydro.get_param_names(lag_flux_1) == (:lt,)
-#     @test LumpedHydro.get_output_names(lag_flux_1) == (:a_lag,)
-#     @test lag_flux_1(Float32[2, 3, 4, 2, 3, 1], [3.5]) ≈ [[
-#         0.043634488475497855, 0.334102918508042, 1.2174967306061588,
-#         2.519953682639187, 3.2301609643779736, 2.7991762465729138
-#     ]]
-# end
-
 @testset "test neural flux" begin
     @variables a b c d e
     nn = Lux.Chain(
@@ -69,5 +56,5 @@ end
     @test LumpedHydro.get_param_names(nn_flux_1) == Symbol[]
     @test LumpedHydro.get_nn_names(nn_flux_1) == [:testnn]
     @test LumpedHydro.get_output_names(nn_flux_1) == [:d, :e]
-    # @test nn_flux_1([1 2 3], [collect(ComponentVector(nn_ps))]) ≈ func([1 2 3]', nn_ps)'
+    @test nn_flux_1([1, 2, 3], Vector(ComponentVector(nn_ps))) ≈ func([1, 2, 3], nn_ps)
 end

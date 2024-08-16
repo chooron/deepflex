@@ -45,19 +45,19 @@ HydroUnit = LumpedHydro.HydroUnit
 #* define the production store
 prod_funcs = [
     SimpleFlux([prcp, ep] => [pn, en],
-        flux_exprs=[prcp - min(prcp, ep), ep - min(prcp, ep)]),
+        exprs=[prcp - min(prcp, ep), ep - min(prcp, ep)]),
     SimpleFlux([pn, soilwater] => [ps], [x1],
-        flux_exprs=[max(0.0, pn * (1 - (soilwater / x1)^2))]),
+        exprs=[max(0.0, pn * (1 - (soilwater / x1)^2))]),
     SimpleFlux([en, soilwater] => [es], [x1],
-        flux_exprs=[en * (2 * soilwater / x1 - (soilwater / x1)^2)]),
+        exprs=[en * (2 * soilwater / x1 - (soilwater / x1)^2)]),
     SimpleFlux([soilwater] => [perc], [x1],
-        flux_exprs=[((x1)^(-4)) / 4 * ((4 / 9)^(4)) * (soilwater^5)]),
+        exprs=[((x1)^(-4)) / 4 * ((4 / 9)^(4)) * (soilwater^5)]),
     SimpleFlux([pn, ps, perc] => [pr], [x1],
-        flux_exprs=[pn - ps + perc]),
+        exprs=[pn - ps + perc]),
     SimpleFlux([pr] => [slowflow, fastflow],
-        flux_exprs=[0.9 * pr, 0.1 * pr]),
+        exprs=[0.9 * pr, 0.1 * pr]),
     SimpleFlux([ps, es, perc, soilwater] => [new_soilwater],
-        flux_exprs=[soilwater + ps - es - perc])
+        exprs=[soilwater + ps - es - perc])
 ]
 prod_dfuncs = [StateFlux(soilwater => new_soilwater)]
 prod_lfuncs = [
@@ -68,13 +68,13 @@ prod_ele = HydroElement(:gr4j_prod, funcs=prod_funcs, dfuncs=prod_dfuncs, lfuncs
 #* define the routing store
 rst_funcs = [
     SimpleFlux([routingstore] => [exch], [x2, x3],
-        flux_exprs=[x2 * abs(routingstore / x3)^3.5]),
+        exprs=[x2 * abs(routingstore / x3)^3.5]),
     SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
-        flux_exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
+        exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
     SimpleFlux([routedflow, fastflow_routed, exch] => [flow],
-        flux_exprs=[routedflow + max(fastflow_routed + exch, 0.0)]),
+        exprs=[routedflow + max(fastflow_routed + exch, 0.0)]),
     SimpleFlux([slowflow_routed, exch, routedflow, routingstore] => [new_routingstore],
-        flux_exprs=[routingstore + slowflow_routed + exch - routedflow])
+        exprs=[routingstore + slowflow_routed + exch - routedflow])
 ]
 rst_dfuncs = [StateFlux(routingstore => new_routingstore)]
 rst_ele = HydroElement(:gr4j_rst, funcs=rst_funcs, dfuncs=rst_dfuncs)

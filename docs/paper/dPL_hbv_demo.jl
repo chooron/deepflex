@@ -25,38 +25,14 @@ qobs_vec = df[ts, "flow(mm)"]
 #! parameters in the HBV-light model
 @parameters TT CFMAX CFR CWH FC beta LP PERC k0 k1 k2 UZL
 
-#! hydrological flux in the Exp-Hydro model
-@variables prcp = 0.0 [description = "precipitation", unit = "mm"]
-@variables temp = 0.0 [description = "precipitation", unit = "°C"]
-@variables lday = 0.0 [description = "length of day", unit = "-"]
-@variables pet = 0.0 [description = "potential evapotranspiration", unit = "mm"]
-@variables rainfall = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
-@variables snowfall = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
-@variables refreeze = 0.0 [description = "Refreeze of ponding water"]
-@variables melt = 0.0 [description = "snow melt", unit = "mm"]
-@variables snowinfil = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables snowpack = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables meltwater = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-@variables soilwater = 0.0 [description = " Snowmelt infiltration", unit = "mm"]
-
-@variables soilwetfrac = 0.0
-@variables recharge = 0.0
-@variables excess = 0.0
-@variables evapfrac = 0.0
-@variables evap = 0.0
-
-@variables upperzone = 0.0
-@variables lowerzone = 0.0
-@variables perc = 0.0
-@variables q0 = 0.0
-@variables q1 = 0.0
-@variables q2 = 0.0
-@variables flow = 0.0
+#! hydrological flux in the dpl-hbv model
+@variables prcp temp lday pet rainfall snowfall refreeze melt snowinfil
+@variables snowpack meltwater soilwater
+@variables soilwetfrac recharge excess evapfrac evap
+@variables upperzone lowerzone perc q0 q1 q2 flow
 
 #* dynamic parameters
-@variables beta = 0.0
-@variables gamma = 0.0
-
+@variables beta gamma
 
 SimpleFlux = LumpedHydro.SimpleFlux
 StdMeanNormFlux = LumpedHydro.StdMeanNormFlux
@@ -76,15 +52,15 @@ step_func = LumpedHydro.step_func
 #! define the snow pack reservoir
 snow_funcs = [
     SimpleFlux([prcp, temp] => [snowfall, rainfall], [TT],
-        flux_exprs=[step_func(TT - temp) * prcp, step_func(temp - TT) * prcp]),
+        exprs=[step_func(TT - temp) * prcp, step_func(temp - TT) * prcp]),
     SimpleFlux([temp, lday] => [pet],
-        flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     SimpleFlux([snowpack, temp] => [melt], [TT, CFMAX],
-        flux_exprs=[min(snowpack, CFMAX * max(0.0, temp - TT))]),
+        exprs=[min(snowpack, CFMAX * max(0.0, temp - TT))]),
     SimpleFlux([meltwater, temp] => [refreeze], [TT, CFMAX, CFR],
-        flux_exprs=[min(meltwater, CFR * CFMAX * max(0.0, TT - temp))]),
+        exprs=[min(meltwater, CFR * CFMAX * max(0.0, TT - temp))]),
     SimpleFlux([meltwater, snowpack] => [snowinfil], [CWH],
-        flux_exprs=[max(0.0, meltwater - CWH * snowpack)]),
+        exprs=[max(0.0, meltwater - CWH * snowpack)]),
 ]
 snow_dfuncs = [StateFlux([snowfall, refreeze] => [melt], snowpack), StateFlux([melt] => [refreeze, snowinfil], meltwater)]
 snow_ele = HydroElement(:hbv_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
@@ -92,25 +68,27 @@ snow_ele = HydroElement(:hbv_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 thetas_nn = Lux.Chain(
     Lux.Dense(4 => 16, Lux.tanh),
     Lux.Dense(16 => 16, Lux.leakyrelu),
-    Lux.Dense(16 => 2, Lux.leakyrelu)
+    Lux.Dense(16 => 2, Lux.leakyrelu),
+    name=:thetas
 )
 recharge_nn = Lux.Chain(
     Lux.Dense(2 => 16, Lux.tanh),
     Lux.Dense(16 => 16, Lux.leakyrelu),
-    Lux.Dense(16 => 1, Lux.leakyrelu)
+    Lux.Dense(16 => 1, Lux.leakyrelu),
+    name=:recharge
 )
 #! define the soil water reservoir
 soil_funcs = [
-    NeuralFlux([prcp, temp, pet, soilwater] => [beta, gamma], :thetas => thetas_nn),
+    NeuralFlux([prcp, temp, pet, soilwater] => [beta, gamma], thetas_nn),
     SimpleFlux([soilwater, beta] => [soilwetfrac], [FC],
-        flux_exprs=[clamp(abs(soilwater / FC)^beta, 0.0, 1.0)]),
-    NeuralFlux([rainfall, snowinfil, soilwetfrac] => [recharge], :recharge => recharge_nn),
+        exprs=[clamp(abs(soilwater / FC)^beta, 0.0, 1.0)]),
+    NeuralFlux([rainfall, snowinfil, soilwetfrac] => [recharge], recharge_nn),
     SimpleFlux([soilwater] => [excess], [FC],
-        flux_exprs=[max(0.0, soilwater - FC)]),
+        exprs=[max(0.0, soilwater - FC)]),
     SimpleFlux([soilwater] => [evapfrac], [LP, FC],
-        flux_exprs=[soilwater / (LP * FC)]),
+        exprs=[soilwater / (LP * FC)]),
     SimpleFlux([soilwater, pet, evapfrac, gamma] => [evap],
-        flux_exprs=[min(soilwater, pet * (evapfrac^gamma))]),
+        exprs=[min(soilwater, pet * (evapfrac^gamma))]),
 ]
 
 soil_dfuncs = [StateFlux([rainfall, snowinfil] => [evap, excess, recharge], soilwater)]
@@ -119,15 +97,15 @@ soil_ele = HydroElement(:hbv_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 #! define the upper and lower subsurface zone 
 zone_funcs = [
     SimpleFlux([soilwater, upperzone, evapfrac] => [perc], [PERC],
-        flux_exprs=[min(soilwater, PERC)]),
+        exprs=[min(soilwater, PERC)]),
     SimpleFlux([upperzone] => [q0], [k0, UZL],
-        flux_exprs=[max(0.0, (upperzone - UZL) * k0)]),
+        exprs=[max(0.0, (upperzone - UZL) * k0)]),
     SimpleFlux([upperzone] => [q1], [k1],
-        flux_exprs=[upperzone * k1]),
+        exprs=[upperzone * k1]),
     SimpleFlux([lowerzone] => [q2], [k2],
-        flux_exprs=[lowerzone * k2]),
+        exprs=[lowerzone * k2]),
     SimpleFlux([q0, q1, q2] => [flow],
-        flux_exprs=[q0 + q1 + q2]),
+        exprs=[q0 + q1 + q2]),
 ]
 
 zone_dfuncs = [StateFlux([recharge, excess] => [perc, q0, q1], upperzone), StateFlux([perc] => [q2], lowerzone)]

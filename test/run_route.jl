@@ -14,3 +14,17 @@ router2(input_mat, ComponentVector(k=1.2, x=0.5, dt=1.0))
 # re = LumpedHydro.solve_mskfunc(input_vec, ComponentVector(k=1.2, x=0.5, dt=1.0))
 
 # re = LumpedHydro.solve_mskfunc(input_vec, ComponentVector(k=1.2, x=0.5, dt=1.0))
+
+
+# @testset "test lag flux" begin
+#     @variables a a_lag
+#     @parameters lt
+#     lag_flux_1 = LagFlux(a => a_lag, lt, LumpedHydro.uh_1_half)
+#     @test LumpedHydro.get_input_names(lag_flux_1) == (:a,)
+#     @test LumpedHydro.get_param_names(lag_flux_1) == (:lt,)
+#     @test LumpedHydro.get_output_names(lag_flux_1) == (:a_lag,)
+#     @test lag_flux_1(Float32[2, 3, 4, 2, 3, 1], [3.5]) ≈ [[
+#         0.043634488475497855, 0.334102918508042, 1.2174967306061588,
+#         2.519953682639187, 3.2301609643779736, 2.7991762465729138
+#     ]]
+# end

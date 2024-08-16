@@ -75,6 +75,7 @@ include("utils/show.jl")
 include("utils/graph.jl")
 include("utils/smooth.jl")
 include("utils/unithydro.jl")
+include("utils/runtime_build.jl")
 
 # framework build
 include("flux.jl")

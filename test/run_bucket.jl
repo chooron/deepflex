@@ -5,7 +5,7 @@ pas = ComponentVector(params=params, initstates=init_states)
 ts = collect(1:100)
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
 input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]);
-input = reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))
+input = reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))'
 dtype = eltype(input[1]);
 
 @testset "test hydro element (basic element, Snowpack in Exp-Hydro)" begin
@@ -30,49 +30,33 @@ dtype = eltype(input[1]);
     end
 
     result = snow_ele(input, pas, timeidx=ts)
-
+    ele_state_and_output_names = vcat(LumpedHydro.get_state_names(snow_ele), LumpedHydro.get_output_names(snow_ele))
+    result = NamedTuple{Tuple(ele_state_and_output_names)}(eachslice(result, dims=1))
     @testset "test first output for hydro element" begin
         snowpack0 = init_states[:snowpack]
-        pet0 = snow_funcs[1]([input.temp[1] input.lday[1]], dtype[])[1]
-        snowfall0, rainfall0 = snow_funcs[2]([input.prcp[1] input.temp[1]], [params.Tmin])
-        melt0 = snow_funcs[3]([snowpack0 input.temp[1]], [params.Tmax, params.Df])[1]
+        pet0 = snow_funcs[1]([input_ntp.temp[1], input_ntp.lday[1]], dtype[])[1]
+        snowfall0, rainfall0 = snow_funcs[2]([input_ntp.prcp[1], input_ntp.temp[1]], [params.Tmin])
+        melt0 = snow_funcs[3]([snowpack0, input_ntp.temp[1]], [params.Tmax, params.Df])[1]
         @test snowpack0 == result.snowpack[1]
         @test snowfall0 == result.snowfall[1]
         @test rainfall0 == result.rainfall[1]
         @test melt0 == result.melt[1]
     end
 
-    @testset "test build state function" begin
-        @variables routingstore exch slowflow_routed routedflow
-        @parameters x2, x3
-        funcs = [
-            SimpleFlux([routingstore] => [exch], [x2, x3],
-                exprs=[x2 * abs(routingstore / x3)^3.5]),
-            SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
-                exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
-        ]
-        dfunc = LumpedHydro.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
-        var_ntp = (routingstore=routingstore, slowflow_routed=slowflow_routed)
-        param_ntp = (x2=x2, x3=x3)
-        state_func = LumpedHydro.build_state_func(funcs, dfunc, var_ntp, param_ntp)
-        rgt, slg = 10.0, 20.0
-        exch = 2.42 * abs(rgt / 69.63)^3.5
-        @test state_func([rgt, slg], [2.42, 69.63]) == exch + slg - 69.63^(-4) / 4 * (rgt + slg + exch)^5
-    end
 
-    # todo
-    @testset "test modify element" begin
+    # # todo
+    # @testset "test modify element" begin
 
-    end
+    # end
 
     @testset "test ode solved results" begin
-        prcp_itp = LinearInterpolation(input.prcp, ts)
-        temp_itp = LinearInterpolation(input.temp, ts)
+        prcp_itp = LinearInterpolation(input_ntp.prcp, ts)
+        temp_itp = LinearInterpolation(input_ntp.temp, ts)
 
         function snowpack_bucket!(du, u, p, t)
             snowpack_ = u[1]
             Df, Tmax, Tmin = p
-            prcp_, temp_ = prcp_itp, temp_itp
+            prcp_, temp_ = prcp_itp(t), temp_itp(t)
             snowfall_ = step_func(Tmin - temp_) * prcp_
             melt_ = step_func(temp_ - Tmax) * step_func(snowpack_) * min(snowpack_, Df * (temp_ - Tmax))
             du[1] = snowfall_ - melt_
@@ -81,23 +65,22 @@ dtype = eltype(input[1]);
         sol = solve(prob, Tsit5(), saveat=ts, reltol=1e-3, abstol=1e-3)
         num_u = length(prob.u0)
         manual_result = [sol[i, :] for i in 1:num_u]
-        pkg_result = LumpedHydro.solve_prob(snow_ele, input=input, pas=pas, timeidx=ts)
-        @test manual_result == pkg_result
+        pkg_result = LumpedHydro.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)
+        @test manual_result[1] == pkg_result[1, :]
     end
 
     @testset "test all of the output" begin
-        snowpack_vec = LumpedHydro.solve_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1]
-        pet_vec = snow_funcs[1](reduce(hcat, [input.temp, input.lday]), dtype[])[:, 1]
-        snow_funcs_2_output = snow_funcs[2](reduce(hcat, [input.prcp, input.temp]), [params.Tmin])
-        snowfall_vec, rainfall_vec = snow_funcs_2_output[:, 1], snow_funcs_2_output[:, 2]
-        melt_vec = snow_funcs[3](reduce(hcat, [snowpack_vec, input.temp]), [params.Tmax, params.Df])[:, 1]
-        @test pet_vec == collect(result.pet)
-        @test snowfall_vec == collect(result.snowfall)
-        @test rainfall_vec == collect(result.rainfall)
-        @test melt_vec == collect(result.melt)
+        snowpack_vec = LumpedHydro.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
+        pet_vec = reduce(hcat, snow_funcs[1].(eachslice(reduce(hcat, [input_ntp.temp, input_ntp.lday]), dims=1), Ref(dtype[])))[1,:]
+        snow_funcs_2_output = reduce(hcat, snow_funcs[2].(eachslice(reduce(hcat, [input_ntp.prcp, input_ntp.temp]), dims=1), Ref([params.Tmin])))
+        snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]
+        melt_vec = reduce(hcat, snow_funcs[3].(eachslice(reduce(hcat, [snowpack_vec, input_ntp.temp]), dims=1), Ref([params.Tmax, params.Df])))[1, :]
+        @test reduce(vcat, pet_vec) == collect(result.pet)
+        @test reduce(vcat, snowfall_vec) == collect(result.snowfall)
+        @test reduce(vcat, rainfall_vec) == collect(result.rainfall)
+        @test reduce(vcat, melt_vec) == collect(result.melt)
     end
 
-    #todo
-    @testset "test build bucket function" begin
-    end
+    # #todo
+    # @testset "test build bucket function" begin end
 end

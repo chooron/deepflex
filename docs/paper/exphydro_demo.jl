@@ -28,8 +28,8 @@ include("../../src/LumpedHydro.jl")
 @variables snowfall = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
 @variables evap = 0.0 [description = "evapotranspiration", unit = "mm"]
 @variables melt = 0.0 [description = "melting", unit = "mm"]
-@variables baseflow = 0.0 [description = "discharge", unit = "mm"]
-@variables surfaceflow = 0.0 [description = "discharge", unit = "mm"]
+@variables baseflow = 0.0 [description = "base discharge", unit = "mm"]
+@variables surfaceflow = 0.0 [description = "surface discharge", unit = "mm"]
 @variables flow = 0.0 [description = "discharge", unit = "mm"]
 SimpleFlux = LumpedHydro.SimpleFlux
 LagFlux = LumpedHydro.LagFlux
@@ -41,11 +41,11 @@ step_func = LumpedHydro.step_func
 #! define the snow pack reservoir
 snow_funcs = [
     SimpleFlux([temp, lday] => [pet],
-        flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-        flux_exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+        exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
     SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-        flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+        exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
 snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
@@ -53,13 +53,13 @@ snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 #! define the soil water reservoir
 soil_funcs = [
     SimpleFlux([soilwater, pet] => [evap], [Smax],
-        flux_exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
+        exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
     SimpleFlux([soilwater] => [baseflow], [Smax, Qmax, f],
-        flux_exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
+        exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
     SimpleFlux([soilwater] => [surfaceflow], [Smax],
-        flux_exprs=[max(0.0, soilwater - Smax)]),
+        exprs=[max(0.0, soilwater - Smax)]),
     SimpleFlux([baseflow, surfaceflow] => [flow],
-        flux_exprs=[baseflow + surfaceflow]),
+        exprs=[baseflow + surfaceflow]),
 ]
 soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
 soil_ele = HydroElement(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
