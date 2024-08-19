@@ -1,10 +1,10 @@
 ```@meta
-CurrentModule = LumpedHydro
+CurrentModule = HydroModels
 ```
 
-# LumpedHydro.jl
+# HydroModels.jl
 
-LumpedHydro.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
+HydroModels.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
 
 ## 安装
 
@@ -24,7 +24,7 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
-using LumpedHydro
+using HydroModels
 
 # load data
 file_path = "data/exphydro/01013500.csv"
@@ -37,7 +37,7 @@ temp_vec = df[ts, "tmean(C)"]
 flow_vec = df[ts, "flow(mm)"]
 
 # build model
-model = LumpedHydro.ExpHydro.Unit(name=:exphydro, mtk=false)
+model = HydroModels.ExpHydro.Unit(name=:exphydro, mtk=false)
 
 # setup parameters and initstates
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
@@ -47,7 +47,7 @@ pas = ComponentVector((params=unit_params, initstates=unit_init_states, weight=1
 
 # run model
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
-solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
+solver = HydroModels.ODESolver(reltol=1e-3, abstol=1e-3)
 result = model(input, pas, timeidx=ts, solver=solver);
 result_df = DataFrame(result)
 
