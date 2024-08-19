@@ -1,10 +1,8 @@
 @reexport module HBV_EDU
 #* convert from https://github.com/kratzert/RRMPG/blob/master/rrmpg/models/hbvedu_model.py
-using ..LumpedHydro
-using ..LumpedHydro: step_func
-using ..LumpedHydro.Symbolics: @variables
-using ..LumpedHydro.ModelingToolkit: @parameters
-using ..LumpedHydro.ModelingToolkit: t_nounits as t
+using ..HydroModels
+using ..HydroModels: step_func
+using ..HydroModels: @variables, @parameters
 
 """
 SnowWaterReservoir in HBV_EDU

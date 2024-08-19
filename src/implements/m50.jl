@@ -1,7 +1,7 @@
 @reexport module M50
-using ..LumpedHydro
+using ..HydroModels
 using ..NamedTupleTools
-import ..LumpedHydro: Lux
+import ..HydroModels: Lux
 
 """
 Implement for [Improving hydrologic models for predictions and process understanding using neural ODEs](https://hess.copernicus.org/articles/26/5085/2022/)

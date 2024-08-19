@@ -11,8 +11,7 @@ using BenchmarkTools
 using StableRNGs
 using Optimization
 using OptimizationBBO
-using CairoMakie
-include("../../src/LumpedHydro.jl")
+include("../../src/HydroModels.jl")
 
 # load data
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
@@ -34,14 +33,13 @@ qobs_vec = df[ts, "flow(mm)"]
 #* dynamic parameters
 @variables beta gamma
 
-SimpleFlux = LumpedHydro.SimpleFlux
-StdMeanNormFlux = LumpedHydro.StdMeanNormFlux
-NeuralFlux = LumpedHydro.NeuralFlux
-LagFlux = LumpedHydro.LagFlux
-StateFlux = LumpedHydro.StateFlux
-HydroElement = LumpedHydro.HydroElement
-HydroUnit = LumpedHydro.HydroUnit
-step_func = LumpedHydro.step_func
+SimpleFlux = HydroModels.SimpleFlux
+StdMeanNormFlux = HydroModels.StdMeanNormFlux
+NeuralFlux = HydroModels.NeuralFlux
+StateFlux = HydroModels.StateFlux
+HydroUnit = HydroModels.HydroUnit
+HydroBucket = HydroModels.HydroBucket
+step_func = HydroModels.step_func
 
 #* θ是regional data所以可以针对实测和预测结果模拟优化出来, 
 #* 而γ和β是根据观测数据预测得到的随时间变化的参数,
@@ -63,7 +61,7 @@ snow_funcs = [
         exprs=[max(0.0, meltwater - CWH * snowpack)]),
 ]
 snow_dfuncs = [StateFlux([snowfall, refreeze] => [melt], snowpack), StateFlux([melt] => [refreeze, snowinfil], meltwater)]
-snow_ele = HydroElement(:hbv_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_ele = HydroBucket(:hbv_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 thetas_nn = Lux.Chain(
     Lux.Dense(4 => 16, Lux.tanh),
@@ -92,7 +90,7 @@ soil_funcs = [
 ]
 
 soil_dfuncs = [StateFlux([rainfall, snowinfil] => [evap, excess, recharge], soilwater)]
-soil_ele = HydroElement(:hbv_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_ele = HydroBucket(:hbv_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the upper and lower subsurface zone 
 zone_funcs = [
@@ -120,13 +118,6 @@ pas = ComponentVector(params=params, initstates=init_states)
 input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
 result = hbv_model(input, pas, timeidx=ts)
 
-
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, ts, result.flow, color=:red)
-lines!(ax, ts, qobs_vec, color=:blue)
-fig
-
 #! set the tunable parameters boundary
 lower_bounds = [-1.5, 1, 0.0, 0.0, 50.0, 0.3, 1.0, 0.05, 0.01, 0.001, 0.0, 0.0]
 upper_bounds = [1.2, 8.0, 0.2, 0.1, 500.0, 1.0, 6.0, 0.5, 0.3, 0.15, 3.0, 70.0]
@@ -135,7 +126,7 @@ output = (flow=qobs_vec,)
 #! model calibration
 #* ComponentVector{Float64}(params = (TT = -1.2223657527438707, CFMAX = 2.201359793941345, CWH = 0.022749518921432663, CFR = 0.058335602629828544, FC = 160.01327559173077, LP = 0.7042581781418978, 
 #* beta = 5.580695551758287, k0 = 0.0500023960318018, k1 = 0.04573064980956475, k2 = 0.14881856483902567, PERC = 1.3367222956722589, UZL = 44.059927907190016))
-best_pas = LumpedHydro.param_box_optim(
+best_pas = HydroModels.param_box_optim(
     hbv_model,
     tunable_pas=ComponentVector(params=params),
     const_pas=ComponentVector(initstates=init_states),
@@ -146,5 +137,5 @@ best_pas = LumpedHydro.param_box_optim(
     ub=upper_bounds,
     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
     maxiters=10000,
-    loss_func=LumpedHydro.mse,
+    loss_func=HydroModels.mse,
 )

@@ -1,3 +1,35 @@
+struct HydroRoute <: AbstractRoute
+    "routement information: keys contains: input, output, param, state"
+    nameinfo::NamedTuple
+    "route types"
+    routefunc::Function
+
+    function HydroRoute(
+        inputs::Vector{Num},
+        routefunc::Function
+    )
+        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        output_names = map(s -> Symbol(s, :_routed), input_names)
+        #* Setup the name information of the hydroroutement
+        nameinfo = (input=input_names, output=output_names, param=[:k, :x])
+
+        return new(
+            nameinfo,
+            routefunc
+        )
+    end
+end
+
+function (route::HydroRoute)(
+    input::AbstractMatrix,
+    params::ComponentVector;
+    timeidx::AbstractVector
+)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    sol_arrs = route.routefunc.(eachslice(input, dims=1), Ref(params), timeidx)
+    reduce(hcat, sol_arrs)'
+end
+
 struct UnitHydroRoute <: AbstractRoute
     "routement information: keys contains: input, output, param, state"
     nameinfo::NamedTuple
@@ -27,13 +59,11 @@ struct UnitHydroRoute <: AbstractRoute
 
         return new(
             nameinfo,
-            uhfuncs,
-        )
+            uhfuncs,        )
     end
 end
 
 function solve_uhfunc(input_vec, uh_weight)
-    println(input_vec)
     #* 首先将lagflux转换为discrete problem
     function lag_prob(u, p, t)
         u = circshift(u, -1)
@@ -82,22 +112,44 @@ function run_multi_fluxes(
     end
 end
 
-struct MuskingumRoute <: AbstractRoute
-    "routement information: keys contains: input, output, param, state"
-    nameinfo::NamedTuple
-
-    function MuskingumRoute(
-        inputs::Vector{Num};
-    )
-        input_names = Symbolics.tosymbol.(inputs, escape=false)
-        output_names = map(s -> Symbol(s, :_routed), input_names)
-        #* Setup the name information of the hydroroutement
-        nameinfo = (input=input_names, output=output_names, param=[:k, :x])
-
-        return new(
-            nameinfo,
-        )
+function run_multi_fluxes(
+    route::HydroRoute;
+    input::AbstractArray,
+    params::ComponentVector,
+    ptypes::Vector{Symbol}=collect(keys(params)),
+)
+    #* array dims: (variable dim, num of node, sequence length)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    #* var_name * [weight_len * node_num]
+    pytype_params = [params[ptype] for ptype in ptypes]
+    sols = map(eachindex(ptypes)) do (idx)
+        node_sols = reduce(hcat, route.routefunc.(eachslice(input[idx, :, :], dims=1), pytype_params[idx]))
+        node_sols
     end
+    if length(sols) > 1
+        sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
+        return permutedims(sol_arr, (3, 1, 2))
+    else
+        return reshape(sols[1], 1, size(input)[3], size(input)[2])
+    end
+end
+
+function solve_nashuh(input_vec, params, timeidx)
+    n = params.n
+    init_states = zeros(n)
+    input_itp = LinearInterpolation(input_vec, timeidx)
+
+    function nash_unithydro!(du, u, p, t)
+        k = p
+        du[1] = input_itp(t) - u[1] / k
+        for i in 2:n
+            du[i] = (u[i-1] - u[i]) / k
+        end
+    end
+
+    prob = ODEProblem(nash_unithydro!, init_states, (timeidx[1], timeidx[end]), (params.p,))
+    sol = solve(prob, Tsit5())
+    sol.u
 end
 
 function solve_mskfunc(input_vec, params)
@@ -105,7 +157,6 @@ function solve_mskfunc(input_vec, params)
     c0 = ((dt / k) - (2 * x)) / ((2 * (1 - x)) + (dt / k))
     c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
     c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
-    println((c0, c1, c2))
     function msk_prob(u, p, t)
         println(t)
         q0 = u[1]
@@ -119,35 +170,4 @@ function solve_mskfunc(input_vec, params)
     prob = DiscreteProblem(msk_prob, [input_vec[1]], (2, length(input_vec)), ComponentVector(c0=c0, c1=c1, c2=c2))
     sol = solve(prob, FunctionMap())
     reduce(vcat, sol.u)
-end
-
-function (::MuskingumRoute)(
-    input::AbstractMatrix,
-    params::ComponentVector;
-)
-    #* Extract the initial state of the parameters and routement in the pas variable
-    sol_arrs = solve_mskfunc.(eachslice(input, dims=1), Ref(params))
-    reduce(hcat, sol_arrs)'
-end
-
-function run_multi_fluxes(
-    ::MuskingumRoute;
-    input::AbstractArray,
-    params::ComponentVector,
-    ptypes::Vector{Symbol}=collect(keys(params)),
-)
-    #* array dims: (variable dim, num of node, sequence length)
-    #* Extract the initial state of the parameters and routement in the pas variable
-    #* var_name * [weight_len * node_num]
-    pytype_params = [params[ptype] for ptype in ptypes]
-    sols = map(eachindex(ptypes)) do (idx)
-        node_sols = reduce(hcat, solve_mskfunc.(eachslice(input[idx, :, :], dims=1), pytype_params[idx]))
-        node_sols
-    end
-    if length(sols) > 1
-        sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-        return permutedims(sol_arr, (3, 1, 2))
-    else
-        return reshape(sols[1], 1, size(input)[3], size(input)[2])
-    end
 end

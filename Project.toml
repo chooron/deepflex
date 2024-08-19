@@ -1,18 +1,16 @@
-name = "LumpedHydro"
-uuid = "0b298ff5-3dd4-4fe7-848b-d22450ef51c7"
+name = "HydroModels"
+uuid = "7e3cde01-c141-467b-bff6-5350a0af19fc"
 authors = ["jingx <50790703+chooron@users.noreply.github.com>"]
 version = "0.1.0"
 
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-ArrayPadding = "fe5ef43c-4912-423d-9170-4bd5cb6a013a"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"

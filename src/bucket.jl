@@ -154,6 +154,12 @@ function solve_single_prob(
     sol
 end
 
+"""
+input dims: var_names * node_names * ts_len
+pas type: ComponentVector(params=(node_1=(p1=,p2=,)), initstates=(...), nn=(...))
+
+output dims: var_names * node_names * ts_len
+"""
 function run_multi_fluxes(
     ele::HydroBucket;
     #* var num * node num * ts len
@@ -170,16 +176,22 @@ function run_multi_fluxes(
     #* array dims: (num of node, sequence length, variable dim)
     ele_output_vec = [ele.flux_func.(eachslice(input[:, i, :], dims=2), Ref(ele_param_vec[i]), Ref(nn_params_vec)) for i in 1:size(input)[2]]
     ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
-    ele_output_arr
+    permutedims(ele_output_arr, (1, 3, 2))
 end
 
+"""
+input dims: var_names * node_names * ts_len
+pas type: ComponentVector(params=(node_1=(p1=,p2=,)), initstates=(...), nn=(...))
+
+output dims: var_names * node_names * ts_len
+"""
 function solve_multi_prob(
     ele::HydroBucket;
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector,
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
-    solver::LumpedHydro.AbstractSolver=LumpedHydro.ODESolver()
+    solver::AbstractSolver=ODESolver()
 )
     #* 针对多个相同的state function采用并行化计算,这样能够避免神经网络反复多次计算减少梯度计算反馈
     #* 同时将多组state function放到同一个ode function中,这种并行计算或能提高预测性能,

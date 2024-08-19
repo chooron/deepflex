@@ -1,4 +1,4 @@
-include("../src/LumpedHydro.jl")
+include("../src/HydroModels.jl")
 using ComponentArrays
 using ModelingToolkit: @variables, @parameters
 

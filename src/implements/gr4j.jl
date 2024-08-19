@@ -1,6 +1,6 @@
 @reexport module GR4J
 
-using ..LumpedHydro
+using ..HydroModels
 
 """
 SoilWaterReservoir in GR4J

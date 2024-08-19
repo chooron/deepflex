@@ -1,4 +1,5 @@
-module LumpedHydro
+module HydroModels
+
 ## External packages
 # common packages
 using TOML
@@ -15,8 +16,6 @@ using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # ModelingToolkit building
-using ModelingToolkit
-using ModelingToolkit: D_nounits as D
 using ModelingToolkit: @variables, @parameters
 using Symbolics
 using SymbolicUtils
@@ -31,7 +30,7 @@ using DataInterpolations
 # solve ODEProblem
 using SciMLBase
 using OrdinaryDiffEq
-using DiffEqFlux
+using SciMLSensitivity
 
 # deep learning
 using Lux
@@ -104,16 +103,15 @@ include("implements/cemaneige.jl")
 include("implements/exphydro.jl")
 include("implements/gr4j.jl")
 include("implements/hbv_edu.jl")
-include("implements/hbv_maxbas.jl")
-include("implements/hbv_nn.jl")
 include("implements/hymod.jl")
 include("implements/simhyd.jl")
 include("implements/m50.jl")
 
 # export abstract structs
-export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit
+export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute
 export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV_EDU
-end
+
+end # module HydroModels

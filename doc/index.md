@@ -1,18 +1,18 @@
 ```@meta
-CurrentModule = LumpedHydro
+CurrentModule = HydroModels
 ```
 
-# LumpedHydro.jl
+# HydroModels.jl
 
-LumpedHydro.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
+HydroModels.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
 
 ## 安装
 
-To install ModelingToolkitNeuralNets.jl, use the Julia package manager:
+To install HydroModels.jl, use the Julia package manager:
 
 ```julia
 using Pkg
-Pkg.add("LumpedHydro")
+Pkg.add("HydroModels")
 ```
 
 ## 运行一个ExpHydro水文模型
@@ -24,7 +24,7 @@ using DataFrames
 using CairoMakie
 using BenchmarkTools
 using ComponentArrays
-using LumpedHydro
+using HydroModels
 
 # load data
 file_path = "data/exphydro/01013500.csv"
@@ -47,7 +47,7 @@ pas = ComponentVector((params=unit_params, initstates=unit_init_states, weight=1
 
 # run model
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
-solver = LumpedHydro.ODESolver(reltol=1e-3, abstol=1e-3)
+solver = HydroModels.ODESolver(reltol=1e-3, abstol=1e-3)
 result = model(input, pas, timeidx=ts, solver=solver);
 result_df = DataFrame(result)
 

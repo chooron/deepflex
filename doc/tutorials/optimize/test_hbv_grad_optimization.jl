@@ -7,9 +7,9 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
-using LumpedHydro
+using HydroModels
 # test exphydro model
-# include("../../src/LumpedHydro.jl")
+# include("../../src/HydroModels.jl")
 # 5.0.0
 # predefine the parameters
 tt, dd, FC, Beta, PWP, L = 0.0, 4.25, 177.1, 2.35, 105.89, 4.87
@@ -21,7 +21,7 @@ pas = ComponentVector((vertical=(params=params, initstates=initstates)))
 tunable_pas = ComponentVector(params=params)
 const_pas = ComponentVector(initstates=initstates)
 
-unit = LumpedHydro.HBV_EDU.Unit(name=:hbv)
+unit = HydroModels.HBV_EDU.Unit(name=:hbv)
 
 # load data
 file_path = "data/hbv_edu/hbv_sample.csv"
@@ -32,7 +32,7 @@ input = (prcp=df[!,:prec], pet=df[!,:pet], temp=df[!,:temp])
 target = (flow=df[!,:qsim],)
 timeidx = collect(1:length(df[!,:qsim]))
 
-best_pas = LumpedHydro.param_grad_optim(
+best_pas = HydroModels.param_grad_optim(
     unit,
     tunable_pas=tunable_pas,
     const_pas=const_pas,

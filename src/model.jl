@@ -13,8 +13,8 @@ a basic hydrology unit must include:
 $(FIELDS)
 # Example
 ```
-using LumpedHydro
-using LumpedHydro.ExpHydro: Surface, Soil, FreeWater
+using HydroModels
+using HydroModels.ExpHydro: Surface, Soil, FreeWater
 
 HydroUnit(
     name,
@@ -23,7 +23,7 @@ HydroUnit(
 )
 ```
 """
-struct HydroUnit <: AbstractUnit
+struct HydroModel <: AbstractUnit
     "hydrological computation unit information"
     infos::NamedTuple
     "hydrological computation elements"
@@ -31,22 +31,28 @@ struct HydroUnit <: AbstractUnit
     "input idx for each components"
     input_idx::Vector
 
-    function HydroUnit(name; components::Vector{<:AbstractComponent})
+    function HydroModel(;
+        name::Symbol,
+        verticals::Vector{<:AbstractComponent},
+        laterals::Vector{<:AbstractComponent}
+    )
         #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
         unit_input_names = unit_var_names = get_var_names(components)[1]
         input_idx = Vector[]
-        for component in components
-            tmp_input_idx = map(get_input_names(component)) do nm
+        for vert in verticals
+            tmp_input_idx = map(get_input_names(vert)) do nm
                 findfirst(varnm -> varnm == nm, unit_var_names)
             end
             #* 更新unit_var_names
-            unit_var_names = reduce(vcat, [unit_var_names, get_state_names(component), get_output_names(component)])
+            unit_var_names = reduce(vcat, [unit_var_names, get_state_names(vert), get_output_names(vert)])
             push!(input_idx, tmp_input_idx)
         end
-        unit_infos = (name=name, input=unit_input_names, var=unit_var_names)
+        route_flux_names = get_input_names.(laterals)
+        unit_infos = (name=name, input=unit_input_names, flux=unit_var_names, route=route_flux_names, )
         new(
             unit_infos,
-            components,
+            verticals,
+            laterals,
             input_idx,
         )
     end
@@ -99,10 +105,11 @@ function (unit::HydroUnit)(
             solved_states = nothing
         end
         fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, pas=pas, ptypes=ptypes)
+        fluxes_outputs_perm = permutedims(fluxes_outputs, (1, 3, 2))
         if isnothing(solved_states)
-            fluxes = cat(fluxes, fluxes_outputs, dims=1)
+            fluxes = cat(fluxes, fluxes_outputs_perm, dims=1)
         else
-            fluxes = cat(fluxes, solved_states, fluxes_outputs, dims=1)
+            fluxes = cat(fluxes, solved_states, fluxes_outputs_perm, dims=1)
         end
     end
     if output_type == :namedtuple

@@ -1,8 +1,8 @@
 @reexport module ExpHydro
 
-using ..LumpedHydro
-using ..LumpedHydro: @variables, @parameters
-using ..LumpedHydro: step_func
+using ..HydroModels
+using ..HydroModels: @variables, @parameters
+using ..HydroModels: step_func
 
 """
 SoilWaterReservoir in Exp-Hydro

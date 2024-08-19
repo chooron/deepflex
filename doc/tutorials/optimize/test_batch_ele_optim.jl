@@ -8,7 +8,7 @@ using NamedTupleTools
 using Optimization
 using HydroEquations
 
-include("../../src/LumpedHydro.jl")
+include("../../../src/HydroModels.jl")
 
 # test exphydro model
 
@@ -19,7 +19,7 @@ tunable_pas = ComponentVector(params=(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tma
 const_pas = ComponentVector(initstates=(snowwater=0.0, soilwater=1300.0))
 
 init_pas = ComponentVector(params=(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin), initstates=(snowwater=0.0, soilwater=1300.0))
-model = LumpedHydro.ExpHydro.SurfaceStorage(name=:sf)
+model = HydroModels.ExpHydro.SurfaceStorage(name=:sf)
 
 # load data
 file_path = "data/m50/01013500.csv"
@@ -37,7 +37,7 @@ output = (melt=flow_vec,)
 
 #! 除了snowwater外其他中间变量都没有梯度,猜测是merge函数引起的问题
 #! 试试componentvector是否会出现这个问题
-best_pas = LumpedHydro.param_grad_optim(
+best_pas = HydroModels.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,

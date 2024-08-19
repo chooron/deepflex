@@ -23,14 +23,14 @@ dtype = eltype(input[1]);
     snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
     snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
     @testset "test hydro element info" begin
-        @test Set(LumpedHydro.get_input_names(snow_ele)) == Set((:temp, :lday, :prcp))
-        @test Set(LumpedHydro.get_param_names(snow_ele)) == Set((:Tmin, :Tmax, :Df))
-        @test Set(LumpedHydro.get_output_names(snow_ele)) == Set((:pet, :snowfall, :rainfall, :melt))
-        @test Set(LumpedHydro.get_state_names(snow_ele)) == Set((:snowpack,))
+        @test Set(HydroModels.get_input_names(snow_ele)) == Set((:temp, :lday, :prcp))
+        @test Set(HydroModels.get_param_names(snow_ele)) == Set((:Tmin, :Tmax, :Df))
+        @test Set(HydroModels.get_output_names(snow_ele)) == Set((:pet, :snowfall, :rainfall, :melt))
+        @test Set(HydroModels.get_state_names(snow_ele)) == Set((:snowpack,))
     end
 
     result = snow_ele(input, pas, timeidx=ts)
-    ele_state_and_output_names = vcat(LumpedHydro.get_state_names(snow_ele), LumpedHydro.get_output_names(snow_ele))
+    ele_state_and_output_names = vcat(HydroModels.get_state_names(snow_ele), HydroModels.get_output_names(snow_ele))
     result = NamedTuple{Tuple(ele_state_and_output_names)}(eachslice(result, dims=1))
     @testset "test first output for hydro element" begin
         snowpack0 = init_states[:snowpack]
@@ -65,12 +65,12 @@ dtype = eltype(input[1]);
         sol = solve(prob, Tsit5(), saveat=ts, reltol=1e-3, abstol=1e-3)
         num_u = length(prob.u0)
         manual_result = [sol[i, :] for i in 1:num_u]
-        pkg_result = LumpedHydro.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)
+        pkg_result = HydroModels.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)
         @test manual_result[1] == pkg_result[1, :]
     end
 
     @testset "test all of the output" begin
-        snowpack_vec = LumpedHydro.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
+        snowpack_vec = HydroModels.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
         pet_vec = reduce(hcat, snow_funcs[1].(eachslice(reduce(hcat, [input_ntp.temp, input_ntp.lday]), dims=1), Ref(dtype[])))[1,:]
         snow_funcs_2_output = reduce(hcat, snow_funcs[2].(eachslice(reduce(hcat, [input_ntp.prcp, input_ntp.temp]), dims=1), Ref([params.Tmin])))
         snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]

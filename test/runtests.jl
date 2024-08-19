@@ -1,7 +1,7 @@
 using CSV
 using DataFrames
-using LumpedHydro
-using LumpedHydro: step_func
+using HydroModels
+using HydroModels: step_func
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
@@ -14,7 +14,7 @@ using DataInterpolations
 using OrdinaryDiffEq
 using Aqua
 
-@testset "LumpedHydro.jl" begin
+@testset "HydroModels.jl" begin
     include("run_flux.jl")
     include("utils/run_runtime_build.jl")
     include("run_bucket.jl")

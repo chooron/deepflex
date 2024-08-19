@@ -1,10 +1,8 @@
 @reexport module SIMHYD
 # https://github.com/hydrogo/LHMP/blob/master/models/simhyd_cemaneige.py
-using ..LumpedHydro
-using ..LumpedHydro.Symbolics: @variables
-using ..LumpedHydro.ModelingToolkit: @parameters
-using ..LumpedHydro.ModelingToolkit: t_nounits as t
-using ..LumpedHydro.ModelingToolkit: Num
+using ..HydroModels
+using ..HydroModels: @variables,@parameters
+using ..HydroModels.Symbolics: Num
 """
 elements in SIMHYD
 """

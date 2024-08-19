@@ -1,10 +1,8 @@
 @reexport module HyMOD
 # https://github.com/KMarkert/hymod
-using ..LumpedHydro
-using ..LumpedHydro.Symbolics: @variables
-using ..LumpedHydro.ModelingToolkit: @parameters
-using ..LumpedHydro.ModelingToolkit: t_nounits as t
-using ..LumpedHydro.ModelingToolkit: Num
+using ..HydroModels
+using ..HydroModels: @variables, @parameters
+using ..HydroModels.Symbolics: Num
 """
 SoilWaterReservoir in HYMOD
 """

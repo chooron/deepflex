@@ -6,9 +6,9 @@ using BenchmarkTools
 using NamedTupleTools
 using ModelingToolkit
 
-include("../../src/LumpedHydro.jl")
+include("../../../src/HydroModels.jl")
 
-ele = LumpedHydro.ExpHydro.SurfaceStorage(name=:sf)
+ele = HydroModels.ExpHydro.SurfaceStorage(name=:sf)
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 ps = [f, Smax, Qmax, Df, Tmax, Tmin]
@@ -22,6 +22,6 @@ df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 input_matrix = reduce(hcat, [input[1], input[2], input[3]])' # (var nm * ts len)
-solver = LumpedHydro.ODESolver()
+solver = HydroModels.ODESolver()
 results = ele(input_matrix, pas, timeidx=ts, solver=solver)
 

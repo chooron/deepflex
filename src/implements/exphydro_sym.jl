@@ -1,6 +1,6 @@
 @reexport module ExpHydro
 
-using ..LumpedHydro
+using ..HydroModels
 
 """
 SoilWaterReservoir in Exp-Hydro

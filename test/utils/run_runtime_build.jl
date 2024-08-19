@@ -5,7 +5,7 @@
     outputs = [d, e]
     params = [x1, x2]
     exprs = [x1 * a + x2 * b + c, x1 * c + x2]
-    func = LumpedHydro.build_flux_func(inputs, outputs, params, exprs)
+    func = HydroModels.build_flux_func(inputs, outputs, params, exprs)
     @test func([1, 2, 1], [2, 1]) == [2 * 1 + 1 * 2 + 1, 2 * 1 + 1]
 end
 
@@ -18,9 +18,9 @@ end
         SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
             exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
     ]
-    dfunc = LumpedHydro.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
+    dfunc = HydroModels.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
     infos = (input=[:slowflow_routed], state=[:routingstore])
-    flux_func, state_func = LumpedHydro.build_ele_func(funcs, [dfunc], infos)
+    flux_func, state_func = HydroModels.build_ele_func(funcs, [dfunc], infos)
     rgt, slg = 10.0, 20.0
     exch = 2.42 * abs(rgt / 69.63)^3.5
     routedflow = 69.63^(-4) / 4 * (rgt + slg + exch)^5

@@ -1,7 +1,6 @@
 # import lib
 using CSV
 using DataFrames
-# using CairoMakie
 using ComponentArrays
 using OptimizationOptimisers
 using BenchmarkTools
@@ -9,15 +8,15 @@ using NamedTupleTools
 using Optimization
 
 # test exphydro model
-include("../../src/LumpedHydro.jl")
+include("../../../src/HydroModels.jl")
 
 # predefine the parameters
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 
 tunable_pas = ComponentVector(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin))
-const_pas = ComponentVector(initstates=ComponentVector(snowwater=0.0, soilwater=1300.0))
+const_pas = ComponentVector(initstates=ComponentVector(snowpack=0.0, soilwater=1300.0))
 
-model = LumpedHydro.ExpHydro.Unit(name=:exphydro)
+model = HydroModels.ExpHydro.Unit(name=:exphydro)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
@@ -34,7 +33,7 @@ input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
 input_matrix = reduce(hcat, collect(input))'
 output = (flow=flow_vec,)
 
-best_pas = LumpedHydro.param_grad_optim(
+best_pas = HydroModels.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
