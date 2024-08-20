@@ -64,7 +64,7 @@ abstract type AbstractElement <: AbstractComponent end
 abstract type AbstractHydroBucket <: AbstractElement end
 abstract type AbstractRoute <: AbstractElement end
 #* 负责多个平衡联合单元的计算
-abstract type AbstractUnit <: AbstractComponent end
+abstract type AbstractModel <: AbstractComponent end
 
 # utils
 include("utils/attr.jl")
@@ -89,8 +89,8 @@ export HydroBucket # , add_inputflux!, add_outputflux!,
 include("route.jl")
 export UnitHydroRoute, MuskingumRoute
 
-include("unit.jl")
-export HydroUnit #, update_unit!, add_elements!, remove_elements!
+include("model.jl")
+export HydroModel #, update_unit!, add_elements!, remove_elements!
 
 include("optimize.jl")
 export param_grad_optim, param_box_optim, nn_param_optim

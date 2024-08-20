@@ -61,7 +61,7 @@ function FreeWater(; name::Symbol)
     )
 end
 
-function Unit(; name::Symbol)
+function Model(; name::Symbol)
 
     elements = [
         SurfaceStorage(name=name),
@@ -69,7 +69,7 @@ function Unit(; name::Symbol)
         FreeWater(name=name)
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements,
     )

@@ -59,23 +59,9 @@ struct UnitHydroRoute <: AbstractRoute
 
         return new(
             nameinfo,
-            uhfuncs,        )
+            uhfuncs,
+        )
     end
-end
-
-function solve_uhfunc(input_vec, uh_weight)
-    #* 首先将lagflux转换为discrete problem
-    function lag_prob(u, p, t)
-        u = circshift(u, -1)
-        u[end] = 0.0
-        input_vec[Int(t)] .* p[:weight] .+ u
-    end
-
-    prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)),
-        ComponentVector(weight=uh_weight))
-    #* 求解这个问题
-    sol = solve(prob, FunctionMap())
-    Array(sol)[1, :]
 end
 
 function (route::UnitHydroRoute)(
@@ -134,23 +120,6 @@ function run_multi_fluxes(
     end
 end
 
-function solve_nashuh(input_vec, params, timeidx)
-    n = params.n
-    init_states = zeros(n)
-    input_itp = LinearInterpolation(input_vec, timeidx)
-
-    function nash_unithydro!(du, u, p, t)
-        k = p
-        du[1] = input_itp(t) - u[1] / k
-        for i in 2:n
-            du[i] = (u[i-1] - u[i]) / k
-        end
-    end
-
-    prob = ODEProblem(nash_unithydro!, init_states, (timeidx[1], timeidx[end]), (params.p,))
-    sol = solve(prob, Tsit5())
-    sol.u
-end
 
 function solve_mskfunc(input_vec, params)
     k, x, dt = params.k, params.x, params.dt

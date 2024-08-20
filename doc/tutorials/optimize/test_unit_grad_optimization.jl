@@ -16,7 +16,7 @@ f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.67454884
 tunable_pas = ComponentVector(params=ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin))
 const_pas = ComponentVector(initstates=ComponentVector(snowpack=0.0, soilwater=1300.0))
 
-model = HydroModels.ExpHydro.Unit(name=:exphydro)
+model = HydroModels.ExpHydro.Model(name=:exphydro)
 
 # load data
 file_path = "data/exphydro/01013500.csv"

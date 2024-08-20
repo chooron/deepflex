@@ -69,7 +69,7 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true)
+function Model(; name::Symbol, mtk::Bool=true)
 
     elements = [
         Surface(name=name, mtk=mtk),
@@ -77,7 +77,7 @@ function Unit(; name::Symbol, mtk::Bool=true)
         FreeWater(name=name, mtk=mtk)
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements,
     )

@@ -84,7 +84,7 @@ function OutputElement(; name::Symbol)
     )
 end
 
-function Unit(; name::Symbol)
+function Model(; name::Symbol)
     @info "hello"
     components = [
         SoilStorage(name=name),
@@ -93,7 +93,7 @@ function Unit(; name::Symbol)
         OutputElement(name=name),
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=components
     )

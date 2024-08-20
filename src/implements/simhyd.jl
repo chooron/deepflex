@@ -67,12 +67,12 @@ function SIMHYD_ELE(; name::Symbol, mtk::Bool=true)
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true)
+function Model(; name::Symbol, mtk::Bool=true)
     elements = [
         SIMHYD_ELE(name=name, mtk=mtk),
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements,
     )

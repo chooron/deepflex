@@ -1,6 +1,6 @@
 get_input_names(func::AbstractFlux) = func.infos[:input]
 get_input_names(ele::AbstractHydroBucket) = ele.infos[:input]
-get_input_names(unit::AbstractUnit) = unit.infos[:input]
+get_input_names(unit::AbstractModel) = unit.infos[:input]
 
 get_output_names(func::AbstractFlux) = func.infos[:output]
 get_output_names(::AbstractStateFlux) = Symbol[]
@@ -53,4 +53,4 @@ function get_var_names(elements::Vector{<:AbstractHydroBucket})
     end
     input_names, output_names, state_names
 end
-get_var_names(unit::AbstractUnit) = unit.infos[:var]
+get_var_names(unit::AbstractModel) = unit.infos[:var]

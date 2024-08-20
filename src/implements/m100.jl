@@ -36,7 +36,7 @@ function M100_ELE(; name::Symbol, mtk::Bool=true)
 end
 
 
-function Unit(; name::Symbol)
+function Model(; name::Symbol)
     build_unit(
         name=name,
         components=[M100_ELE(name=name, mtk=mtk)]

@@ -102,13 +102,13 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true)
+function Model(; name::Symbol, mtk::Bool=true)
     elements = [
         SoilStorage(name=name, mtk=mtk),
         FreeWaterStorage(name=name, mtk=mtk),
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements,
     )

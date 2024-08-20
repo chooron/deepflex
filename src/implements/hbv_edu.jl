@@ -99,14 +99,14 @@ function FreeWaterStorage(; name::Symbol)
     )
 end
 
-function Unit(; name::Symbol)
+function Model(; name::Symbol)
     elements = [
         SnowStorage(name=name),
         SoilStorage(name=name),
         FreeWaterStorage(name=name),
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements
     )

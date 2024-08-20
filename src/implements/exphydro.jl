@@ -59,14 +59,14 @@ function SoilStorage(; name::Symbol)
     )
 end
 
-function Unit(; name::Symbol)
+function Model(; name::Symbol)
 
     elements = [
         SurfaceStorage(name=name),
         SoilStorage(name=name),
     ]
 
-    HydroUnit(
+    HydroModel(
         name,
         components=elements,
     )

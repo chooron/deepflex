@@ -2,8 +2,7 @@
 
 using ..HydroModels
 using ..HydroModels: ifelse_func
-using ..HydroModels.Symbolics: @variables
-using ..HydroModels: @parameters
+using ..HydroModels: @variables, @parameters
 using ..HydroModels: Num
 
 """
@@ -52,7 +51,7 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
         HydroModels.SimpleFlux(
             [prcp, mean_temp, max_temp, min_temp] => [solid_frac], [altitude, zthresh],
             exprs=@.[ifelse_func(zthresh - altitude) * (ifelse_func(max_temp) * ifelse_func(-min_temp) * (1.0 - max_temp / (max_temp - min_temp)) + ifelse_func(-max_temp)) +
-                          ifelse_func(altitude - zthresh) * (ifelse_func(-mean_temp) + ifelse_func(3 - mean_temp) * ifelse_func(mean_temp) * (1 - (mean_temp + 1) / 4.0))]
+                     ifelse_func(altitude - zthresh) * (ifelse_func(-mean_temp) + ifelse_func(3 - mean_temp) * ifelse_func(mean_temp) * (1 - (mean_temp + 1) / 4.0))]
         ),
         HydroModels.SimpleFlux([prcp, solid_frac] => [snowfall, rainfall], exprs=@.[prcp * solid_frac, prcp * (1 - solid_frac)]),
         HydroModels.SimpleFlux([thermal, mean_temp] => [new_thermal], [CTG], exprs=@.[min(0.0, CTG * thermal + (1 - CTG) * mean_temp)]),

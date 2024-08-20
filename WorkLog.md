@@ -80,39 +80,15 @@
 - [ ] 模型输入的pas，三个主要键名：ps，st，nn
 - [ ] 参数输入校验工作
 - [ ] Route 类型的构建
+
   - [X] 马斯京跟
   - [X] 单位线
   - [ ] hydrodischarge
-- [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码如下：
-
-```julia
-is_variable(x::Num) = is_variable(x.val)
-function is_variable(x)
-    if x isa ModelingToolkit.SymbolicUtils.Symbolic
-        if haskey(x.metadata, ModelingToolkit.Symbolics.VariableSource)
-            src = x.metadata[ModelingToolkit.Symbolics.VariableSource]
-            return first(src) == :variables
-        end
-    end
-    return false
-end
-
+- [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码(temp/mtk_marco.jl)：
 - [ ] 当前DataInterpolations.jl在v5.0.0版本才兼容，其他版本存在问题
 - [ ] DiscreteProblem似乎无法通过梯度优化
 - [X] 构建了flux的计算匿名函数与state一致，**这时候就需要额外构建针对lag flux的element了**
 - [ ] 中间计算转为matrix合并的方式存储信息,效率显著提高
-
-@parameters a1
-@variables a2
-@variables b
-
-eq1 = b ~ a1 + a2^2 + 1
-eq1.lhs
-Equation
-get_variables(eq1)
-nn = Lux.Chain(layer_1 = Dense(2 => 3, relu), name=:ann)
-
-```
 
 # 关键功能和实现技术
 
@@ -128,7 +104,7 @@ nn = Lux.Chain(layer_1 = Dense(2 => 3, relu), name=:ann)
 
 # 一些结论
 
-* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型
+* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型，现在已经改为matrix加index的存储
 
 # 优化模型的问题
 

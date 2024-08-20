@@ -8,11 +8,11 @@ HydroModels.jl是一个基于julia语言编写的用于构建概念性水文模�
 
 ## 安装
 
-To install ModelingToolkitNeuralNets.jl, use the Julia package manager:
+To install HydroModels.jl, use the Julia package manager:
 
 ```julia
 using Pkg
-Pkg.add("LumpedHydro")
+Pkg.add("HydroModels")
 ```
 
 ## 运行一个ExpHydro水文模型

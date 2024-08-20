@@ -66,8 +66,8 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     )
 end
 
-function Unit(; name::Symbol, mtk::Bool=true, step::Bool=true)
-    HydroUnit(
+function Model(; name::Symbol, mtk::Bool=true, step::Bool=true)
+    HydroModel(
         name,
         components=[SurfaceStorage(name=name, mtk=mtk), SoilStorage(name=name, mtk=mtk)],
         step=step,
