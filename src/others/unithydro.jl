@@ -1,19 +1,3 @@
-
-function solve_uhfunc(input_vec, uh_weight)
-    #* 首先将lagflux转换为discrete problem
-    function lag_prob(u, p, t)
-        u = circshift(u, -1)
-        u[end] = 0.0
-        input_vec[Int(t)] .* p[:weight] .+ u
-    end
-
-    prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)),
-        ComponentVector(weight=uh_weight))
-    #* 求解这个问题
-    sol = solve(prob, FunctionMap())
-    Array(sol)[1, :]
-end
-
 function uh_1_half(lag; kw...)
     timeidx = 1:ceil(lag)
     sf = get(kw, :smooth_func, ifelse_func)
@@ -42,4 +26,31 @@ function uh_3_half(lag; kw...)
     value = @.(sf(lag - timeidx) * ff * (0.5 * timeidx^2 - 0.5 * (timeidx - 1)^2) +
                sf(timeidx - lag) * ff * (0.5 * lag^2 - 0.5 * (timeidx - 1)^2))
     return value
+end
+
+function solve_uhfunc(input_vec, uh_weight)
+    #* 首先将lagflux转换为discrete problem
+    function lag_prob(u, p, t)
+        u = circshift(u, -1)
+        u[end] = 0.0
+        input_vec[Int(t)] .* p[:weight] .+ u
+    end
+
+    prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)),
+        ComponentVector(weight=uh_weight))
+    #* 求解这个问题
+    sol = solve(prob, FunctionMap())
+    Array(sol)[1, :]
+end
+
+function UnitHydroRoute(
+    input::Num,
+    params::Vector{Num},
+)
+    return RouteFlux(
+        [input],
+        params,
+        solve_uhfunc,
+        :unit_hydrograph
+    )
 end

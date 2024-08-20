@@ -73,15 +73,11 @@ include("utils/name.jl")
 include("utils/show.jl")
 include("utils/graph.jl")
 include("utils/smooth.jl")
-include("utils/unithydro.jl")
 include("utils/runtime_build.jl")
 
 # framework build
 include("flux.jl")
 export SimpleFlux, StateFlux, NeuralFlux
-# special flux
-include("utils/normalize.jl")
-export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
@@ -97,6 +93,16 @@ export param_grad_optim, param_box_optim, nn_param_optim
 
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
+
+# some route function and special flux
+include("others/unithydro.jl")
+export UnitHydroRoute
+include("others/cascade.jl")
+export CascadeRoute
+include("others/muskingum.jl")
+export MuskingumRoute
+include("others/normalize.jl")
+export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 # Implements Models
 include("implements/cemaneige.jl")

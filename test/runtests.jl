@@ -1,18 +1,17 @@
+using Aqua
 using CSV
 using DataFrames
+using Lux
 using HydroModels
 using HydroModels: step_func
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using Symbolics
-using Lux
 using LuxCore
 using StableRNGs
 using ComponentArrays
 using DataInterpolations
 using OrdinaryDiffEq
-using Aqua
 
 @testset "HydroModels.jl" begin
     include("run_flux.jl")

@@ -1,4 +1,6 @@
 @inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector) = flux.func(input, params)
+@inline (flux::AbstractFlux)(input::AbstractMatrix, params::AbstractVector) = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params)))
+
 """
 $(TYPEDEF)
 A struct representing common hydrological fluxes
@@ -206,6 +208,76 @@ struct StateFlux <: AbstractStateFlux
         ori_state = first(@variables $ori_state_name)
         new_state = first(@variables $new_state_name)
         return StateFlux(ori_state => new_state)
+    end
+end
+
+struct RouteFlux <: AbstractRouteFlux
+    "A map of input names (Symbol) and its variables (Num)"
+    inputs::Vector{Num}
+    "A map of output names (Symbol) and its variables (Num)"
+    outputs::Vector{Num}
+    "A map of parameters names (Symbol) and its variables (Num)"
+    params::Vector{Num}
+    "flux expressions to descripe the formula of the output variable"
+    func::Function
+    "bucket information: keys contains: input, output, param"
+    infos::NamedTuple
+
+    function RouteFlux(
+        inputs::Vector{Num},
+        params::Vector{Num},
+        routefunc::Function,
+        routetype::Symbol,
+    )
+        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        param_names = Symbolics.tosymbol.(params, escape=false)
+        output_names = map(s -> Symbol(s, :_routed), input_names)
+        outputs = [first(@variables $nm) for nm in output_names]
+        #* Setup the name information of the hydroroutement
+        infos = (input=input_names, output=output_names, param=param_names, rtype=routetype)
+
+        return new(
+            inputs,
+            outputs,
+            params,
+            routefunc,
+            infos
+        )
+    end
+end
+
+(::AbstractRouteFlux)(::AbstractVector, ::AbstractVector) = @error "Abstract RouteFlux is not support for single timepoint"
+
+function (route::AbstractRouteFlux)(
+    input::AbstractMatrix,
+    params::ComponentVector;
+    timeidx::AbstractVector
+)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    sol_arrs = route.routefunc.(eachslice(input, dims=1), Ref(params), Ref(timeidx))
+    reduce(hcat, sol_arrs)'
+end
+
+function run_multi_fluxes(
+    route::AbstractRoute;
+    input::AbstractArray,
+    params::ComponentVector,
+    timeidx::AbstractVector,
+    ptypes::Vector{Symbol}=collect(keys(params)),
+)
+    #* array dims: (variable dim, num of node, sequence length)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    #* var_name * [weight_len * node_num]
+    pytype_params = [params[ptype] for ptype in ptypes]
+    sols = map(eachindex(ptypes)) do (idx)
+        node_sols = reduce(hcat, route.routefunc.(eachslice(input[idx, :, :], dims=1), pytype_params[idx], Ref(timeidx)))
+        node_sols
+    end
+    if length(sols) > 1
+        sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
+        return permutedims(sol_arr, (3, 1, 2))
+    else
+        return reshape(sols[1], 1, size(input)[3], size(input)[2])
     end
 end
 
