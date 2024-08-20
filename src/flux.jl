@@ -1,5 +1,13 @@
 @inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector) = flux.func(input, params)
-@inline (flux::AbstractFlux)(input::AbstractMatrix, params::AbstractVector) = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params)))
+function (flux::AbstractFlux)(input::AbstractMatrix, pas::ComponentVector)
+    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
+    if length(flux.infos[:nn]) > 0
+        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
+    else
+        nn_params_vec = nothing
+    end
+    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), Ref(nn_params_vec)))
+end
 
 """
 $(TYPEDEF)
@@ -65,7 +73,7 @@ struct SimpleFlux <: AbstractSimpleFlux
     )
         #* Get input and output names
         input_names, output_names = flux_names[1], flux_names[2]
-        infos = (input=input_names, output=output_names, param=param_names)
+        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[])
         if length(flux_funcs) > 0
             #* Create variables by names
             inputs = [first(@variables $var) for var in input_names]
@@ -102,7 +110,7 @@ struct SimpleFlux <: AbstractSimpleFlux
         input_names = Symbolics.tosymbol.(inputs, escape=false)
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = length(params) > 0 ? Symbolics.tosymbol.(params) : Symbol[]
-        infos = (input=input_names, output=output_names, param=param_names)
+        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[])
 
         if length(exprs) == 0
             #* Get the corresponding calculation formula according to the input and output parameter names
@@ -144,7 +152,7 @@ struct StateFlux <: AbstractStateFlux
         input_names = Symbolics.tosymbol.(fluxes, escape=false)
         state_name = Symbolics.tosymbol(state, escape=false)
         param_names = length(params) > 0 ? Symbol.(Symbolics.tosymbol.(params, escape=false)) : Symbol[]
-        infos = (input=input_names, state=state_name, param=param_names)
+        infos = (input=input_names, state=state_name, param=param_names, nn=Symbol[])
         state_func = build_flux_func(fluxes, [state], params, [expr])
         return new(
             fluxes,
@@ -250,11 +258,10 @@ end
 
 function (route::AbstractRouteFlux)(
     input::AbstractMatrix,
-    params::ComponentVector;
-    timeidx::AbstractVector
+    params::ComponentVector
 )
     #* Extract the initial state of the parameters and routement in the pas variable
-    sol_arrs = route.routefunc.(eachslice(input, dims=1), Ref(params), Ref(timeidx))
+    sol_arrs = route.func.(eachslice(input, dims=1), Ref(params))
     reduce(hcat, sol_arrs)'
 end
 

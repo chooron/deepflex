@@ -58,6 +58,7 @@ abstract type AbstractSolver end
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
+abstract type AbstractRouteFlux <: AbstractFlux end
 
 #* 负责某一平衡单元的计算
 abstract type AbstractElement <: AbstractComponent end
@@ -96,11 +97,11 @@ export ODESolver, DiscreteSolver, ManualSolver
 
 # some route function and special flux
 include("others/unithydro.jl")
-export UnitHydroRoute
+export UnitHydroRouteFlux
 include("others/cascade.jl")
-export CascadeRoute
+export CascadeRouteFlux
 include("others/muskingum.jl")
-export MuskingumRoute
+export MuskingumRouteFlux
 include("others/normalize.jl")
 export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 

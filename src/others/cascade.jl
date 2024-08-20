@@ -16,7 +16,7 @@ function solve_nashuh(input_vec, params)
     sol.u
 end
 
-function CascadeRoute(
+function CascadeRouteFlux(
     inputs::Num,
 )
     @parameters k [description = "水库的平均滞留时间"]

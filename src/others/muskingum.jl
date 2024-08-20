@@ -18,7 +18,7 @@ function solve_mskfunc(input_vec, params)
     reduce(vcat, sol.u)
 end
 
-function MuskingumRoute(
+function MuskingumRouteFlux(
     input::Num,
     params::Vector{Num},
 )

@@ -28,28 +28,31 @@ function uh_3_half(lag; kw...)
     return value
 end
 
-function solve_uhfunc(input_vec, uh_weight)
-    #* 首先将lagflux转换为discrete problem
-    function lag_prob(u, p, t)
-        u = circshift(u, -1)
-        u[end] = 0.0
-        input_vec[Int(t)] .* p[:weight] .+ u
+
+function UnitHydroRouteFlux(
+    input::Num,
+    param::Num,
+    uh_func::Function
+)
+    param_name = Symbolics.tosymbol(param)
+    function solve_uhfunc(input_vec, params)
+        #* 首先将lagflux转换为discrete problem
+        function lag_prob(u, p, t)
+            u = circshift(u, -1)
+            u[end] = 0.0
+            input_vec[Int(t)] .* p[:weight] .+ u
+        end
+
+        uh_weight = uh_func(params[param_name])
+        prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)), ComponentVector(weight=uh_weight))
+        #* 求解这个问题
+        sol = solve(prob, FunctionMap())
+        Array(sol)[1, :]
     end
 
-    prob = DiscreteProblem(lag_prob, uh_weight, (1, length(input_vec)),
-        ComponentVector(weight=uh_weight))
-    #* 求解这个问题
-    sol = solve(prob, FunctionMap())
-    Array(sol)[1, :]
-end
-
-function UnitHydroRoute(
-    input::Num,
-    params::Vector{Num},
-)
     return RouteFlux(
         [input],
-        params,
+        [param],
         solve_uhfunc,
         :unit_hydrograph
     )
