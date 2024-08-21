@@ -4,11 +4,12 @@ using DataFrames
 using ComponentArrays
 using OrdinaryDiffEq
 using ModelingToolkit
-using CairoMakie
 using OptimizationBBO
 using BenchmarkTools
 using DataInterpolations
-include("../../src/LumpedHydro.jl")
+using Plots
+using HydroErrors
+include("../../src/HydroModels.jl")
 
 #! parameters in the Exp-Hydro model
 @parameters Tmin = 0.0 [description = "snowfall temperature", unit = "°C"]
@@ -31,12 +32,11 @@ include("../../src/LumpedHydro.jl")
 @variables baseflow = 0.0 [description = "base discharge", unit = "mm"]
 @variables surfaceflow = 0.0 [description = "surface discharge", unit = "mm"]
 @variables flow = 0.0 [description = "discharge", unit = "mm"]
-SimpleFlux = LumpedHydro.SimpleFlux
-LagFlux = LumpedHydro.LagFlux
-StateFlux = LumpedHydro.StateFlux
-HydroElement = LumpedHydro.HydroElement
-HydroUnit = LumpedHydro.HydroUnit
-step_func = LumpedHydro.step_func
+SimpleFlux = HydroModels.SimpleFlux
+StateFlux = HydroModels.StateFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
+step_func = HydroModels.step_func
 
 #! define the snow pack reservoir
 snow_funcs = [
@@ -48,7 +48,7 @@ snow_funcs = [
         exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the soil water reservoir
 soil_funcs = [
@@ -62,10 +62,10 @@ soil_funcs = [
         exprs=[baseflow + surfaceflow]),
 ]
 soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-soil_ele = HydroElement(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_ele = HydroBucket(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the Exp-Hydro model
-exphydro_model = HydroUnit(:exphydro, components=[snow_ele, soil_ele])
+exphydro_model = HydroModel(:exphydro, components=[snow_ele, soil_ele])
 
 # load data
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
@@ -79,16 +79,10 @@ input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
 pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00),
     params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)))
 timeidx = collect(1:length(prcp_vec))
-solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
+solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
 result = exphydro_model(input, pas, timeidx=timeidx, solver=solver);
 
-@info 1 - LumpedHydro.nse(result.flow, qobs_vec)
-
-fig = Figure(size=(400, 300))
-ax = CairoMakie.Axis(fig[1, 1], title="predict results", xlabel="time", ylabel="flow(mm)")
-lines!(ax, timeidx, result.flow, color=:red)
-lines!(ax, timeidx, qobs_vec, color=:blue)
-fig
+@info 1 - HydroErr.nse(result.flow, qobs_vec)
 
 #! set the tunable parameters and constant parameters
 tunable_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09))
@@ -99,27 +93,27 @@ upper_bounds = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
 #! prepare flow
 output = (flow=qobs_vec,)
 #! model calibration
-best_pas = LumpedHydro.param_box_optim(
+best_pas = HydroModels.param_box_optim(
     exphydro_model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
-    input=input,
-    target=output,
-    timeidx=timeidx,
+    input=[input],
+    target=[output],
+    timeidx=[timeidx],
     lb=lower_bounds,
     ub=upper_bounds,
     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
     maxiters=1000,
-    loss_func=LumpedHydro.nse,
+    loss_func=HydroErr.nse,
     solver=solver
 )
-# #! use the optimized parameters for model simulation
-# result_opt = exphydro_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)
-# pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
-# pas = ComponentVector(pas_list, getaxes(tunable_pas))
-# result_opt_df = DataFrame(result_opt)
-# result_opt_df.qobs = qobs_vec
+#! use the optimized parameters for model simulation
+total_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09), initstates=(snowpack=0.1, soilwater=1303.00))
+update_pas = HydroModels.update_ca(total_pas, ComponentVector(best_pas, getaxes(tunable_pas)))
+result_opt = exphydro_model(input, update_pas, timeidx=timeidx, solver=solver)
+result_opt_df = DataFrame(result_opt)
+result_opt_df.qobs = qobs_vec
 # CSV.write("temp.csv", result_opt_df)
-# 1 - LumpedHydro.nse(result_opt.flow, qobs_vec)
-# 1 - LumpedHydro.nse(result.flow, qobs_vec)
+1 - HydroErr.nse(result_opt.flow, qobs_vec)
+1 - HydroErr.nse(result.flow, qobs_vec)
 

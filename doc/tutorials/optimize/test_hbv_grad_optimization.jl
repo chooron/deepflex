@@ -21,7 +21,7 @@ pas = ComponentVector((vertical=(params=params, initstates=initstates)))
 tunable_pas = ComponentVector(params=params)
 const_pas = ComponentVector(initstates=initstates)
 
-unit = HydroModels.HBV_EDU.Unit(name=:hbv)
+unit = HydroModels.HBV_EDU.Model(name=:hbv)
 
 # load data
 file_path = "data/hbv_edu/hbv_sample.csv"

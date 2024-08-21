@@ -15,7 +15,7 @@ function uh_2_full(lag; kw...)
                sf(double_lag - timeidx) * sf(timeidx - lag) * (1 - 0.5 * abs(2 - timeidx / lag)^2.5) +
                sf(lag - timeidx) * (0.5 * abs(timeidx / lag)^2.5))
 
-    vcat(value[1], circshift(value, -1) - value[1:end-1])
+    vcat(value[1], value[2:end] .- value[1:end-1])
 end
 
 function uh_3_half(lag; kw...)

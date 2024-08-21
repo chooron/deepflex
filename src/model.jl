@@ -33,7 +33,9 @@ struct HydroModel <: AbstractModel
 
     function HydroModel(name; components::Vector{<:AbstractComponent})
         #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
-        input_names = var_names = get_var_names(components)[1]
+        input_names, output_names, state_names = get_var_names(components)
+        nn_names = reduce(union, get_nn_names.(components))
+        var_names = input_names
         input_idx = Vector[]
         for component in components
             tmp_input_idx = map(get_input_names(component)) do nm
@@ -43,7 +45,7 @@ struct HydroModel <: AbstractModel
             var_names = reduce(vcat, [var_names, get_state_names(component), get_output_names(component)])
             push!(input_idx, tmp_input_idx)
         end
-        model_infos = (name=name, input=input_names, var=var_names)
+        model_infos = (name=name, input=input_names, var=var_names, output=output_names, state=state_names, nn=nn_names)
         new(
             model_infos,
             components,
@@ -61,8 +63,8 @@ function (model::HydroModel)(
     output_type::Symbol=:namedtuple
 )
     fluxes = reduce(hcat, [input[nm] for nm in get_input_names(model)])'
-    for (tmp_ele, idx) in zip(model.components, model.input_idx)
-        tmp_fluxes = tmp_ele(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
+    for (tmp_comp, idx) in zip(model.components, model.input_idx)
+        tmp_fluxes = tmp_comp(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
     if output_type == :namedtuple

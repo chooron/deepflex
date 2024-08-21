@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "d65ac0fd0afd23997078436d1f3a92098941ce07"
+project_hash = "7ff4ef45679bac299fd748ffbd642e6ffb517658"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "99a6f5d0ce1c7c6afdb759daa30226f71c54f6b0"
@@ -1004,9 +1004,9 @@ git-tree-sha1 = "6c3e57bc26728b99f470b267a437f0d380eac4fc"
 uuid = "1baab800-613f-4b0a-84e4-9cd3431bfbb9"
 version = "0.4.16"
 
-[[deps.HydroErr]]
+[[deps.HydroErrors]]
 deps = ["DocStringExtensions", "Statistics"]
-path = "D:\\Julia\\Julia-1.10.4\\packages\\dev\\HydroErr"
+path = "D:\\Julia\\Julia-1.10.4\\packages\\dev\\HydroErrors"
 uuid = "cde335eb-da38-4796-83c8-e508648b3902"
 version = "0.1.0"
 

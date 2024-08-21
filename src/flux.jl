@@ -1,5 +1,5 @@
-@inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector) = flux.func(input, params)
-function (flux::AbstractFlux)(input::AbstractMatrix, pas::ComponentVector)
+@inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector; kwargs...) = flux.func(input, params)
+function (flux::AbstractFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
     if length(flux.infos[:nn]) > 0
         nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
@@ -258,10 +258,11 @@ end
 
 function (route::AbstractRouteFlux)(
     input::AbstractMatrix,
-    params::ComponentVector
+    pas::ComponentVector;
+    kwargs...
 )
     #* Extract the initial state of the parameters and routement in the pas variable
-    sol_arrs = route.func.(eachslice(input, dims=1), Ref(params))
+    sol_arrs = route.func.(eachslice(input, dims=1), Ref(pas[:params]))
     reduce(hcat, sol_arrs)'
 end
 
@@ -270,8 +271,9 @@ function run_multi_fluxes(
     input::AbstractArray,
     params::ComponentVector,
     timeidx::AbstractVector,
-    ptypes::Vector{Symbol}=collect(keys(params)),
+    kwargs...
 )
+    ptypes = get(kwargs, :ptypes, collect(keys(params)))
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
     #* var_name * [weight_len * node_num]

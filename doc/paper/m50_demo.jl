@@ -11,7 +11,8 @@ using BenchmarkTools
 using StableRNGs
 using Optimization
 using NamedTupleTools
-include("../../src/LumpedHydro.jl")
+using HydroErrors
+include("../../src/HydroModels.jl")
 
 # load data
 df = DataFrame(CSV.File("data/m50/01013500.csv"));
@@ -30,56 +31,38 @@ prcp_norm_vec, temp_norm_vec, snowpack_norm_vec, soilwater_norm_vec =
     [@.((tmp_vec - mean) / std) for (tmp_vec, mean, std) in zip(inputs, means, stds)]
 
 #! parameters in the Exp-Hydro model
-@parameters Tmin = 0.0 [description = "snowfall temperature", unit = "°C"]
-@parameters Tmax = 0.0 [description = "snowmelt temperature", unit = "°C"]
-@parameters Df = 0.0 [description = "thermal degree-day factor", unit = "mm/(d°C)"]
-@parameters Smax = 0.0 [description = "maximum water storage", unit = "mm"]
-@parameters f = 0.0 [description = "runoff decline rate", unit = "mm^(-1)"]
-@parameters Qmax = 0.0 [description = "maximum subsurface runoff", unit = "mm/d"]
-@parameters snowpack_norm_param[1:2]
-@parameters soilwater_norm_param[1:2]
-@parameters prcp_norm_param[1:2]
-@parameters temp_norm_param[1:2]
+@parameters Tmin Tmax Df Smax f Qmax
+#! parameters in normalize flux
+@parameters snowpack_std snowpack_mean
+@parameters soilwater_std soilwater_mean
+@parameters prcp_std prcp_mean
+@parameters temp_std temp_mean
 
 #! hydrological flux in the Exp-Hydro model
-@variables prcp = 0.0 [description = "precipitation", unit = "mm"]
-@variables temp = 0.0 [description = "precipitation", unit = "°C"]
-@variables lday = 0.0 [description = "length of day", unit = "-"]
-@variables pet = 0.0 [description = "potential evapotranspiration", unit = "mm"]
-@variables snowpack = 0.0 [description = "snow storage", unit = "mm"]
-@variables soilwater = 0.0 [description = "catchment water storage", unit = "mm"]
-@variables rainfall = 0.0 [description = "rain splitted from precipitation", unit = "mm"]
-@variables snowfall = 0.0 [description = "snow splitted from precipitation", unit = "mm"]
+@variables prcp temp lday pet rainfall snowfall
+@variables snowpack soilwater lday pet
+@variables melt log_evap_div_lday log_flow
+@variables norm_snw norm_slw norm_temp norm_prcp
 
-@variables melt = 0.0 [description = "melting", unit = "mm"]
-@variables log_evap_div_lday = 0.0 [description = "log(evap/lday)"]
-@variables log_flow = 0.0 [description = "log discharge"]
-
-@variables norm_snw = 0.0 [description = "discharge", unit = "mm"]
-@variables norm_slw = 0.0 [description = "discharge", unit = "mm"]
-@variables norm_temp = 0.0 [description = "discharge", unit = "mm"]
-@variables norm_prcp = 0.0 [description = "discharge", unit = "mm"]
-
-SimpleFlux = LumpedHydro.SimpleFlux
-StdMeanNormFlux = LumpedHydro.StdMeanNormFlux
-NeuralFlux = LumpedHydro.NeuralFlux
-LagFlux = LumpedHydro.LagFlux
-StateFlux = LumpedHydro.StateFlux
-HydroElement = LumpedHydro.HydroElement
-HydroUnit = LumpedHydro.HydroUnit
-step_func = LumpedHydro.step_func
+SimpleFlux = HydroModels.SimpleFlux
+StdMeanNormFlux = HydroModels.StdMeanNormFlux
+NeuralFlux = HydroModels.NeuralFlux
+StateFlux = HydroModels.StateFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
+step_func = HydroModels.step_func
 
 #! define the snow pack reservoir
 snow_funcs = [
     SimpleFlux([temp, lday] => [pet],
-        flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-        flux_exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+        exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
     SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-        flux_exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+        exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroElement(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the ET NN and Q NN
 et_nn = Lux.Chain(
@@ -104,39 +87,39 @@ soil_funcs = [
     #* normalize
     StdMeanNormFlux(
         [snowpack, soilwater, prcp, temp] => [norm_snw, norm_slw, norm_prcp, norm_temp],
-        [snowpack_norm_param, soilwater_norm_param, prcp_norm_param, temp_norm_param]
+        [[snowpack_mean, snowpack_std], [soilwater_mean, soilwater_std], [prcp_mean, prcp_std], [temp_mean, temp_std]]
     ),
     NeuralFlux([norm_snw, norm_slw, norm_temp] => [log_evap_div_lday, log_flow], et_nn),
     NeuralFlux([norm_slw, norm_prcp] => [log_flow], q_nn),
 ]
 
 state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
-soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], state_expr=state_expr)]
-soil_ele = HydroElement(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
+soil_ele = HydroBucket(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the Exp-Hydro model
-m50_model = HydroUnit(:m50, components=[snow_ele, soil_ele]);
+m50_model = HydroModel(:m50, components=[snow_ele, soil_ele]);
 
 #! pretrain each NN
 et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
 q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
 
-et_nn_p = LuxCore.initialparameters(StableRNG(42), et_nn)
-q_nn_p = LuxCore.initialparameters(StableRNG(42), q_nn)
+et_nn_p = Vector(ComponentVector(LuxCore.initialparameters(StableRNG(42), et_nn)))
+q_nn_p = Vector(ComponentVector(LuxCore.initialparameters(StableRNG(42), q_nn)))
 
 input = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
 params = (f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)
-norm_params = NamedTuple{Tuple([Symbol(nm, :_norm_param) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(
-    [[mean, std] for (mean, std) in zip(means, stds)]
-)
+var_stds = NamedTuple{Tuple([Symbol(nm, :_std) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(stds)
+var_means = NamedTuple{Tuple([Symbol(nm, :_mean) for nm in [:prcp, :temp, :snowpack, :soilwater]])}(means)
+
 nn_params = (etnn=et_nn_p, qnn=q_nn_p)
-pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00), params=reduce(merge, [params, norm_params]), nn=nn_params))
+pas = ComponentVector(initstates=(snowpack=0.0, soilwater=1303.00), params=reduce(merge, [params, var_means, var_stds]), nn=nn_params)
 timeidx = collect(1:length(prcp_vec))
-solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
+solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
 result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 
 
-# et_nn_p_trained = LumpedHydro.nn_param_optim(
+# et_nn_p_trained = HydroModels.nn_param_optim(
 #     et_nn_flux,
 #     input=et_nn_input,
 #     target=(log_evap_div_lday=log.(df[ts, :evap] ./ df[ts, :lday]),),
@@ -144,7 +127,7 @@ result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 #     maxiters=100,
 # )
 
-# q_nn_p_trained = LumpedHydro.nn_param_optim(
+# q_nn_p_trained = HydroModels.nn_param_optim(
 #     q_nn_flux,
 #     input=q_nn_input,
 #     target=(log_flow=log.(df[ts, :flow]),),
@@ -161,7 +144,7 @@ result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 # #! prepare flow
 # output = (log_flow=qobs_vec,)
 # #! model calibration
-# best_pas = LumpedHydro.param_grad_optim(
+# best_pas = HydroModels.param_grad_optim(
 #     m50_model,
 #     tunable_pas=tunable_pas,
 #     const_pas=const_pas,
@@ -173,10 +156,10 @@ result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 # )
 
 # #! use the optimized parameters for model simulation
-# result_opt = m50_model(input, LumpedHydro.merge_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)
+# result_opt = m50_model(input, HydroModels.merge_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)
 # pas_list = [0.0, 1303.0042478479704, 0.0167447802633775, 1709.4610152413964, 18.46996175240424, 2.674548847651345, 0.17573919612506747, -2.0929590840638728, 0.8137969540102923]
 # pas = ComponentVector(pas_list, getaxes(tunable_pas))
 
-# LumpedHydro.mse(result_opt.log_flow, qobs_vec)
-# 1 - LumpedHydro.nse(result_opt.log_flow, qobs_vec)
+# HydroModels.mse(result_opt.log_flow, qobs_vec)
+# 1 - HydroModels.nse(result_opt.log_flow, qobs_vec)
 

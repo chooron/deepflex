@@ -20,4 +20,4 @@ get_exprs(flux::AbstractStateFlux) = [flux.expr]
 
 #* used for getting element attr
 get_ode_func(::AbstractElement) = nothing
-get_ode_func(buc::AbstractHydroBucket) = buc.ode_func
+get_ode_func(buc::AbstractBucket) = buc.ode_func

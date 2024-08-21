@@ -6,8 +6,8 @@ using OptimizationOptimisers
 using BenchmarkTools
 using NamedTupleTools
 using Optimization
-using HydroEquations
 using ModelingToolkit
+using HydroErrors
 
 include("../../../src/HydroModels.jl")
 
@@ -19,15 +19,15 @@ include("../../../src/HydroModels.jl")
 #* test state flux
 snow_funcs = [
     HydroModels.SimpleFlux([temp, lday] => [pet],
-        flux_exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     HydroModels.SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-        flux_exprs=[HydroModels.step_func(Tmin - temp) * prcp, HydroModels.step_func(temp - Tmin) * prcp]),
+        exprs=[HydroModels.step_func(Tmin - temp) * prcp, HydroModels.step_func(temp - Tmin) * prcp]),
     HydroModels.SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-        flux_exprs=[HydroModels.step_func(temp - Tmax) * HydroModels.step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+        exprs=[HydroModels.step_func(temp - Tmax) * HydroModels.step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [HydroModels.StateFlux([snowfall] => [melt], snowpack)]
 
-model = HydroModels.HydroElement(:sf, funcs=snow_funcs, dfuncs=snow_dfuncs)
+model = HydroModels.HydroBucket(:sf, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 # predefine the parameters
 tunable_pas = ComponentVector(params=(f=0.01674478, Smax=1709.461015, Qmax=18.46996175, Df=2.674548848, Tmax=0.175739196, Tmin=-2.092959084))
@@ -60,6 +60,6 @@ best_pas = HydroModels.param_grad_optim(
     timeidx=repeat([timeidx], 10),
     adtype=Optimization.AutoZygote(),
     maxiters=100,
-    loss_func=HydroEquations.mse
+    loss_func=HydroErrors.mse
 )
 # ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))

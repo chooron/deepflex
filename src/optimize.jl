@@ -20,7 +20,7 @@ function param_box_optim(
     kwargs...,
 )
     #* Get the argument for parameter optimization
-    loss_func = get(kwargs, :loss_func, HydroErr.mse)
+    loss_func = get(kwargs, :loss_func, HydroErrors.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
@@ -93,7 +93,7 @@ function param_grad_optim(
     #* Get the argument for parameter optimization
     solve_alg = get(kwargs, :solve_alg, Adam())
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
-    loss_func = get(kwargs, :loss_func, HydroErr.mse)
+    loss_func = get(kwargs, :loss_func, HydroErrors.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
     #* 把这个放到run kwargs里面, timeidx也是
@@ -123,7 +123,7 @@ function batch_param_grad_optim(
     #* Get the argument for parameter optimization
     solve_alg = get(kwargs, :solve_alg, Adam())
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
-    loss_func = get(kwargs, :loss_func, HydroErr.mse)
+    loss_func = get(kwargs, :loss_func, HydroErrors.mse)
     maxiters = get(kwargs, :maxiters, 10)
     solver = get(kwargs, :solver, ODESolver())
 
@@ -182,7 +182,7 @@ function nn_param_optim(
     solve_alg = get(kwargs, :solve_alg, Adam(0.01))
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
     maxiters = get(kwargs, :maxiters, 100)
-    loss_func = get(kwargs, :loss_func, HydroErr.mse)
+    loss_func = get(kwargs, :loss_func, HydroErrors.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
 
     #* Integrate nn's input variables

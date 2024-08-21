@@ -8,7 +8,7 @@ $(FIELDS)
 ```
 ```
 """
-struct HydroBucket <: AbstractHydroBucket
+struct HydroBucket <: AbstractBucket
     "bucket information: keys contains: input, output, param, state"
     infos::NamedTuple
     """

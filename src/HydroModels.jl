@@ -41,8 +41,8 @@ using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
 
-# HydroErr
-using HydroErr
+# HydroErrors
+using HydroErrors
 
 # HydroEquations
 # using HydroEquations
@@ -52,20 +52,21 @@ const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.t
 
 ## Abstract Component Types
 abstract type AbstractComponent end
-abstract type AbstractFlux end
 abstract type AbstractSolver end
+
+#* 负责某一平衡单元的计算
+abstract type AbstractFlux <: AbstractComponent end
+abstract type AbstractElement <: AbstractComponent end
+abstract type AbstractBucket <: AbstractElement end
+abstract type AbstractRoute <: AbstractElement end
+#* 负责多个平衡联合单元的计算
+abstract type AbstractModel <: AbstractComponent end
 
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
 
-#* 负责某一平衡单元的计算
-abstract type AbstractElement <: AbstractComponent end
-abstract type AbstractHydroBucket <: AbstractElement end
-abstract type AbstractRoute <: AbstractElement end
-#* 负责多个平衡联合单元的计算
-abstract type AbstractModel <: AbstractComponent end
 
 # utils
 include("utils/attr.jl")

@@ -32,6 +32,6 @@ function Base.show(io::IO, flux::AbstractNeuralFlux)
     end
 end
 
-function Base.show(io::IO, ele::AbstractHydroBucket)
+function Base.show(io::IO, ele::AbstractBucket)
     println(io, ele.infos)
 end

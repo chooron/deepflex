@@ -1,4 +1,4 @@
-using LumpedHydro
+using HydroModels
 using ModelingToolkit
 
 #! construction method 1
@@ -44,8 +44,8 @@ dfluxes_v2 = [
 
 #! lag fluxes for slow flow and fast flow.
 lfluxes = [
-    LagFlux(:slowflow => :slowflow_routed, :x4, LumpedHydro.uh_1_half),
-    LagFlux(:fastflow => :fastflow_routed, :x4, LumpedHydro.uh_2_full),
+    LagFlux(:slowflow => :slowflow_routed, :x4, HydroModels.uh_1_half),
+    LagFlux(:fastflow => :fastflow_routed, :x4, HydroModels.uh_2_full),
 ]
 
 

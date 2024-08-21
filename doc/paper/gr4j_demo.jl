@@ -7,7 +7,8 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OptimizationBBO
 using BenchmarkTools
-include("../../src/LumpedHydro.jl")
+using HydroErrors
+include("../../src/HydroModels.jl")
 
 #* parameters in the GR4J model
 @parameters x1 = 0.0 [description = "maximum soil moisture storage", unit = "mm"]
@@ -36,11 +37,11 @@ include("../../src/LumpedHydro.jl")
 @variables exch = 0.0 [description = "catchment groundwater exchange", unit = "mm/d"]
 @variables routedflow = 0.0 [description = "routed flow in the routing store", unit = "mm/d"]
 @variables flow = 0.0 [description = "routed flow in the routing store", unit = "mm/d"]
-SimpleFlux = LumpedHydro.SimpleFlux
-LagFlux = LumpedHydro.LagFlux
-StateFlux = LumpedHydro.StateFlux
-HydroElement = LumpedHydro.HydroElement
-HydroUnit = LumpedHydro.HydroUnit
+SimpleFlux = HydroModels.SimpleFlux
+UnitHydroRouteFlux = HydroModels.UnitHydroRouteFlux
+StateFlux = HydroModels.StateFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
 
 #* define the production store
 prod_funcs = [
@@ -60,11 +61,11 @@ prod_funcs = [
         exprs=[soilwater + ps - es - perc])
 ]
 prod_dfuncs = [StateFlux(soilwater => new_soilwater)]
-prod_lfuncs = [
-    LagFlux(slowflow => slowflow_routed, x4, LumpedHydro.uh_1_half),
-    LagFlux(fastflow => fastflow_routed, x4, LumpedHydro.uh_2_full)
-]
-prod_ele = HydroElement(:gr4j_prod, funcs=prod_funcs, dfuncs=prod_dfuncs, lfuncs=prod_lfuncs)
+
+uh_flux_1 = UnitHydroRouteFlux(slowflow, x4, HydroModels.uh_1_half)
+uh_flux_2 = UnitHydroRouteFlux(fastflow, x4, HydroModels.uh_2_full)
+
+prod_ele = HydroBucket(:gr4j_prod, funcs=prod_funcs, dfuncs=prod_dfuncs)
 #* define the routing store
 rst_funcs = [
     SimpleFlux([routingstore] => [exch], [x2, x3],
@@ -77,9 +78,9 @@ rst_funcs = [
         exprs=[routingstore + slowflow_routed + exch - routedflow])
 ]
 rst_dfuncs = [StateFlux(routingstore => new_routingstore)]
-rst_ele = HydroElement(:gr4j_rst, funcs=rst_funcs, dfuncs=rst_dfuncs)
+rst_ele = HydroBucket(:gr4j_rst, funcs=rst_funcs, dfuncs=rst_dfuncs)
 #* define the gr4j model
-gr4j_model = HydroUnit(:gr4j, components=[prod_ele, rst_ele])
+gr4j_model = HydroModel(:gr4j, components=[prod_ele, uh_flux_1, uh_flux_2, rst_ele])
 # load data
 df = DataFrame(CSV.File("data/gr4j/sample.csv"));
 for col in names(df)[3:end]
@@ -97,36 +98,37 @@ pas = ComponentVector(
     initstates=(soilwater=235.97, routingstore=45.47)
 )
 timeidx = collect(1:length(prcp_vec))
-solver = LumpedHydro.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
-@benchmark result = gr4j_model(input, pas, timeidx=timeidx, solver=solver); 
+solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
+result = gr4j_model(input, pas, timeidx=timeidx, solver=solver);
+HydroModels.get_output_names(gr4j_model)
+#! set the tunable parameters and constant parameters
+tunable_pas = ComponentVector(params=(x1=320.11, x2=2.42, x3=69.63, x4=1.39))
+const_pas = ComponentVector(initstates=(soilwater=235.97, routingstore=45.47))
+total_pas = ComponentVector(params=(x1=320.11, x2=2.42, x3=69.63, x4=1.39), initstates=(soilwater=235.97, routingstore=45.47))
+#! set the tunable parameters boundary
+tunable_param_lb = [0.0, -10.0, 1.0, 0.5]
+tunable_param_ub = [2000.0, 10.0, 100.0, 15.0]
+#! prepare flow
+output = (flow=qobs_vec,)
+#! model calibration
+best_pas = HydroModels.param_box_optim(
+    gr4j_model,
+    tunable_pas=tunable_pas,
+    const_pas=const_pas,
+    input=[input],
+    target=[output],
+    timeidx=[timeidx],
+    lb=tunable_param_lb,
+    ub=tunable_param_ub,
+    solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+    maxiters=100,
+    loss_func=HydroErr.mse,
+    solver=solver
+)
+#! use the optimized parameters for model simulation
+result_opt = gr4j_model(input, HydroModels.update_ca(total_pas, ComponentVector(best_pas, getaxes(tunable_pas))), timeidx=timeidx, solver=solver)
 
-# #! set the tunable parameters and constant parameters
-# tunable_pas = ComponentVector(params=(x1=320.11, x2=2.42, x3=69.63, x4=1.39))
-# const_pas = ComponentVector(initstates=(soilwater=235.97, routingstore=45.47))
-# #! set the tunable parameters boundary
-# tunable_param_lb = [0.0, -10.0, 1.0, 0.5]
-# tunable_param_ub = [2000.0, 10.0, 100.0, 15.0]
-# #! prepare flow
-# output = (flow=qobs_vec,)
-# #! model calibration
-# best_pas = LumpedHydro.param_box_optim(
-#     gr4j_model,
-#     tunable_pas=tunable_pas,
-#     const_pas=const_pas,
-#     input=input,
-#     target=output,
-#     timeidx=timeidx,
-#     lb=tunable_param_lb,
-#     ub=tunable_param_ub,
-#     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
-#     maxiters=100,
-#     loss_func=LumpedHydro.mse,
-#     solver=solver
-# )
-# #! use the optimized parameters for model simulation
-# result_opt = gr4j_model(input, ComponentVector(best_pas; const_pas...), timeidx=timeidx, solver=solver)
 
-
-# 1 - LumpedHydro.nse(result_opt.flow, df[!, "qobs"])
-# 1 - LumpedHydro.nse(result.flow, df[!, "qobs"])
+HydroErr.mse(result_opt.flow, df[!, "qobs"])
+HydroErr.mse(result.flow, df[!, "qobs"])
 

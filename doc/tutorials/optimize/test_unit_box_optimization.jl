@@ -5,7 +5,7 @@ using ComponentArrays
 using OptimizationBBO
 using BenchmarkTools
 using NamedTupleTools
-using HydroErr
+using HydroErrors
 # using HydroModels
 
 include("../../../src/HydroModels.jl")
@@ -24,7 +24,7 @@ ts = collect(1:10000)
 tunable_param_lb = ComponentVector(lb_list, getaxes(tunable_pas))
 tunable_param_ub = ComponentVector(ub_list, getaxes(tunable_pas))
 
-model = HydroModels.ExpHydro.Unit(name=:exphydro)
+model = HydroModels.ExpHydro.Model(name=:exphydro)
 
 # load data
 file_path = "data/exphydro/01013500.csv"
