@@ -312,7 +312,7 @@ struct NeuralFlux <: AbstractNeuralFlux
     "A map of neural network names (Symbol) and its variables (Num)"
     nnparam::Symbolics.Arr
     "flux expressions to descripe the formula of the output variable"
-    exprs::Vector{Num}
+    expr::Symbolics.Arr{Num, 1}
     "flux expressions to descripe the formula of the output variable"
     func::Function
     "neural network  information: keys contains: input, output, param"
@@ -363,7 +363,7 @@ struct NeuralFlux <: AbstractNeuralFlux
             input_vars,
             output_vars,
             chain_params,
-            [flux_expr],
+            flux_expr,
             nn_func,
             infos,
             (input=nn_input, output=nn_output, paramlen=length(init_params)),

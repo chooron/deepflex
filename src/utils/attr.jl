@@ -17,6 +17,7 @@ get_all_vars(flux::AbstractFlux) = reduce(union, [get_input_vars(flux), get_outp
 
 get_exprs(flux::AbstractFlux) = flux.exprs
 get_exprs(flux::AbstractStateFlux) = [flux.expr]
+get_exprs(flux::AbstractNeuralFlux) = [flux.expr]
 
 #* used for getting element attr
 get_ode_func(::AbstractElement) = nothing

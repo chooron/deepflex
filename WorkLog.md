@@ -67,7 +67,7 @@
 前面有杂事耽搁了，最近可以重新优化这个框架啦，计划改造项目如下：
 
 - [X] 我想让Flux的构建方式能够更有可读性，就是输入输出变量用键值对来连接
-- [ ] 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善
+- ~~ 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善~~
 - [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
 - [ ] ~~记得本来采用StructArray，能够有效的避免反复计算带来的问题~~
 - [ ] 自定义base.show
@@ -75,20 +75,20 @@
 - [X] optimize需要提供多组数据训练的功能
 - [ ] 当前optimization只针对于参数率定功能，后续可能会考虑
 - [ ] 提供实时更新、添加、删除以及提示信息（包括当前element的输入输出）
-- [ ] 当前lagflux仅起到了信息记录作用，或可以删除
-- [ ] neuralflux的参数或需要与其他参数独立出来，在分布式计算中不能对每个单元格都分配一个神经网络参数，故一般是一个统一的神经网络，所以参数类型为（ps=..., st=...., nn=...,）
-- [ ] 模型输入的pas，三个主要键名：ps，st，nn
+- [X] 当前lagflux仅起到了信息记录作用，或可以删除=>改成routeflux可以用于各种汇流计算
+- [X] neuralflux的参数或需要与其他参数独立出来，在分布式计算中不能对每个单元格都分配一个神经网络参数，故一般是一个统一的神经网络，所以参数类型为（ps=..., st=...., nn=...,）
+- [ ] ~~模型输入的pas，三个主要键名：ps，st，nn~~
 - [ ] 参数输入校验工作
 - [ ] Route 类型的构建
 
   - [X] 马斯京跟
   - [X] 单位线
-  - [ ] hydrodischarge
+  - [X] hydrodischarge
 - [ ] 使用macro构建simpleflux， @simpleflux var => expr, @lagflux var=> (flux, unithydro, lagtime), @stateflux var => expr, @neuralflux var => (input, nn) ，参考代码(temp/mtk_marco.jl)：
-- [ ] 当前DataInterpolations.jl在v5.0.0版本才兼容，其他版本存在问题
+- [X] 当前DataInterpolations.jl在v5.0.0版本才兼容，其他版本存在问题
 - [ ] DiscreteProblem似乎无法通过梯度优化
 - [X] 构建了flux的计算匿名函数与state一致，**这时候就需要额外构建针对lag flux的element了**
-- [ ] 中间计算转为matrix合并的方式存储信息,效率显著提高
+- [X] 中间计算转为matrix合并的方式存储信息,效率显著提高
 
 # 关键功能和实现技术
 

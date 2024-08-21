@@ -34,6 +34,7 @@ using SciMLSensitivity
 
 # deep learning
 using Lux
+using NNlib
 using Zygote
 
 # parameters Optimization

@@ -23,13 +23,14 @@ function Base.show(io::IO, flux::AbstractStateFlux)
 end
 
 function Base.show(io::IO, flux::AbstractNeuralFlux)
-    compact = get(io, :compact, false)
-    # todo 创建用于展示nn flux的函数
-    if compact
-        println(io, first(collect(flux.output_info)) ~ flux.state_expr)
-    else
-        println(io, first(collect(flux.output_info)) ~ flux.state_expr)
-    end
+    # compact = get(io, :compact, false)
+    # # todo 创建用于展示nn flux的函数
+    # if compact
+    #     println(io, first(collect(flux.output_info)) ~ flux.state_expr)
+    # else
+    #     println(io, first(collect(flux.output_info)) ~ flux.state_expr)
+    # end
+    flux
 end
 
 function Base.show(io::IO, ele::AbstractBucket)
