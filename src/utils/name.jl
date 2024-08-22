@@ -17,10 +17,11 @@ get_param_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_param_names.(
 get_param_names(ele::AbstractBucket) = ele.infos[:param]
 
 get_nn_names(::AbstractFlux) = Symbol[]
-get_nn_names(func::AbstractNeuralFlux) = func.infos[:param]
+get_nn_names(func::AbstractNeuralFlux) = func.infos[:nn]
 get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs))
 get_nn_names(ele::AbstractBucket) = ele.infos[:nn]
 
+get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
@@ -36,7 +37,7 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     input_names, output_names, state_names
 end
 #* elements name utils
-get_var_names(ele::AbstractBucket) = reduce(vcat, collect(ele.infos[[:input, :output, :state]]))
+get_var_names(ele::AbstractBucket) = ele.infos[:input], ele.infos[:output], ele.infos[:state]
 
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()

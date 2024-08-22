@@ -1,14 +1,3 @@
-@inline (flux::AbstractFlux)(input::AbstractVector, params::AbstractVector; kwargs...) = flux.func(input, params)
-function (flux::AbstractFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
-    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    if length(flux.infos[:nn]) > 0
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
-    else
-        nn_params_vec = nothing
-    end
-    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), Ref(nn_params_vec)))
-end
-
 """
 $(TYPEDEF)
 A struct representing common hydrological fluxes
@@ -126,6 +115,16 @@ struct SimpleFlux <: AbstractSimpleFlux
             infos
         )
     end
+end
+
+#* callable functions
+function (flux::AbstractSimpleFlux)(input::AbstractVector, pas::ComponentVector; kwargs...)
+    flux.func(input, collect([pas[:params][nm] for nm in flux.infos[:param]]), nothing)
+end
+
+function (flux::AbstractSimpleFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
+    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), Ref(nothing)))
 end
 
 struct StateFlux <: AbstractStateFlux
@@ -254,20 +253,16 @@ struct RouteFlux <: AbstractRouteFlux
     end
 end
 
-(::AbstractRouteFlux)(::AbstractVector, ::AbstractVector) = @error "Abstract RouteFlux is not support for single timepoint"
+(::AbstractRouteFlux)(::AbstractVector, ::ComponentVector) = @error "Abstract RouteFlux is not support for single timepoint"
 
-function (route::AbstractRouteFlux)(
-    input::AbstractMatrix,
-    pas::ComponentVector;
-    kwargs...
-)
+function (route::AbstractRouteFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     #* Extract the initial state of the parameters and routement in the pas variable
     sol_arrs = route.func.(eachslice(input, dims=1), Ref(pas[:params]))
     reduce(hcat, sol_arrs)'
 end
 
 function run_multi_fluxes(
-    route::AbstractRoute;
+    route::AbstractRouteFlux;
     input::AbstractArray,
     params::ComponentVector,
     timeidx::AbstractVector,
@@ -312,7 +307,7 @@ struct NeuralFlux <: AbstractNeuralFlux
     "A map of neural network names (Symbol) and its variables (Num)"
     nnparam::Symbolics.Arr
     "flux expressions to descripe the formula of the output variable"
-    expr::Symbolics.Arr{Num, 1}
+    expr::Symbolics.Arr{Num,1}
     "flux expressions to descripe the formula of the output variable"
     func::Function
     "neural network  information: keys contains: input, output, param"
@@ -358,7 +353,7 @@ struct NeuralFlux <: AbstractNeuralFlux
         nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
 
         #* neuralflux infos
-        infos = (input=input_names, output=output_names, param=[chain_name])
+        infos = (input=input_names, output=output_names, param=Symbol[], nn=[chain_name])
         new(
             input_vars,
             output_vars,
@@ -381,4 +376,14 @@ struct NeuralFlux <: AbstractNeuralFlux
 
         return NeuralFlux(input_vars => output_vars, chain)
     end
+end
+
+function (flux::AbstractNeuralFlux)(input::AbstractVector, pas::ComponentVector; kwargs...)
+    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
+    flux.func(input, nn_params_vec)
+end
+
+function (flux::AbstractNeuralFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
+    flux.func(input', nn_params_vec)
 end

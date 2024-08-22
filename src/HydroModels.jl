@@ -68,7 +68,6 @@ abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
 
-
 # utils
 include("utils/attr.jl")
 include("utils/ca.jl")
@@ -85,9 +84,6 @@ export SimpleFlux, StateFlux, NeuralFlux
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
 
-include("route.jl")
-export UnitHydroRoute, MuskingumRoute
-
 include("model.jl")
 export HydroModel #, update_unit!, add_elements!, remove_elements!
 
@@ -98,13 +94,13 @@ include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
 
 # some route function and special flux
-include("others/unithydro.jl")
+include("fluxes/unithydro.jl")
 export UnitHydroRouteFlux
-include("others/cascade.jl")
+include("fluxes/cascade.jl")
 export CascadeRouteFlux
-include("others/muskingum.jl")
+include("fluxes/muskingum.jl")
 export MuskingumRouteFlux
-include("others/normalize.jl")
+include("fluxes/normalize.jl")
 export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
 
 # Implements Models

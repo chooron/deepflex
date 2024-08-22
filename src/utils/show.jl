@@ -1,24 +1,24 @@
 function Base.show(io::IO, flux::AbstractSimpleFlux)
     compact = get(io, :compact, false)
-
-    if compact
-        for (flux_expr, output) in zip(flux.flux_exprs, collect(flux.output_info))
-            println(io, output ~ flux_expr)
-        end
-    else
-        for (flux_expr, output) in zip(flux.flux_exprs, collect(flux.output_info))
-            println(io, output ~ flux_expr)
-        end
-    end
+    println(io, flux.infos)
+    # if compact
+    #     for (flux_expr, output) in zip(flux.exprs, collect(flux.output_info))
+    #         println(io, output ~ flux_expr)
+    #     end
+    # else
+    #     for (flux_expr, output) in zip(flux.exprs, collect(flux.output_info))
+    #         println(io, output ~ flux_expr)
+    #     end
+    # end
 end
 
 function Base.show(io::IO, flux::AbstractStateFlux)
     compact = get(io, :compact, false)
 
     if compact
-        println(io, first(collect(flux.output_info)) ~ flux.state_expr)
+        println(io, first(collect(flux.output_info)) ~ flux.expr)
     else
-        println(io, first(collect(flux.output_info)) ~ flux.state_expr)
+        println(io, first(collect(flux.output_info)) ~ flux.expr)
     end
 end
 

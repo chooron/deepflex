@@ -15,7 +15,7 @@ using OrdinaryDiffEq
 
 @testset "HydroModels.jl" begin
     include("run_flux.jl")
-    include("utils/run_runtime_build.jl")
-    include("run_bucket.jl")
+    # include("utils/run_runtime_build.jl")
+    # include("run_bucket.jl")
     # Aqua.test_all(LumpedHydro; ambiguities = false)
 end

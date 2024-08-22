@@ -13,10 +13,22 @@ $(FIELDS)
 end
 
 function (solver::ODESolver)(
-    ode_prob::ODEProblem
+    ode_func!::Function,
+    pas::ComponentVector,
+    initstates::AbstractArray,
+    timeidx::AbstractVector
 )
+    #* build problem
+    # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
+    prob = ODEProblem(
+        ode_func!,
+        initstates,
+        (timeidx[1], timeidx[end]),
+        pas
+    )
+    #* solve problem
     sol = solve(
-        ode_prob,
+        prob,
         solver.alg,
         saveat=solver.saveat,
         reltol=solver.reltol,
@@ -39,30 +51,63 @@ $(FIELDS)
 """
 @kwdef struct DiscreteSolver <: AbstractSolver
     alg = FunctionMap()
-    reltol = 1e-3
-    abstol = 1e-3
-    sensealg = GaussAdjoint()
+    sensealg = InterpolatingAdjoint()
 end
 
 function (solver::DiscreteSolver)(
-    disc_prob::DiscreteProblem,
+    ode_func!::Function,
+    pas::ComponentVector,
+    initstates::AbstractArray,
+    timeidx::AbstractVector
 )
-    sol = solve(
-        disc_prob,
-        solver.alg,
-        reltol=solver.reltol,
-        abstol=solver.abstol,
-        # sensealg=solver.sensealg
+    #* build problem
+    # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
+    prob = DiscreteProblem(
+        ode_func!,
+        initstates,
+        (timeidx[1], timeidx[end]),
+        pas
     )
-    num_u = length(disc_prob.u0)
+    #* solve problem
+    sol = solve(
+        prob,
+        solver.alg,
+    )
+    sol_arr = Array(sol)
     if SciMLBase.successful_retcode(sol)
-        return [sol[i, :] for i in 1:num_u]
+        return sol_arr
     else
-        println("solve fail")
-        return [zeros(length(timeidx)) for _ in 1:num_u]
+        return false
     end
 end
 
 @kwdef struct ManualSolver <: AbstractSolver
     # todo impletement the manual solver for state at each step
+end
+
+function (solver::ManualSolver)(
+    ode_func!::Function,
+    pas::ComponentVector,
+    initstates::AbstractArray,
+    timeidx::AbstractVector
+)
+    #* build problem
+    # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
+    prob = DiscreteProblem(
+        ode_func!,
+        initstates,
+        (timeidx[1], timeidx[end]),
+        pas
+    )
+    #* solve problem
+    sol = solve(
+        prob,
+        solver.alg,
+    )
+    sol_arr = Array(sol)
+    if SciMLBase.successful_retcode(sol)
+        return sol_arr
+    else
+        return false
+    end
 end

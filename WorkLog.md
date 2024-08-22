@@ -1,7 +1,5 @@
 # Coding Log
 
-# 当前问题
-
 - [X] 模型构建中需要调整fluxes的输入变量名称和输出变量名称
 - [X] fluxes的function返回值过于固定，不够灵活
 - [X] LAG Element无法参与整体ode的计算(可以参与计算但是兼容性很差,lagflux需要中间状态的缓冲计算)
@@ -17,9 +15,6 @@
 - [X] **由于component的参数存在多重嵌套，在参数优化的定义中存在问题**
 - [X] 当前需要找出ODEProblem在用ForwardDifferetial求解时存在的问题，需要构建一个demo来重现这个问题，猜测这个问题应该是可调参数与不可调参数引起的问题
 - [X] 需要将水文的三种模型进行拆分，LumpedHydro.jl, SpatialHydro.jl, ~~GridedHydro.jl~~
-
-# 工作计划
-
 - [X] routing function编写
 - [X] 创建模型搭建基础类
 - [X] 针对之前的模型进行ComponentArrays改造
@@ -29,7 +24,7 @@
 - [ ] web端口构造
 - [X] 在julia 1.10上完成部署
 - [ ] ~~StaticArrays或能够将性能进一步提升~~
-- [ ] routing function的weight使用GuadGK.jl求解
+- ~~ routing function的weight使用GuadGK.jl求解~~
 - [X] 针对之前的模型进行ModelingToolkit改造
 - [X] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
@@ -50,22 +45,15 @@
 - [ ] HBV计算结果有问题
 - [X] M50无法实现在mtk下计算，以及step=false下计算
 - [X] 将输入数据修改为StructArray类型
-
-* [ ] **~~根据macro提供一个自动生成模型计算的函数~~**
-
+- [ ] **~~根据macro提供一个自动生成模型计算的函数~~**
 - [X] 根据计算网络结构迭代计算模型
 - [X] LumpedHydro.jl中不考虑Node这个结构了，这个结构直接移至到SpatialHydro.jl
 - [X] stateflux生成临时函数时存在问题
 - [ ] sort_elements_by_topograph函数异常，或考虑不使用自动判断element计算顺序
 - [X] 新增dPL-HBV, ENN, ~~PRNN~~
-- [X] **NeuralFlux嵌入到dfunc无法生成耦合函数**
+- [X] **~~NeuralFlux嵌入到dfunc无法生成耦合函数~~**
   - 当前输入变量只能是@varaibles (v(t))[1:4]这种类型，但这种类型或无法实现变量的替换
   - 考虑的方法是将nnflux前所有flux套入至nnflux中，但这种方式不行，因为nnflux前面可能还有nnflux
-
-# 暑假工作计划
-
-前面有杂事耽搁了，最近可以重新优化这个框架啦，计划改造项目如下：
-
 - [X] 我想让Flux的构建方式能够更有可读性，就是输入输出变量用键值对来连接
 - ~~ 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善~~
 - [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
@@ -80,7 +68,6 @@
 - [ ] ~~模型输入的pas，三个主要键名：ps，st，nn~~
 - [ ] 参数输入校验工作
 - [ ] Route 类型的构建
-
   - [X] 马斯京跟
   - [X] 单位线
   - [X] hydrodischarge
@@ -90,7 +77,7 @@
 - [X] 构建了flux的计算匿名函数与state一致，**这时候就需要额外构建针对lag flux的element了**
 - [X] 中间计算转为matrix合并的方式存储信息,效率显著提高
 
-# 关键功能和实现技术
+## 关键功能和实现技术
 
 * [X] 基于julia多重分派的名称驱动代码风格，根据名称调用对应的flux
   * [X] 该项目是以命名驱动为核心，但是在一些情况中创建一些并没有实际含义的变量
@@ -101,16 +88,3 @@
   * [X] 参数优化
 * [ ] 参数动态模拟估计，Time-vary parameter estimation
 * [X] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
-
-# 一些结论
-
-* namedtuple类型合并相比componentArray要更加高效，而componentArray在兼容mtk时会更佳，在存储flux时采用namedtuple类型，而存储params采用componentVector类型，现在已经改为matrix加index的存储
-
-# 优化模型的问题
-
-**AutoZygote**
-
-- No MTK (Solved):
-  **ERROR: MethodError: no method matching length(::ChainRulesCore.ZeroTangent)**
-- MTK:
-  **ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.**

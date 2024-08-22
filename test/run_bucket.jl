@@ -43,12 +43,6 @@ dtype = eltype(input[1]);
         @test melt0 == result.melt[1]
     end
 
-
-    # # todo
-    # @testset "test modify element" begin
-
-    # end
-
     @testset "test ode solved results" begin
         prcp_itp = LinearInterpolation(input_ntp.prcp, ts)
         temp_itp = LinearInterpolation(input_ntp.temp, ts)
@@ -71,7 +65,7 @@ dtype = eltype(input[1]);
 
     @testset "test all of the output" begin
         snowpack_vec = HydroModels.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
-        pet_vec = reduce(hcat, snow_funcs[1].(eachslice(reduce(hcat, [input_ntp.temp, input_ntp.lday]), dims=1), Ref(dtype[])))[1,:]
+        pet_vec = reduce(hcat, snow_funcs[1].(eachslice(reduce(hcat, [input_ntp.temp, input_ntp.lday]), dims=1), Ref(dtype[])))[1, :]
         snow_funcs_2_output = reduce(hcat, snow_funcs[2].(eachslice(reduce(hcat, [input_ntp.prcp, input_ntp.temp]), dims=1), Ref([params.Tmin])))
         snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]
         melt_vec = reduce(hcat, snow_funcs[3].(eachslice(reduce(hcat, [snowpack_vec, input_ntp.temp]), dims=1), Ref([params.Tmax, params.Df])))[1, :]
@@ -81,6 +75,22 @@ dtype = eltype(input[1]);
         @test reduce(vcat, melt_vec) == collect(result.melt)
     end
 
-    # #todo
-    # @testset "test build bucket function" begin end
+    @testset "test build state function" begin
+        @variables routingstore exch slowflow_routed routedflow
+        @parameters x2, x3
+        funcs = [
+            SimpleFlux([routingstore] => [exch], [x2, x3],
+                exprs=[x2 * abs(routingstore / x3)^3.5]),
+            SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
+                exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
+        ]
+        dfunc = HydroModels.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
+        infos = (input=[:slowflow_routed], state=[:routingstore])
+        flux_func, state_func = HydroModels.build_ele_func(funcs, [dfunc], infos)
+        rgt, slg = 10.0, 20.0
+        exch = 2.42 * abs(rgt / 69.63)^3.5
+        routedflow = 69.63^(-4) / 4 * (rgt + slg + exch)^5
+        @test flux_func([slg, rgt], [2.42, 69.63], []) ≈ [exch, routedflow]
+        @test state_func([slg], [rgt], [2.42, 69.63], []) ≈ [exch + slg - 69.63^(-4) / 4 * (rgt + slg + exch)^5]
+    end
 end

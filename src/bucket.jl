@@ -9,8 +9,6 @@ $(FIELDS)
 ```
 """
 struct HydroBucket <: AbstractBucket
-    "bucket information: keys contains: input, output, param, state"
-    infos::NamedTuple
     """
     Hydrological flux functions
     """
@@ -19,6 +17,8 @@ struct HydroBucket <: AbstractBucket
     Hydrological ode functions
     """
     ode_func::Union{Nothing,Function}
+    "bucket information: keys contains: input, output, param, state"
+    infos::NamedTuple
 
     function HydroBucket(
         name::Symbol;
@@ -37,9 +37,9 @@ struct HydroBucket <: AbstractBucket
         flux_func, ode_func = build_ele_func(funcs, dfuncs, infos)
 
         return new(
-            infos,
             flux_func,
             ode_func,
+            infos,
         )
     end
 end
@@ -50,7 +50,6 @@ function (ele::HydroBucket)(
     timeidx::Vector,
     solver::AbstractSolver=ODESolver(),
 )
-    # todo 输入的pas检验是否满足要求
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -113,44 +112,26 @@ function solve_single_prob(
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
     params_idx = [getaxes(params)[1][nm].idx for nm in ele.infos[:param]]
-    # #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
+    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
     ode_param_func = (p) -> [p[:params][idx] for idx in params_idx]
 
     if length(ele.infos[:nn]) > 0
-        nn_params = pas[:nn]
-        nn_params_idx = [getaxes(nn_params)[1][nm].idx for nm in ele.infos[:nn]]
+        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
         ode_nn_param_func = (_) -> nothing
     end
 
     #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
-    function singel_ele_ode_func!(du, u, p, t)
+    function single_ele_ode_func!(du, u, p, t)
         ode_input = ode_input_func(t)
         ode_params = ode_param_func(p)
         nn_params = ode_nn_param_func(p)
         du[:] = ele.ode_func(ode_input, u, ode_params, nn_params)
     end
 
-    if typeof(solver) == ODESolver
-        #* Construct ODEProblem based on DifferentialEquations.jl from this temporary function `singel_ele_ode_func!`
-        prob = ODEProblem(
-            singel_ele_ode_func!,
-            collect(init_states[ele.infos[:state]]),
-            (timeidx[1], timeidx[end]),
-            pas
-        )
-    elseif typeof(solver) == DiscreteSolver
-        #* Construct ODEProblem based on DifferentialEquations.jl from this temporary function `singel_ele_ode_func!`
-        prob = DiscreteProblem(
-            singel_ele_ode_func!,
-            collect(init_states[ele.infos[:state]]),
-            (timeidx[1], timeidx[end]),
-            pas
-        )
-    end
     #* Solve the problem using the solver wrapper
-    sol = solver(prob)
+    sol = solver(single_ele_ode_func!, pas, collect(init_states[ele.infos[:state]]), timeidx)
     sol
 end
 
@@ -233,15 +214,8 @@ function solve_multi_prob(
         du[:] = tmp_output
     end
 
-    #* Construct ODEProblem based on DifferentialEquations.jl from this temporary function `single_ele_ode_func!`
-    prob = ODEProblem(
-        multi_ele_ode_func!,
-        init_states_matrix,
-        (timeidx[1], timeidx[end]),
-        pas
-    )
-
     #* Solve the problem using the solver wrapper
-    solver(prob)
+    sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
+    sol
 end
 
