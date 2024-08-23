@@ -1,3 +1,13 @@
+
+
+"""
+32 64 128
+16     1
+8  4   2
+"""
+d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
+d8_nn_pads = [(1, 1, 2, 0), (1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
+
 """
 $(SIGNATURES)
 
@@ -50,7 +60,8 @@ Construct a calculation graph based on all hydrological components in the hydrol
 function sort_components(components::AbstractVector{<:AbstractComponent})
     input_names, output_names, state_names = get_var_names(components)
     components_ntp = reduce(merge, map(components) do component
-        tmp_input_names,tmp_output_names, tmp_state_names = get_var_names(component)
+        tmp_input_names, tmp_output_names, tmp_state_names = get_var_names(component)
+        println((tmp_input_names, tmp_output_names, tmp_state_names))
         tmp_output_state_names = vcat(tmp_output_names, tmp_state_names)
         NamedTuple{Tuple(tmp_output_state_names)}(repeat([component], length(tmp_output_state_names)))
     end)
@@ -76,20 +87,9 @@ function sort_components(components::AbstractVector{<:AbstractComponent})
             end
         end
     end
-    reverse(sorted_components)
+    sorted_components
 end
 
-
-d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
-# d8_pads_args1 = [(1, 2), (2, 2), (2, 1), (2, 0), (1, 0), (0, 0), (0, 1), (0, 2)]
-# d8_pads_args2 = [(1, 0), (0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0)]
-d8_nn_pads = [(1, 1, 2, 0), (1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
-
-"""
-32 64 128
-16     1
-8  4   2
-"""
 #! nodeinfo: node_id => row_idx, col_idx
 function cal_grid_sort(nodeinfo::NamedTuple, flwacc::AbstractMatrix)
     #* 先转换为vec类型
