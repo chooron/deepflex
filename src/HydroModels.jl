@@ -63,10 +63,17 @@ abstract type AbstractRoute <: AbstractElement end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractModel <: AbstractComponent end
 
+#* Flux的多种变体
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
+abstract type AbstractContRouteFlux <: AbstractFlux end
+abstract type AbstractDiscRouteFlux <: AbstractFlux end
+
+#* route的多种变体
+abstract type AbstractGridRoute <: AbstractRoute end
+abstract type AbstractVectorRoute <: AbstractRoute end
 
 # utils
 include("utils/attr.jl")

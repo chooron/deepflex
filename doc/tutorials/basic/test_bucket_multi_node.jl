@@ -21,7 +21,6 @@ init_states = ComponentVector(snowpack=0.0, soilwater=1303.004248)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
 
-node_pas = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([pas], length(node_names))))
 node_params = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([params], length(node_names))))
 node_initstates = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([init_states], length(node_names))))
 node_pas = ComponentVector(params=node_params, initstates=node_initstates)
