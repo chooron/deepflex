@@ -68,32 +68,21 @@ function (route::GridRoute)(
     # todo 先假设就只有一个输入
     itp_func = itp_funcs[1]
 
-    #* 将node的参数转换为arr
-    lateral_pas = pas[:lateral]
-    river0 = [lateral_pas[ndtype][:river0] for ndtype in ndtypes]
+    cal_flux_q_out!, cal_flux_q_out = rfunc.qout_func(; ndtypes)
+    flux_initstates = rfunc.get_initstates(; pas[:initstates], ndtypes)
 
-    #* 首先是获取
-    function river_route!(du, u, p, t)
-        s_river, q_in = u[:, 1], u[:, 2]
-        lag_params = [lateral_pas[ndtype][:lag] for ndtype in ndtypes]
-        q_rf = @.((s_river + q_in) / (lag_params + 1))
-        q_out = q_rf .+ itp_func(t) .* unit_convert
+    function grid_route!(du, u, p, t)
+        q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], itp_func(t), p)
         new_q_in = grid_routing(q_out, route.positions, route.flwdir)
-        du[:, 1] = q_in .- q_rf
-        du[:, 2] = new_q_in .- q_in
+        du[:q_in][:] = new_q_in .- q_in
     end
 
-    #* var num * node num
-    vars0 = input[:, :, 1]
-    #* 求解出S_river和q_in的状态
-    u0 = cat(river0, vars0, dims=2)
-    prob = ODEProblem(river_route!, u0, (timeidx[1], timeidx[end]), lateral_pas)
-    sol = solver(prob)
+    init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
+    prob = ODEProblem(grid_route!, init_states, (1, size(input_mat)[1]), pas[:params])
+    sol = solve(prob, Tsit5())
 
-    #* 根据状态求解结果得到
-    river_state, q_in = sol[:, 1, :], sol[:, 2, :]
-    q_rf = (river_state .+ q_in) ./ (lag_arr .+ 1.0)
-    q_out = q_rf .+ input[1, :, :] .* unit_convert
+    flux_states, q_inflows = sol[:, 1, :], sol[:, 2, :]
+    q_out = cal_flux_q_out.(eachslice(flux_states, dims=2), eachslice(q_inflows, dims=2), eachslice(input, dims=2), Ref(p), Ref(true))
 end
 
 struct VectorRoute <: AbstractVectorRoute

@@ -7,6 +7,7 @@ using Dates
 using Reexport
 using StableRNGs
 using Statistics
+using SparseArrays
 using ComponentArrays
 using ComponentArrays: indexmap, getval
 using NamedTupleTools

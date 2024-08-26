@@ -271,7 +271,6 @@ function run_multi_fluxes(
     ptypes = get(kwargs, :ptypes, collect(keys(params)))
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
-    #* var_name * [weight_len * node_num]
     pytype_params = [params[ptype] for ptype in ptypes]
     sols = map(eachindex(ptypes)) do (idx)
         node_sols = reduce(hcat, route.routefunc.(eachslice(input[idx, :, :], dims=1), pytype_params[idx], Ref(timeidx)))

@@ -4,7 +4,6 @@ function solve_mskfunc(input_vec, params)
     c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
     c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
     function msk_prob(u, p, t)
-        println(t)
         q0 = u[1]
         c0, c1, c2 = p
         input1 = input_vec[Int(t)]

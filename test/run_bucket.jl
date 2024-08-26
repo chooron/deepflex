@@ -34,9 +34,9 @@ dtype = eltype(input[1]);
     result = NamedTuple{Tuple(ele_state_and_output_names)}(eachslice(result, dims=1))
     @testset "test first output for hydro element" begin
         snowpack0 = init_states[:snowpack]
-        pet0 = snow_funcs[1]([input_ntp.temp[1], input_ntp.lday[1]], dtype[])[1]
-        snowfall0, rainfall0 = snow_funcs[2]([input_ntp.prcp[1], input_ntp.temp[1]], [params.Tmin])
-        melt0 = snow_funcs[3]([snowpack0, input_ntp.temp[1]], [params.Tmax, params.Df])[1]
+        pet0 = snow_funcs[1]([input_ntp.temp[1], input_ntp.lday[1]], ComponentVector(params=ComponentVector()))[1]
+        snowfall0, rainfall0 = snow_funcs[2]([input_ntp.prcp[1], input_ntp.temp[1]], ComponentVector(params=(Tmin=params.Tmin,)))
+        melt0 = snow_funcs[3]([snowpack0, input_ntp.temp[1]], ComponentVector(params=(Tmax=params.Tmax, Df=params.Df)))[1]
         @test snowpack0 == result.snowpack[1]
         @test snowfall0 == result.snowfall[1]
         @test rainfall0 == result.rainfall[1]
@@ -65,10 +65,10 @@ dtype = eltype(input[1]);
 
     @testset "test all of the output" begin
         snowpack_vec = HydroModels.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
-        pet_vec = reduce(hcat, snow_funcs[1].(eachslice(reduce(hcat, [input_ntp.temp, input_ntp.lday]), dims=1), Ref(dtype[])))[1, :]
-        snow_funcs_2_output = reduce(hcat, snow_funcs[2].(eachslice(reduce(hcat, [input_ntp.prcp, input_ntp.temp]), dims=1), Ref([params.Tmin])))
+        pet_vec = snow_funcs[1](reduce(hcat, [input_ntp.temp, input_ntp.lday])', ComponentVector(params=ComponentVector()))[1, :]
+        snow_funcs_2_output = snow_funcs[2](reduce(hcat, [input_ntp.prcp, input_ntp.temp])', ComponentVector(params=(Tmin=params.Tmin,)))
         snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]
-        melt_vec = reduce(hcat, snow_funcs[3].(eachslice(reduce(hcat, [snowpack_vec, input_ntp.temp]), dims=1), Ref([params.Tmax, params.Df])))[1, :]
+        melt_vec = snow_funcs[3](reduce(hcat, [snowpack_vec, input_ntp.temp])', ComponentVector(params=(Tmax=params.Tmax, Df=params.Df)))[1, :]
         @test reduce(vcat, pet_vec) == collect(result.pet)
         @test reduce(vcat, snowfall_vec) == collect(result.snowfall)
         @test reduce(vcat, rainfall_vec) == collect(result.rainfall)

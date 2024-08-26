@@ -24,7 +24,9 @@
 - [ ] web端口构造
 - [X] 在julia 1.10上完成部署
 - [ ] ~~StaticArrays或能够将性能进一步提升~~
+
 - ~~ routing function的weight使用GuadGK.jl求解~~
+
 - [X] 针对之前的模型进行ModelingToolkit改造
 - [X] **完善参数优化模块,包括模型参数优化,神经网络参数优化和混合参数优化**
 - [ ] **提供自定义ODE求解,人为通过离散的方式求解,适应多数论文的计算,需要对比与DiscreteProblem之间的求解速度差距**
@@ -55,7 +57,9 @@
   - 当前输入变量只能是@varaibles (v(t))[1:4]这种类型，但这种类型或无法实现变量的替换
   - 考虑的方法是将nnflux前所有flux套入至nnflux中，但这种方式不行，因为nnflux前面可能还有nnflux
 - [X] 我想让Flux的构建方式能够更有可读性，就是输入输出变量用键值对来连接
+
 - ~~ 我记得当前在mtk框架下仍然难以通过AutoZygote的测试，这一块需要进一步完善~~
+
 - [X] 非mtk框架下由于多次使用namedtuple，模型的计算性能还是不够好
 - [ ] ~~记得本来采用StructArray，能够有效的避免反复计算带来的问题~~
 - [ ] 自定义base.show
@@ -76,6 +80,9 @@
 - [ ] DiscreteProblem似乎无法通过梯度优化
 - [X] 构建了flux的计算匿名函数与state一致，**这时候就需要额外构建针对lag flux的element了**
 - [X] 中间计算转为matrix合并的方式存储信息,效率显著提高
+- [ ] 值得注意的是route flux可以分为两种，第一种类似于单位线这种，是在所有数据输入后才能计算出最终结果，第二种可以在一个时段后就可以得到汇流结果，比如马斯京根和cascade
+- [X] 发现route这个过程可以理解成q_out转换为new_q_in的一个过程，不同就在于这个转换过程的不同
+- [ ] 完成了routeflux的核心构建，实现route模块与routeflux模块的拆分
 
 ## 关键功能和实现技术
 

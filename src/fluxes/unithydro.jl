@@ -35,7 +35,11 @@ function UnitHydroRouteFlux(
     uh_func::Function
 )
     param_name = Symbolics.tosymbol(param)
-    function solve_uhfunc(input_vec, params)
+
+    """
+    * 一种是用构建Discrete problem的方式求解
+    """
+    function solve_uhfuncv1(input_vec, params)
         #* 首先将lagflux转换为discrete problem
         function lag_prob(u, p, t)
             u = circshift(u, -1)
@@ -50,10 +54,20 @@ function UnitHydroRouteFlux(
         Array(sol)[1, :]
     end
 
+    """
+    * 一种是用构建稀疏矩阵的方式求和
+    """
+    function solve_uhfuncv2(input_vec, params)
+        uh_weight = uh_func(params[param_name])
+        uh_result = [-(i - 1) => uh_wi .* input_vec for (i, uh_wi) in enumerate(uh_weight)]
+        uh_sparse_matrix = spdiagm(uh_result...)
+        sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
+    end
+
     return RouteFlux(
         [input],
         [param],
-        solve_uhfunc,
+        solve_uhfuncv2,
         :unit_hydrograph
     )
 end
