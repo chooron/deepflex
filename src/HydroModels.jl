@@ -69,6 +69,7 @@ abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
+# todo we will check if it need subdivide
 abstract type AbstractContRouteFlux <: AbstractFlux end
 abstract type AbstractDiscRouteFlux <: AbstractFlux end
 
@@ -87,10 +88,13 @@ include("utils/runtime_build.jl")
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux
+export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, UnitHydroFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
+
+include("route.jl")
+export GridRoute, VectorRoute
 
 include("model.jl")
 export HydroModel #, update_unit!, add_elements!, remove_elements!
@@ -101,11 +105,14 @@ export param_grad_optim, param_box_optim, nn_param_optim
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
 
-# some route function and special flux
+# some unit hydro function
 include("fluxes/unithydro.jl")
-export UnitHydroRouteFlux
+
+# some route function and special flux
 include("fluxes/cascade.jl")
 export CascadeRouteFlux
+include("fluxes/discharge.jl")
+export DischargeRouteFlux
 include("fluxes/muskingum.jl")
 export MuskingumRouteFlux
 include("fluxes/normalize.jl")
@@ -122,7 +129,7 @@ include("implements/m50.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute
-export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux
+export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractRouteFlux
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV_EDU

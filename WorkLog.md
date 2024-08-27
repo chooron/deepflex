@@ -83,6 +83,7 @@
 - [ ] 值得注意的是route flux可以分为两种，第一种类似于单位线这种，是在所有数据输入后才能计算出最终结果，第二种可以在一个时段后就可以得到汇流结果，比如马斯京根和cascade
 - [X] 发现route这个过程可以理解成q_out转换为new_q_in的一个过程，不同就在于这个转换过程的不同
 - [ ] 完成了routeflux的核心构建，实现route模块与routeflux模块的拆分
+- [ ] 将routeflux细化成routeflux和unithydroflux两种类型
 
 ## 关键功能和实现技术
 

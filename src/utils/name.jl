@@ -1,25 +1,32 @@
 get_input_names(func::AbstractFlux) = func.infos[:input]
 get_input_names(ele::AbstractBucket) = ele.infos[:input]
+get_input_names(route::AbstractRoute) = route.infos[:input]
 get_input_names(unit::AbstractModel) = unit.infos[:input]
 
 get_output_names(func::AbstractFlux) = func.infos[:output]
 get_output_names(::AbstractStateFlux) = Symbol[]
 get_output_names(ele::AbstractBucket) = ele.infos[:output]
+get_output_names(route::AbstractRoute) = route.infos[:output]
+get_output_names(unit::AbstractModel) = unit.infos[:output]
 
 get_state_names(::AbstractFlux) = Symbol[]
 get_state_names(func::AbstractStateFlux) = [func.infos[:state]]
 get_state_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(funcs))
 get_state_names(ele::AbstractBucket) = ele.infos[:state]
+get_state_names(unit::AbstractModel) = unit.infos[:state]
 
 get_param_names(func::AbstractFlux) = func.infos[:param]
 get_param_names(::AbstractNeuralFlux) = Symbol[]
 get_param_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_param_names.(funcs))
 get_param_names(ele::AbstractBucket) = ele.infos[:param]
+get_param_names(route::AbstractRoute) = route.infos[:param]
+get_param_names(unit::AbstractModel) = unit.infos[:param]
 
 get_nn_names(::AbstractFlux) = Symbol[]
 get_nn_names(func::AbstractNeuralFlux) = func.infos[:nn]
 get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs))
 get_nn_names(ele::AbstractBucket) = ele.infos[:nn]
+get_nn_names(route::AbstractRoute) = route.infos[:nn]
 
 get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
@@ -38,6 +45,7 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
 end
 #* elements name utils
 get_var_names(ele::AbstractBucket) = ele.infos[:input], ele.infos[:output], ele.infos[:state]
+get_var_names(route::AbstractRoute) = route.infos[:input], route.infos[:output], route.infos[:state]
 
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()
@@ -57,6 +65,3 @@ function get_var_names(components::Vector{<:AbstractComponent})
 end
 
 get_var_names(unit::AbstractModel) = unit.infos[:var]
-get_input_names(unit::AbstractModel) = unit.infos[:input]
-get_output_names(unit::AbstractModel) = unit.infos[:output]
-get_state_names(unit::AbstractModel) = unit.infos[:state]

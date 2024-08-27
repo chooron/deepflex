@@ -218,36 +218,37 @@ struct StateFlux <: AbstractStateFlux
     end
 end
 
-struct RouteFlux <: AbstractRouteFlux
+struct RouteFlux{rtype} <: AbstractRouteFlux
     "A map of input names (Symbol) and its variables (Num)"
     inputs::Vector{Num}
     "A map of output names (Symbol) and its variables (Num)"
     outputs::Vector{Num}
     "A map of parameters names (Symbol) and its variables (Num)"
     params::Vector{Num}
-    "flux expressions to descripe the formula of the output variable"
-    func::Function
+    "A map of parameters names (Symbol) and its variables (Num)"
+    states::Vector{Num}
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
     function RouteFlux(
-        inputs::Vector{Num},
+        input::Num,
         params::Vector{Num},
-        routefunc::Function,
+        states::Vector{Num},
         routetype::Symbol,
     )
-        input_names = Symbolics.tosymbol.(inputs, escape=false)
+        input_name = Symbolics.tosymbol(input, escape=false)
         param_names = Symbolics.tosymbol.(params, escape=false)
-        output_names = map(s -> Symbol(s, :_routed), input_names)
-        outputs = [first(@variables $nm) for nm in output_names]
+        state_names = Symbolics.tosymbol.(states, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
         #* Setup the name information of the hydroroutement
-        infos = (input=input_names, output=output_names, param=param_names, rtype=routetype)
+        infos = (input=[input_name], output=[output_name], param=param_names, state=state_names)
 
-        return new(
-            inputs,
-            outputs,
+        return new{routetype}(
+            [input],
+            [output],
             params,
-            routefunc,
+            states,
             infos
         )
     end
@@ -255,11 +256,7 @@ end
 
 (::AbstractRouteFlux)(::AbstractVector, ::ComponentVector) = @error "Abstract RouteFlux is not support for single timepoint"
 
-function (route::AbstractRouteFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...)
-    #* Extract the initial state of the parameters and routement in the pas variable
-    sol_arrs = route.func.(eachslice(input, dims=1), Ref(pas[:params]))
-    reduce(hcat, sol_arrs)'
-end
+(route::AbstractRouteFlux)(input::AbstractMatrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
 
 function run_multi_fluxes(
     route::AbstractRouteFlux;
@@ -283,6 +280,73 @@ function run_multi_fluxes(
         return reshape(sols[1], 1, size(input)[3], size(input)[2])
     end
 end
+
+struct UnitHydroFlux{solvetype} <: AbstractRouteFlux
+    "A map of input names (Symbol) and its variables (Num)"
+    inputs::Vector{Num}
+    "A map of output names (Symbol) and its variables (Num)"
+    outputs::Vector{Num}
+    "A map of parameters names (Symbol) and its variables (Num)"
+    params::Vector{Num}
+    "unit hydrology function"
+    uhfunc::Function
+    "bucket information: keys contains: input, output, param"
+    infos::NamedTuple
+
+    function UnitHydroFlux(
+        input::Num,
+        param::Num,
+        uhfunc::Function;
+        solvetype::Symbol=:unithydro1,
+    )
+        input_name = Symbolics.tosymbol(input, escape=false)
+        param_name = Symbolics.tosymbol(param, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+        #* Setup the name information of the hydroroutement
+        infos = (input=[input_name], output=[output_name], param=[param_name], state=Symbol[])
+
+        return new{solvetype}(
+            [input],
+            [output],
+            [param],
+            uhfunc,
+            infos
+        )
+    end
+end
+
+"""
+* 一种是用构建Discrete problem的方式求解
+"""
+function (flux::UnitHydroFlux{:unithydro1})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+    input_vec = input[1, :]
+    #* 首先将lagflux转换为discrete problem
+    function lag_prob(u, p, t)
+        u = circshift(u, -1)
+        u[end] = 0.0
+        input_vec[Int(t)] .* p[:weight] .+ u
+    end
+
+    uh_weight = flux.uhfunc(pas[:params][flux.infos[:param][1]])
+    prob = DiscreteProblem(lag_prob, input_vec[1] .* uh_weight, (1, length(input_vec)), ComponentVector(weight=uh_weight))
+    #* 求解这个问题
+    sol = solve(prob, FunctionMap())
+    reshape(Array(sol)[1, :], 1, length(input_vec))
+end
+
+"""
+* 一种是用构建稀疏矩阵的方式求和
+"""
+function (flux::UnitHydroFlux{:unithydro2})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+    input_vec = input[1, :]
+    uh_weight = flux.uhfunc(pas[:params][flux.infos[:param][1]])
+    uh_result = [-(i - 1) => uh_wi .* input_vec for (i, uh_wi) in enumerate(uh_weight)]
+    uh_sparse_matrix = spdiagm(uh_result...)
+    sum_route = sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
+    reshape(sum_route, 1, length(input_vec))
+end
+
 
 """
 $(TYPEDEF)

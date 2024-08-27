@@ -1,6 +1,25 @@
 # simplified hydrological discharge model
-function solve_hdm(input_vec, params)
-    input_itp = LinearInterpolation(input_vec, collect(1:length(input_vec)))
+#= 
+Hydrological discharge model: (https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2023WR036170)
+! 这个模型的route flux是在hydro model的简化基础上完成的,但存在一些问题, 当某个节点没有入流时, 该节点的s_river不会继续增加,只会持续减少,直至为0
+=#
+function DischargeRouteFlux(
+    input::Num,
+)
+    @parameters lag
+    @variables s_river
+
+    return RouteFlux(
+        input,
+        [lag],
+        [s_river],
+        :discharge
+    )
+end
+
+function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+    input_len = size(input)[2]
+    input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
 
     function hdm_ode!(du, u, p, t)
         s_river, q_in = u[1], u[2]
@@ -19,19 +38,18 @@ function solve_hdm(input_vec, params)
     s_river_vec = sol.u[:, 1]
     q_in_vec = sol.u[:, 2]
     q_out_vec = (s_river_vec .+ q_in_vec) ./ (lag + 1) .+ input_vec
-    q_out_vec
+    reshape(q_out_vec, 1, input_len)
 end
 
-function get_hdm_initstates(params, ndtypes)
-    [params[ndtype][:s_river] for ndtype in ndtypes]
+function get_rflux_initstates(::RouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+    [pas[:initstates][ndtype][:s_river] for ndtype in ndtypes]
 end
 
-function get_hdm_func(; kwargs...)
-    ndtypes = kwargs[:ndtypes]
+function get_rflux_func(::RouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
     function cal_q_out!(du, s_rivers, q_in, q_gen, p)
         lag_ps = [p[ndtype][:lag] for ndtype in ndtypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))
-        du[:flux_states][:] = q_in .- q_rf
+        du[:flux_states] = q_in .- q_rf
         q_out = q_rf .+ q_gen
         q_out
     end
@@ -44,18 +62,4 @@ function get_hdm_func(; kwargs...)
     end
 
     return cal_q_out!, cal_q_out
-end
-
-function DischargeRouteFlux(
-    inputs::Num,
-)
-    @parameters k [description = "水库的平均滞留时间"]
-    @parameters n [description = "水库的数目"]
-
-    return RouteFlux(
-        [inputs],
-        [k, n],
-        solve_nashuh,
-        :nash_cascade
-    )
 end
