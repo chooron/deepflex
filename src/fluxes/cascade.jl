@@ -4,7 +4,7 @@ function CascadeRouteFlux(
     @parameters k [description = "水库的平均滞留时间"]
     @parameters n [description = "水库的数目"]
 
-    return RouteFlux(
+    return ContRouteFlux(
         input,
         [k, n],
         Num[],
@@ -12,7 +12,7 @@ function CascadeRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::ContRouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     n = Int(pas[:params].n)
     init_states = zeros(n)
     input_len = size(input)[2]
@@ -32,11 +32,11 @@ function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector
     reshape(sol_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::RouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_initstates(::ContRouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
     reduce(vcat, [zeros(eltype(pas), Int(pas[:params][ndtype][:n])) for ndtype in ndtypes])
 end
 
-function get_rflux_func(::RouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_func(::ContRouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
     #* node_num * ts_len
     node_iuh_nums = [pas[:params][ndtype][:n] for ndtype in ndtypes]
     start_idxes = Int[1; cumsum(node_iuh_nums)[1:end-1] .+ 1]

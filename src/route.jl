@@ -1,9 +1,37 @@
+"""
+    GridRoute(name::Symbol; rfunc::AbstractRouteFlux, flwdir::AbstractMatrix, positions::AbstractVector)
+
+Represents a grid-based routing structure for hydrological modeling.
+
+# Arguments
+- `name::Symbol`: A symbol representing the name of the GridRoute instance.
+- `rfunc::AbstractRouteFlux`: The routing function used for flow calculations.
+- `flwdir::AbstractMatrix`: A matrix representing the flow direction for each grid cell.
+- `positions::AbstractVector`: A vector of positions for each node in the grid.
+
+# Fields
+- `rfunc::AbstractRouteFlux`: The routing function used for flow calculations.
+- `flwdir::AbstractMatrix`: A matrix representing the flow direction for each grid cell.
+- `positions::AbstractVector`: A vector of positions for each node in the grid.
+- `infos::NamedTuple`: Contains information about the GridRoute instance, including input, output, state, and parameter names.
+
+# Description
+GridRoute is a structure that represents a grid-based routing system in a hydrological model. 
+It uses a specified routing function (`rfunc`) to calculate flow between grid cells based on 
+the provided flow direction matrix (`flwdir`) and node positions (`positions`).
+
+The `infos` field stores metadata about the GridRoute instance, including names of inputs, 
+outputs, states, parameters, and neural networks (if applicable) derived from the routing function.
+
+This structure is particularly useful for modeling water flow across a landscape represented as a grid, 
+where each cell has a specific flow direction and contributes to downstream flow.
+"""
 struct GridRoute <: AbstractGridRoute
-    "汇流函数"
+    "Routing function"
     rfunc::AbstractRouteFlux
-    "流向矩阵"
+    "Flow direction matrix"
     flwdir::AbstractMatrix
-    "节点位置信息"
+    "Node position information"
     positions::AbstractVector
     "bucket information: keys contains: input, output, param, state"
     infos::NamedTuple
@@ -89,13 +117,40 @@ function (route::GridRoute)(
     return q_out_reshaped
 end
 
+"""
+    VectorRoute <: AbstractVectorRoute
+
+A structure representing a vector-based routing scheme for hydrological modeling.
+
+# Fields
+- `rfunc::AbstractVector{<:AbstractRouteFlux}`: Vector of routing flux functions for each node.
+- `network::DiGraph`: A directed graph representing the routing network topology.
+- `infos::NamedTuple`: Contains information about the VectorRoute instance, including input, output, state, and parameter names.
+
+# Constructor
+    VectorRoute(
+        name::Symbol;
+        rfunc::AbstractRouteFlux,
+        network::DiGraph
+    )
+
+Constructs a `VectorRoute` object with the given name, routing flux function, and network structure.
+
+# Arguments
+- `name::Symbol`: A symbol representing the name of the routing scheme.
+- `rfunc::AbstractRouteFlux`: The routing flux function to be applied at each node.
+- `network::DiGraph`: A directed graph representing the routing network topology.
+
+The constructor extracts variable names, parameter names, and neural network names from the provided
+routing flux function to set up the internal information structure of the `VectorRoute` object.
+"""
 struct VectorRoute <: AbstractVectorRoute
-    "流向矩阵"
-    flwdir::AbstractMatrix
-    "节点位置信息"
-    positions::AbstractVector
-    "汇流函数"
-    rfunc::AbstractVector{<:AbstractRouteFlux}
+    "Routing function"
+    rfunc::AbstractRouteFlux
+    "Routing network"
+    network::DiGraph
+    "Routing information: keys contain: input, output, param, state, nn"
+    infos::NamedTuple
 
     function VectorRoute(
         name::Symbol;
@@ -130,29 +185,33 @@ function (route::VectorRoute)(
 )
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
-    itp_func = LinearInterpolation.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
+    input_mat = input[1, :, :]
+    itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ndtypes)
     flux_initstates = get_rflux_initstates(route.rfunc; pas, ndtypes)
 
     sorted_idxes = topological_sort(route.network)
-    up_idxes = [inneighbors(network.network, cur_idx) for cur_idx in sorted_idx]
+    up_idxes = [inneighbors(route.network, cur_idx) for cur_idx in sorted_idxes]
 
     function vec_route_ode!(du, u, p, t)
         q_in = u[:q_in]
-        q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], itp_func(t), p)
+        q_gen = [itp_func(t) for itp_func in itp_funcs]
+        q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], q_gen, p)
         for (sorted_idx, up_idx) in zip(sorted_idxes, up_idxes)
-            q_out[sorted_idx] .+= sum(q_out[up_idx])
+            q_out[sorted_idx] = sum(q_out[up_idx]) .+ q_out[sorted_idx]
         end
-        du[:q_in][:] = q_out .- q_in
+        du[:q_in] = q_out .- q_in
     end
 
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
-    prob = ODEProblem(grid_route_ode!, init_states, (1, size(input_mat)[1]), pas[:params])
-    sol = solve(prob, Tsit5())
+    prob = DiscreteProblem(vec_route_ode!, init_states, (1, size(input_mat)[2]), pas[:params])
+    sol = solve(prob, FunctionMap())
 
-    flux_states, q_inflows = sol[:, 1, :], sol[:, 2, :]
-    q_out = cal_flux_q_out.(eachslice(flux_states, dims=2), eachslice(q_inflows, dims=2), eachslice(input, dims=2), Ref(p), Ref(true))
+    flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
+    q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
+
+    q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out
 end
 

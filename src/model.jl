@@ -1,27 +1,28 @@
 """
-$(TYPEDEF)
-The basic hydrological calculation model usually contains multiple hydrological calculation modules,
-Each hydrological calculation module can be solved through step-by-step calculation and overall calculation.
-It is usually used to simulate the vertical calculation process of a watershed or a calculation model.
+    HydroModel <: AbstractModel
 
-a basic hydrology model must include:
-    Surface water layer, typical Elements include snowfall module, interception module, evaporation module, infiltration module, etc.
-    Soil, the water layer in the soil. Typical Elements include soil moisture module, runoff calculation module, etc.
-    FreeWater layer, typical elements include groundwater, surface water, soil flow, etc.
+Represents a hydrological model composed of multiple components.
 
 # Fields
-$(FIELDS)
-# Example
-```
-using LumpedHydro
-using LumpedHydro.ExpHydro: Surface, Soil, FreeWater
+- `infos::NamedTuple`: Contains metadata about the model, including name, input variables, all variables, output variables, state variables, and neural network variables.
+- `components::Vector{<:AbstractComponent}`: A vector of hydrological computation elements (components) that make up the model.
+- `input_idx::Vector`: A vector of indices for each component's input, used to map overall model inputs to component-specific inputs.
 
-HydroModel(
-    name,
-    elements=[Surface(name=name, mtk=mtk), Soil(name=name, mtk=mtk), FreeWater(name=name, mtk=mtk)],
-    step=step,
-)
-```
+# Constructor
+    HydroModel(name; components::Vector{<:AbstractComponent})
+
+Constructs a HydroModel with the given name and components.
+
+# Description
+HydroModel is a structure that encapsulates a complete hydrological model. It manages multiple hydrological components, 
+handles the flow of data between these components, and provides methods for running simulations.
+
+The model automatically determines the connections between components based on their input and output variables. 
+It also keeps track of all variables in the system, including inputs, outputs, states, and any neural network parameters.
+
+When called as a function, the HydroModel applies its components in sequence, passing the outputs of earlier components 
+as inputs to later ones, effectively simulating the hydrological system over time.
+
 """
 struct HydroModel <: AbstractModel
     "hydrological computation model information"
@@ -87,25 +88,8 @@ function (model::HydroModel)(
     fluxes = permutedims(fluxes, (2, 3, 1))
     for (ele, idx) in zip(model.components, model.input_idx)
         fluxes_input = fluxes[idx, :, :]
-        if !isnothing(get_ode_func(ele))
-            #* Call the solve_prob method to solve the state of element at the specified timeidx
-            solved_states = solve_multi_prob(
-                ele, input=fluxes_input, pas=pas,
-                ptypes=ptypes, timeidx=timeidx, solver=solver
-            )
-            if solved_states == false
-                solved_states = zeros(length(ele.nameinfo[:state]), length(inputs), length(timeidx))
-            end
-            fluxes_input = cat(fluxes_input, solved_states, dims=1)
-        else
-            solved_states = nothing
-        end
-        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, pas=pas, ptypes=ptypes)
-        if isnothing(solved_states)
-            fluxes = cat(fluxes, fluxes_outputs, dims=1)
-        else
-            fluxes = cat(fluxes, solved_states, fluxes_outputs, dims=1)
-        end
+        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, pas=pas, ptypes=ptypes, timeidx=timeidx, solver=solver)
+        fluxes = cat(fluxes, fluxes_outputs, dims=1)
     end
     if output_type == :namedtuple
         return [NamedTuple{Tuple(get_var_names(model))}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]

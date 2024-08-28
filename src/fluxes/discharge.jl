@@ -9,7 +9,7 @@ function DischargeRouteFlux(
     @parameters lag
     @variables s_river
 
-    return RouteFlux(
+    return ContRouteFlux(
         input,
         [lag],
         [s_river],
@@ -17,7 +17,7 @@ function DischargeRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::ContRouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     input_len = size(input)[2]
     input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
 
@@ -41,11 +41,11 @@ function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector
     reshape(q_out_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::RouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_initstates(::ContRouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
     [pas[:initstates][ndtype][:s_river] for ndtype in ndtypes]
 end
 
-function get_rflux_func(::RouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_func(::ContRouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
     function cal_q_out!(du, s_rivers, q_in, q_gen, p)
         lag_ps = [p[ndtype][:lag] for ndtype in ndtypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))

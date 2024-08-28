@@ -1,12 +1,33 @@
 """
-$(TYPEDEF)
-The basic hydrological calculation module contains multiple hydrological fluxes,
-and can simulate the balance calculation of a physical module.
+    HydroBucket(name::Symbol; funcs::Vector, dfuncs::Vector=StateFlux[])
+
+Represents a hydrological bucket model component.
+
+# Arguments
+- `name::Symbol`: A symbol representing the name of the HydroBucket instance.
+- `funcs::Vector`: A vector of flux functions that describe the hydrological processes.
+- `dfuncs::Vector`: A vector of state derivative functions (default is an empty vector of StateFlux).
+
 # Fields
-$(FIELDS)
-# Example
-```
-```
+- `flux_func::Function`: Combined function for calculating fluxes.
+- `ode_func::Union{Nothing,Function}`: Function for ordinary differential equations (ODE) calculations, or nothing if not applicable.
+- `infos::NamedTuple`: Contains metadata about the bucket, including input, output, state, parameter, and neural network names.
+
+# Description
+HydroBucket is a structure that encapsulates the behavior of a hydrological bucket model. 
+It combines multiple flux functions and state derivative functions to model water movement 
+and storage within a hydrological unit.
+
+The structure automatically extracts relevant information from the provided functions to 
+populate the `infos` field, which includes names of inputs, outputs, states, parameters, 
+and neural networks (if applicable).
+
+The `flux_func` and `ode_func` are constructed based on the provided `funcs` and `dfuncs`, 
+enabling efficient calculation of fluxes and state changes over time.
+
+This structure is particularly useful for building complex hydrological models by combining 
+multiple HydroBucket instances to represent different components of a water system.
+
 """
 struct HydroBucket <: AbstractBucket
     """
@@ -45,7 +66,7 @@ struct HydroBucket <: AbstractBucket
 end
 
 function (ele::HydroBucket)(
-    input::AbstractMatrix,
+    input::Matrix,
     pas::ComponentVector;
     timeidx::Vector,
     solver::AbstractSolver=ODESolver(),
@@ -63,8 +84,18 @@ function (ele::HydroBucket)(
         fluxes = input
         solved_states = nothing
     end
+
     #* excute other fluxes formula
-    flux_output_matrix = run_fluxes(ele, input=fluxes, pas=pas)
+    params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
+    if !isempty(ele.infos[:nn])
+        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
+    else
+        nn_params_vec = nothing
+    end
+    flux_output = ele.flux_func.(eachcol(input), Ref(params_vec), Ref(nn_params_vec))
+    #* convert vector{vector} to matrix
+    flux_output_matrix = reduce(hcat, flux_output)
+
     #* merge output and state
     if isnothing(solved_states)
         output_matrix = flux_output_matrix
@@ -74,27 +105,80 @@ function (ele::HydroBucket)(
     output_matrix
 end
 
-function run_fluxes(
-    ele::HydroBucket;
-    #* var num * ts len
-    input::AbstractMatrix,
-    pas::ComponentVector,
+function (ele::HydroBucket)(
+    input::Array,
+    pas::ComponentVector;
+    timeidx::Vector,
+    solver::AbstractSolver=ODESolver(),
 )
-    params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
-    if length(ele.infos[:nn]) > 0
+    #* Extract the initial state of the parameters and bucket in the pas variable
+    if !isnothing(ele.ode_func)
+        #* Call the solve_prob method to solve the state of bucket at the specified timeidx
+        solved_states = solve_prob(ele, input=input, pas=pas, timeidx=timeidx, solver=solver)
+        if solved_states == false
+            solved_states = zeros(length(ele.infos[:state]), length(timeidx))
+        end
+        #* Store the solved bucket state in fluxes
+        fluxes = cat(input, solved_states, dims=1)
+    else
+        fluxes = input
+        solved_states = nothing
+    end
+
+    params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
+    if !isempty(ele.infos[:nn])
         nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
     else
         nn_params_vec = nothing
     end
-    ele_output = ele.flux_func.(eachcol(input), Ref(params_vec), Ref(nn_params_vec))
-    #* convert vector{vector} to matrix
-    ele_output_matrix = reduce(hcat, ele_output)
-    ele_output_matrix
+    #* array dims: (num of node, sequence length, variable dim)
+    ele_output_vec = [ele.flux_func.(eachslice(input[:, i, :], dims=2), Ref(params_vec[i]), Ref(nn_params_vec)) for i in 1:size(input)[2]]
+    ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
+
+    #* merge state and output
+    if isnothing(solved_states)
+        final_output_arr = ele_output_arr
+    else
+        final_output_arr = cat(solved_states, ele_output_arr, dims=1)
+    end
+
+    permutedims(final_output_arr, (1, 3, 2))
 end
 
-function solve_single_prob(
+
+"""
+Solve the ordinary differential equations for a HydroBucket model.
+
+This function handles two types of input arguments:
+
+1. Single node input:
+   - `input`: Matrix with dimensions (var_names × ts_len)
+   - `pas`: ComponentVector with structure:
+     ComponentVector(params=(p1=, p2=, ...), initstates=(...), nn=(...))
+
+2. Multiple node input:
+   - `input`: Array with dimensions (var_names × node_names × ts_len)
+   - `pas`: ComponentVector with structure:
+     ComponentVector(params=(node_1=(p1=, p2=, ...), node_2=(p1=, p2=, ...), ...), initstates=(...), nn=(...))
+
+# Arguments
+- `ele::HydroBucket`: The HydroBucket model instance
+- `input`: Input data (Matrix for single node, Array for multiple nodes)
+- `pas::ComponentVector`: Parameters and initial states
+- `timeidx::Vector`: Time index vector
+- `ptypes::Vector{Symbol}`: Parameter types (for multiple node input)
+- `solver::AbstractSolver`: ODE solver to use (default: ODESolver())
+
+# Returns
+- `sol`: Solution of the ordinary differential equations
+
+# Dimensions
+- Input: var_names × node_names × ts_len (or var_names × ts_len for single node)
+- Output: var_names × node_names × ts_len (or var_names × ts_len for single node)
+"""
+function solve_prob(
     ele::HydroBucket;
-    input::AbstractMatrix,
+    input::Matrix,
     pas::ComponentVector,
     timeidx::Vector=collect(1:length(input[1])),
     solver::AbstractSolver=ODESolver(),
@@ -115,7 +199,7 @@ function solve_single_prob(
     #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
     ode_param_func = (p) -> [p[:params][idx] for idx in params_idx]
 
-    if length(ele.infos[:nn]) > 0
+    if !isempty(ele.infos[:nn])
         nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
@@ -132,43 +216,15 @@ function solve_single_prob(
 
     #* Solve the problem using the solver wrapper
     sol = solver(single_ele_ode_func!, pas, collect(init_states[ele.infos[:state]]), timeidx)
+    if sol == false
+        sol = zeros(length(ele.infos[:state]), length(timeidx))
+    end
     sol
 end
 
-"""
-input dims: var_names * node_names * ts_len
-pas type: ComponentVector(params=(node_1=(p1=,p2=,)), initstates=(...), nn=(...))
-
-output dims: var_names * node_names * ts_len
-"""
-function run_multi_fluxes(
+function solve_prob(
     ele::HydroBucket;
-    #* var num * node num * ts len
-    input::AbstractArray,
-    pas::ComponentVector,
-    ptypes::Vector{Symbol}=collect(keys(pas[:params])),
-)
-    ele_param_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
-    if length(ele.infos[:nn]) > 0
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
-    else
-        nn_params_vec = nothing
-    end
-    #* array dims: (num of node, sequence length, variable dim)
-    ele_output_vec = [ele.flux_func.(eachslice(input[:, i, :], dims=2), Ref(ele_param_vec[i]), Ref(nn_params_vec)) for i in 1:size(input)[2]]
-    ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
-    permutedims(ele_output_arr, (1, 3, 2))
-end
-
-"""
-input dims: var_names * node_names * ts_len
-pas type: ComponentVector(params=(node_1=(p1=,p2=,)), initstates=(...), nn=(...))
-
-output dims: var_names * node_names * ts_len
-"""
-function solve_multi_prob(
-    ele::HydroBucket;
-    input::AbstractArray,
+    input::Array,
     pas::ComponentVector,
     timeidx::Vector,
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
@@ -216,6 +272,9 @@ function solve_multi_prob(
 
     #* Solve the problem using the solver wrapper
     sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
+    if sol == false
+        sol = zeros(length(ele.infos[:state]), length(timeidx), length(ptypes))
+    end
     sol
 end
 

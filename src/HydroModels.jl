@@ -69,11 +69,14 @@ abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
-# todo we will check if it need subdivide
-abstract type AbstractContRouteFlux <: AbstractFlux end
-abstract type AbstractDiscRouteFlux <: AbstractFlux end
 
-#* route的多种变体
+#* routeflux的离散求解和连续求解两种形式
+abstract type AbstractContRouteFlux <: AbstractRouteFlux end
+abstract type AbstractDiscRouteFlux <: AbstractRouteFlux end
+#* 以及单位线求解方式
+abstract type AbstractUnitHydroFlux <: AbstractRouteFlux end
+
+#* route的两种变体
 abstract type AbstractGridRoute <: AbstractRoute end
 abstract type AbstractVectorRoute <: AbstractRoute end
 
@@ -85,10 +88,12 @@ include("utils/show.jl")
 include("utils/graph.jl")
 include("utils/smooth.jl")
 include("utils/runtime_build.jl")
+# some unit hydro function
+include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, UnitHydroFlux
+export SimpleFlux, StateFlux, NeuralFlux, ContRouteFlux, DiscRouteFlux, UnitHydroFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
@@ -104,9 +109,6 @@ export param_grad_optim, param_box_optim, nn_param_optim
 
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
-
-# some unit hydro function
-include("fluxes/unithydro.jl")
 
 # some route function and special flux
 include("fluxes/cascade.jl")

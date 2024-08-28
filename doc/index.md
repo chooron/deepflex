@@ -89,13 +89,3 @@ fig
 
   * [X] 提供BoxOptimization或更多算法，用于初步的模型参数优化
   * [X] 局部搜索或梯度则更多的用于神经网络内部权重的优化
-
-## 代码存在的不足
-
-- 当前主流AD方式的Zygote和Enzyme均有相当严苛的条件，其中Zygote不支持MTK存在的try-catch（通常是在参数设置中引起的）: `ERROR: Compiling Tuple{Type{Dict}, Dict{Any, Any}}: try/catch is not supported.`同时Zygote也不支持mutable array，因此也不支持非MTK写法，而Enzyme需要先对代码进行编译，因此存在较多类型问题。
-
-## 未来工作计划
-
-* [ ] 复现当前主流的概念水文模型和已发表并具有代表性的神经耦合的水文模型
-* [ ] 从Lux.jl中LSTM Layer实现方式，来借鉴并修改非MTK的写法，
-* [ ] 根据构建的网络使用迭代计算方式不断从上层调度函数，以此避免计算资源的损耗

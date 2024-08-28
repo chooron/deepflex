@@ -2,8 +2,6 @@ using Aqua
 using CSV
 using DataFrames
 using Lux
-using HydroModels
-using HydroModels: step_func
 using Test
 using ModelingToolkit
 using Symbolics
@@ -12,6 +10,7 @@ using StableRNGs
 using ComponentArrays
 using DataInterpolations
 using OrdinaryDiffEq
+include("../src/HydroModels.jl")
 
 @testset "HydroModels.jl" begin
     include("run_flux.jl")
