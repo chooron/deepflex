@@ -97,7 +97,6 @@ soil_funcs = [
 state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
 soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
 soil_ele = HydroBucket(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
-soil_ele.ode_func
 
 #! define the Exp-Hydro model
 m50_model = HydroModel(:m50, components=[snow_ele, soil_ele]);

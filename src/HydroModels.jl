@@ -99,7 +99,7 @@ include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
 
 include("route.jl")
-export GridRoute, VectorRoute
+export WeightSumRoute, GridRoute, VectorRoute
 
 include("model.jl")
 export HydroModel #, update_unit!, add_elements!, remove_elements!
@@ -118,7 +118,9 @@ export DischargeRouteFlux
 include("fluxes/muskingum.jl")
 export MuskingumRouteFlux
 include("fluxes/normalize.jl")
-export StdMeanNormFlux, MinMaxNormFlux, TranparentFlux
+export StdMeanNormFlux, MinMaxNormFlux
+include("fluxes/rename.jl")
+export RenameFlux
 
 # Implements Models
 include("implements/cemaneige.jl")

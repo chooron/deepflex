@@ -89,7 +89,7 @@ end
 prcp_vec = df[!, "prec"]
 et_vec = df[!, "pet"]
 qobs_vec = df[!, "qobs"]
-ts = collect(qobs_vec)
+ts = collect(1:length(qobs_vec))
 
 # prepare args
 input = (prcp=prcp_vec, ep=et_vec)

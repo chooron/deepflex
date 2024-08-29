@@ -91,8 +91,10 @@ end
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2 3 4 2 3 1] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
-    input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10)))
-    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (3, 1, 2))
+    node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
+    node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
+    input_pas = ComponentVector(params=node_params, initstates=node_initstates)
+    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test unit hydro flux (solve type 2)" begin
@@ -121,8 +123,10 @@ end
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2 3 4 2 3 1] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
-    input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10)))
-    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (3, 1, 2))
+    node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
+    node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
+    input_pas = ComponentVector(params=node_params, initstates=node_initstates)
+    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test neural flux (single output)" begin
@@ -148,7 +152,7 @@ end
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_input for _ in 1:10), (2, 3, 1))
     input_pas = ComponentVector(nn=(testnn=nn_ps_vec,))
-    @test nn_flux_1(input_arr, input_pas, ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
+    @test nn_flux_1(input_arr, input_pas, Symbol[]) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test neural flux (multiple output)" begin
@@ -174,7 +178,7 @@ end
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_input for _ in 1:10), (2, 3, 1))
     input_pas = ComponentVector(nn=(testnn=nn_ps_vec,))
-    @test nn_flux(input_arr, input_pas, ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_output for _ in 1:10), (1, 3, 2))
+    @test nn_flux(input_arr, input_pas, Symbol[]) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test runtime flux function building" begin

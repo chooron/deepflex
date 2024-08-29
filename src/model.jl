@@ -36,6 +36,7 @@ struct HydroModel <: AbstractModel
         #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
         input_names, output_names, state_names = get_var_names(components)
         nn_names = reduce(union, get_nn_names.(components))
+        param_names = reduce(union, get_param_names.(components))
         var_names = input_names
         input_idx = Vector[]
         for component in components
@@ -46,7 +47,7 @@ struct HydroModel <: AbstractModel
             var_names = reduce(vcat, [var_names, get_state_names(component), get_output_names(component)])
             push!(input_idx, tmp_input_idx)
         end
-        model_infos = (name=name, input=input_names, var=var_names, output=output_names, state=state_names, nn=nn_names)
+        model_infos = (name=name, input=input_names, var=var_names, output=output_names, state=state_names, nn=nn_names, param=param_names)
         new(
             model_infos,
             components,
@@ -63,15 +64,17 @@ function (model::HydroModel)(
     solver::AbstractSolver=ODESolver(),
     output_type::Symbol=:namedtuple
 )
-    fluxes = reduce(hcat, [input[nm] for nm in get_input_names(model)])'
+    fluxes = Matrix(reduce(hcat, [input[nm] for nm in get_input_names(model)])')
     for (tmp_comp, idx) in zip(model.components, model.input_idx)
         tmp_fluxes = tmp_comp(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
     if output_type == :namedtuple
         return NamedTuple{Tuple(get_var_names(model))}(eachrow(fluxes))
-    elseif output_type == :array
+    elseif output_type == :matrix
         return fluxes
+    else
+        error("output_type must be :namedtuple or :matrix")
     end
 end
 
@@ -86,14 +89,15 @@ function (model::HydroModel)(
 )
     fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in get_input_names(model)]) for input in inputs])
     fluxes = permutedims(fluxes, (2, 3, 1))
-    for (ele, idx) in zip(model.components, model.input_idx)
-        fluxes_input = fluxes[idx, :, :]
-        fluxes_outputs = run_multi_fluxes(ele, input=fluxes_input, pas=pas, ptypes=ptypes, timeidx=timeidx, solver=solver)
+    for (tmp_comp, idx) in zip(model.components, model.input_idx)
+        fluxes_outputs = tmp_comp(fluxes[idx, :, :], pas, ptypes=ptypes, timeidx=timeidx, solver=solver)
         fluxes = cat(fluxes, fluxes_outputs, dims=1)
     end
     if output_type == :namedtuple
         return [NamedTuple{Tuple(get_var_names(model))}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
     elseif output_type == :array
         return fluxes
+    else
+        error("output_type must be :namedtuple or :array")
     end
 end

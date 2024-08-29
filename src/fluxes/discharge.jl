@@ -5,15 +5,21 @@ Hydrological discharge model: (https://agupubs.onlinelibrary.wiley.com/doi/full/
 =#
 function DischargeRouteFlux(
     input::Num,
+    output::Union{Num,Nothing}=nothing,
 )
-    @parameters lag
-    @variables s_river
+    @parameters lag s_river
+
+    if isnothing(output)
+        input_name = Symbolics.tosymbol(input, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+    end
 
     return ContRouteFlux(
         input,
-        [lag],
-        [s_river],
-        :discharge
+        [lag, s_river],
+        routetype=:discharge,
+        output=output
     )
 end
 
@@ -41,13 +47,13 @@ function (flux::ContRouteFlux{:discharge})(input::AbstractMatrix, pas::Component
     reshape(q_out_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::ContRouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
-    [pas[:initstates][ndtype][:s_river] for ndtype in ndtypes]
+function get_rflux_initstates(::ContRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    [pas[:params][ptype][:s_river] for ptype in ptypes]
 end
 
-function get_rflux_func(::ContRouteFlux{:discharge}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_func(::ContRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     function cal_q_out!(du, s_rivers, q_in, q_gen, p)
-        lag_ps = [p[ndtype][:lag] for ndtype in ndtypes]
+        lag_ps = [p[ptype][:lag] for ptype in ptypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))
         du[:flux_states] = q_in .- q_rf
         q_out = q_rf .+ q_gen
@@ -55,7 +61,7 @@ function get_rflux_func(::ContRouteFlux{:discharge}; pas::ComponentVector, ndtyp
     end
 
     function cal_q_out(s_rivers, q_in, q_gen, p)
-        lag_ps = [p[ndtype][:lag] for ndtype in ndtypes]
+        lag_ps = [p[ptype][:lag] for ptype in ptypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))
         q_out = q_rf .+ q_gen
         q_out

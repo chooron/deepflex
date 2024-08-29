@@ -1,14 +1,21 @@
 function CascadeRouteFlux(
     input::Num,
+    output::Union{Num,Nothing}=nothing,
 )
     @parameters k [description = "水库的平均滞留时间"]
     @parameters n [description = "水库的数目"]
 
+    if isnothing(output)
+        input_name = Symbolics.tosymbol(input, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+    end
+
     return ContRouteFlux(
         input,
         [k, n],
-        Num[],
-        :cascade
+        routetype=:cascade,
+        output=output
     )
 end
 
@@ -32,19 +39,19 @@ function (flux::ContRouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVe
     reshape(sol_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::ContRouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
-    reduce(vcat, [zeros(eltype(pas), Int(pas[:params][ndtype][:n])) for ndtype in ndtypes])
+function get_rflux_initstates(::ContRouteFlux{:cascade}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    reduce(vcat, [zeros(eltype(pas), Int(pas[:params][ptype][:n])) for ptype in ptypes])
 end
 
-function get_rflux_func(::ContRouteFlux{:cascade}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_func(::ContRouteFlux{:cascade}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     #* node_num * ts_len
-    node_iuh_nums = [pas[:params][ndtype][:n] for ndtype in ndtypes]
+    node_iuh_nums = [pas[:params][ptype][:n] for ptype in ptypes]
     start_idxes = Int[1; cumsum(node_iuh_nums)[1:end-1] .+ 1]
     end_idxes = Int.(cumsum(node_iuh_nums))
     iuh_states_idxes = [Int.(sidx:eidx) for (sidx, eidx) in zip(start_idxes, end_idxes)]
 
     function cal_q_out!(du, uh_states, q_in, q_gen, p)
-        k_ps = [p[ndtype][:k] for ndtype in ndtypes]
+        k_ps = [p[ptype][:k] for ptype in ptypes]
         dstates = du[:flux_states]
         dstates[start_idxes] = @.(q_in + q_gen - uh_states[start_idxes] / k_ps)
         for (i, (k, n)) in enumerate(zip(k_ps, node_iuh_nums))
@@ -58,7 +65,7 @@ function get_rflux_func(::ContRouteFlux{:cascade}; pas::ComponentVector, ndtypes
     end
 
     function cal_q_out(uh_states, q_in, q_gen, p)
-        k_ps = [p[ndtype][:k] for ndtype in ndtypes]
+        k_ps = [p[ptype][:k] for ptype in ptypes]
         q_out = [k_ps[i] * uh_states[end_idxes[i]] for i in eachindex(k_ps)]
         q_out
     end

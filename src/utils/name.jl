@@ -9,10 +9,10 @@ get_output_names(ele::AbstractBucket) = ele.infos[:output]
 get_output_names(route::AbstractRoute) = route.infos[:output]
 get_output_names(unit::AbstractModel) = unit.infos[:output]
 
-get_state_names(::AbstractFlux) = Symbol[]
-get_state_names(func::AbstractStateFlux) = [func.infos[:state]]
-get_state_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(funcs))
+get_state_names(flux::AbstractFlux) = flux.infos[:state]
+get_state_names(fluxes::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(fluxes))
 get_state_names(ele::AbstractBucket) = ele.infos[:state]
+get_state_names(route::AbstractRoute) = route.infos[:state]
 get_state_names(unit::AbstractModel) = unit.infos[:state]
 
 get_param_names(func::AbstractFlux) = func.infos[:param]
@@ -27,6 +27,7 @@ get_nn_names(func::AbstractNeuralFlux) = func.infos[:nn]
 get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs))
 get_nn_names(ele::AbstractBucket) = ele.infos[:nn]
 get_nn_names(route::AbstractRoute) = route.infos[:nn]
+get_nn_names(unit::AbstractModel) = unit.infos[:nn]
 
 get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})

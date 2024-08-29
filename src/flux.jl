@@ -66,7 +66,7 @@ struct SimpleFlux <: AbstractSimpleFlux
     )
         #* Get input and output names
         input_names, output_names = flux_names[1], flux_names[2]
-        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[])
+        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[], state=Symbol[])
         if length(flux_funcs) > 0
             #* Create variables by names
             inputs = [first(@variables $var) for var in input_names]
@@ -103,7 +103,7 @@ struct SimpleFlux <: AbstractSimpleFlux
         input_names = Symbolics.tosymbol.(inputs, escape=false)
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = length(params) > 0 ? Symbolics.tosymbol.(params) : Symbol[]
-        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[])
+        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[], state=Symbol[])
 
         if length(exprs) == 0
             #* Get the corresponding calculation formula according to the input and output parameter names
@@ -236,7 +236,7 @@ struct StateFlux <: AbstractStateFlux
         input_names = Symbolics.tosymbol.(fluxes, escape=false)
         state_name = Symbolics.tosymbol(state, escape=false)
         param_names = length(params) > 0 ? Symbol.(Symbolics.tosymbol.(params, escape=false)) : Symbol[]
-        infos = (input=input_names, state=state_name, param=param_names, nn=Symbol[])
+        infos = (input=input_names, state=[state_name], param=param_names, nn=Symbol[])
         state_func = build_flux_func(fluxes, [state], params, [expr])
         return new(
             fluxes,
@@ -335,8 +335,8 @@ They should be incorporated into larger flux structures like SimpleFlux for prop
 function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
-    pytype_params = [params[:params][ptype] for ptype in ptypes]
-    pytype_initstates = [params[:initstates][ptype] for ptype in ptypes]
+    pytype_params = [pas[:params][ptype] for ptype in ptypes]
+    pytype_initstates = [pas[:initstates][ptype] for ptype in ptypes]
 
     sols = map(eachindex(ptypes)) do (idx)
         tmp_pas = ComponentVector(params=pytype_params[idx], initstates=pytype_initstates[idx])
@@ -344,7 +344,7 @@ function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::
         node_sols
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-    return permutedims(sol_arr, (3, 1, 2))
+    return permutedims(sol_arr, (1, 3, 2))
 end
 
 """
@@ -383,30 +383,30 @@ struct DiscRouteFlux{rtype} <: AbstractDiscRouteFlux
     outputs::Vector{Num}
     "A map of parameters names (Symbol) and its variables (Num)"
     params::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
-    states::Vector{Num}
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
     function DiscRouteFlux(
         input::Num,
-        params::Vector{Num},
-        states::Vector{Num},
+        params::Vector{Num};
         routetype::Symbol,
+        output::Union{Num,Nothing}=nothing,
     )
         input_name = Symbolics.tosymbol(input, escape=false)
         param_names = Symbolics.tosymbol.(params, escape=false)
-        state_names = Symbolics.tosymbol.(states, escape=false)
-        output_name = Symbol(input_name, :_routed)
-        output = first(@variables $output_name)
+        if isnothing(output)
+            output_name = Symbol(input_name, :_routed)
+            output = first(@variables $output_name)
+        else
+            output_name = Symbolics.tosymbol(output, escape=false)
+        end
         #* Setup the name information of the hydroroutement
-        infos = (input=[input_name], output=[output_name], param=param_names, state=state_names)
+        infos = (input=[input_name], output=[output_name], param=param_names, state=Symbol[])
 
         return new{routetype}(
             [input],
             [output],
             params,
-            states,
             infos
         )
     end
@@ -448,30 +448,30 @@ struct ContRouteFlux{rtype} <: AbstractContRouteFlux
     outputs::Vector{Num}
     "A map of parameters names (Symbol) and its variables (Num)"
     params::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
-    states::Vector{Num}
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
     function ContRouteFlux(
         input::Num,
-        params::Vector{Num},
-        states::Vector{Num},
+        params::Vector{Num};
         routetype::Symbol,
+        output::Union{Num,Nothing}=nothing,
     )
         input_name = Symbolics.tosymbol(input, escape=false)
         param_names = Symbolics.tosymbol.(params, escape=false)
-        state_names = Symbolics.tosymbol.(states, escape=false)
-        output_name = Symbol(input_name, :_routed)
-        output = first(@variables $output_name)
+        if isnothing(output)
+            output_name = Symbol(input_name, :_routed)
+            output = first(@variables $output_name)
+        else
+            output_name = Symbolics.tosymbol(output, escape=false)
+        end
         #* Setup the name information of the hydroroutement
-        infos = (input=[input_name], output=[output_name], param=param_names, state=state_names)
+        infos = (input=[input_name], output=[output_name], param=param_names, state=Symbol[])
 
         return new{routetype}(
             [input],
             [output],
             params,
-            states,
             infos
         )
     end
@@ -543,12 +543,17 @@ struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
         input::Num,
         param::Num,
         uhfunc::Function;
+        output::Union{Num,Nothing}=nothing,
         solvetype::Symbol=:unithydro1,
     )
         input_name = Symbolics.tosymbol(input, escape=false)
         param_name = Symbolics.tosymbol(param, escape=false)
-        output_name = Symbol(input_name, :_routed)
-        output = first(@variables $output_name)
+        if isnothing(output)
+            output_name = Symbol(input_name, :_routed)
+            output = first(@variables $output_name)
+        else
+            output_name = Symbolics.tosymbol(output, escape=false)
+        end
         #* Setup the name information of the hydroroutement
         infos = (input=[input_name], output=[output_name], param=[param_name], state=Symbol[])
 
@@ -591,7 +596,7 @@ function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector;
     reshape(sum_route, 1, length(input_vec))
 end
 
-function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
+function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, kwargs...)
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
     pytype_params = [pas[:params][ptype] for ptype in ptypes]
@@ -602,7 +607,7 @@ function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, ptypes:
         node_sols
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-    return permutedims(sol_arr, (3, 1, 2))
+    return permutedims(sol_arr, (1, 3, 2))
 end
 
 """

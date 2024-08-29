@@ -1,3 +1,75 @@
+(flux::AbstractRouteFlux)(input::Vector, pas::ComponentVector; kwargs...) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(flux::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+
+"""
+    WeightSumRoute <: AbstractRouteFlux
+
+Represents a weighted cumulative sum routing structure for hydrological modeling.
+
+# Fields
+- `infos::NamedTuple`: A named tuple containing routing information with keys:
+  - `name::Symbol`: The name of the routing component.
+  - `input::Symbol`: The symbol representing the input variable.
+  - `output::Symbol`: The symbol representing the output variable.
+  - `param::Symbol`: The symbol representing the weight parameter.
+
+# Constructor
+    WeightSumRoute(
+        name::Symbol;
+        input::Num,
+        output::Num,
+        param::Num
+    )
+
+Constructs a WeightSumRoute instance.
+
+# Arguments
+- `name::Symbol`: The name of the routing component.
+- `input::Num`: The input variable.
+- `output::Num`: The output variable.
+- `param::Num`: The weight parameter.
+
+# Description
+WeightSumRoute applies a weighted cumulative sum operation to the input,
+where the weights are specified by the `param` parameter. This routing method
+is useful for scenarios where the contribution of each input node needs to be
+weighted differently in the cumulative output.
+"""
+struct WeightSumRoute <: AbstractRouteFlux
+    "Routing information: keys contain: input, output, param, state, nn"
+    infos::NamedTuple
+
+    function WeightSumRoute(
+        name::Symbol;
+        input::Num,
+        output::Num,
+        param::Num,
+    )
+        input_name = Symbolic.tosymbol(input)
+        output_name = Symbolic.tosymbol(output)
+        param_name = Symbolic.tosymbol(param)
+        infos = (name=name, input=input_name, output=output_name, param=param_name, state=Symbol[], nn=Symbol[])
+        return new(
+            infos,
+        )
+    end
+end
+
+function (route::WeightSumRoute)(
+    input::AbstractArray,
+    pas::ComponentVector;
+    ptypes::AbstractVector{Symbol},
+    kwargs...
+)
+    input_mat = input[1, :, :]
+    weight_params = [pas[:params][ptype][route.infos[:param]] for ptype in ptypes]
+    weight_result = sum(input_mat .* weight_params, dims=1)
+    # expand dims
+    output_arr = reduce(vcat, repeat(weight_result, size(input_mat)[1]))
+    reshape(1, size(output_arr)...)
+end
+
+
 """
     GridRoute(name::Symbol; rfunc::AbstractRouteFlux, flwdir::AbstractMatrix, positions::AbstractVector)
 
@@ -82,17 +154,18 @@ end
 
 function (route::GridRoute)(
     input::AbstractArray,
-    pas::ComponentVector,
+    pas::ComponentVector;
     timeidx::AbstractVector,
-    ndtypes::AbstractVector{Symbol},
+    ptypes::AbstractVector{Symbol},
+    kwargs...
 )
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
     itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
-    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ndtypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; pas, ndtypes)
+    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
+    flux_initstates = get_rflux_initstates(route.rfunc; pas, ptypes)
 
     function grid_route_ode!(du, u, p, t)
         q_in = u[:q_in]
@@ -179,17 +252,18 @@ step route
 """
 function (route::VectorRoute)(
     input::AbstractArray,
-    pas::ComponentVector,
+    pas::ComponentVector;
     timeidx::AbstractVector,
-    ndtypes::AbstractVector{Symbol},
+    ptypes::AbstractVector{Symbol},
+    kwargs...
 )
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
     itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
-    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ndtypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; pas, ndtypes)
+    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
+    flux_initstates = get_rflux_initstates(route.rfunc; pas, ptypes)
 
     sorted_idxes = topological_sort(route.network)
     up_idxes = [inneighbors(route.network, cur_idx) for cur_idx in sorted_idxes]
@@ -214,32 +288,3 @@ function (route::VectorRoute)(
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out
 end
-
-#= 
-* entire route
-function (route::VectorRoute)(
-    input::AbstractArray,
-    pas::ComponentVector,
-    timeidx::AbstractVector,
-    ndtypes::AbstractVector{Symbol},
-)
-    #* 获取每个节点的计算顺序
-    sorted_idx = topological_sort(route.network)
-    input_names = [Symbol(:num_, idx) for idx in 1:size(input)[2]]
-    input_ntp = NamedTuple(Tuple(input_names))(eachslice(input, dims=2))
-    for cur_idx in sorted_idx
-        up_idxes = inneighbors(network.network, cur_idx)
-        if length(up_idxes) > 0
-            #* 当前单元产流加上游单元的汇入
-            cur_input = input_ntp[vcat(Symbol(:num_, cur_idx), [Symbol(:num_, up_idx) for up_idx in up_idxes])]
-            #* 计算当前网格的汇出流量
-            input_ntp = merge(input_ntp, route.rfunc[1](sum(collect(cur_input)), pas[ndtypes[cur_idx]], timeidx))
-        else
-            #* 无上游汇入直接使用当前产流计算
-            input_ntp = merge(input_ntp, route.rfunc[1](input_ntp[Symbol(:num_, cur_idx)], pas[ndtypes[cur_idx]], timeidx))
-        end
-    end
-    output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_ntp)
-    permutedims(output_arr, (1, 3, 2))
-end
- =#

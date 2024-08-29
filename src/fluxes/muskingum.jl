@@ -1,13 +1,20 @@
 function MuskingumRouteFlux(
     input::Num,
+    output::Union{Num,Nothing}=nothing,
 )
     @parameters k, x, dt
+
+    if isnothing(output)
+        input_name = Symbolics.tosymbol(input, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+    end
 
     return DiscRouteFlux(
         input,
         [k, x, dt],
-        Num[],
-        :muskingum
+        routetype=:muskingum,
+        output=output
     )
 end
 
@@ -33,15 +40,15 @@ function (flux::DiscRouteFlux{:muskingum})(input::AbstractMatrix, pas::Component
     Array(sol[2,:])
 end
 
-function get_rflux_initstates(::DiscRouteFlux{:muskingum}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
-    [pas[:initstates][ndtype][:s_river] for ndtype in ndtypes]
+function get_rflux_initstates(::DiscRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    [pas[:initstates][ptype][:s_river] for ptype in ptypes]
 end
 
-function get_rflux_func(::DiscRouteFlux{:muskingum}; pas::ComponentVector, ndtypes::AbstractVector{Symbol})
+function get_rflux_func(::DiscRouteFlux{:muskingum}; ::ComponentVector, ptypes::AbstractVector{Symbol})
     function cal_q_out!(du, q_out, q_in, q_gen, p)
-        k_ps = [p[ndtype][:k] for ndtype in ndtypes]
-        x_ps = [p[ndtype][:x] for ndtype in ndtypes]
-        dt_ps = [p[ndtype][:dt] for ndtype in ndtypes]
+        k_ps = [p[ptype][:k] for ptype in ptypes]
+        x_ps = [p[ptype][:x] for ptype in ptypes]
+        dt_ps = [p[ptype][:dt] for ptype in ptypes]
 
         c0_ps = @.(((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
         c1_ps = @.(((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
@@ -53,9 +60,9 @@ function get_rflux_func(::DiscRouteFlux{:muskingum}; pas::ComponentVector, ndtyp
     end
 
     function cal_q_out(q_out, q_in, q_gen, p)
-        k_ps = [p[ndtype][:k] for ndtype in ndtypes]
-        x_ps = [p[ndtype][:x] for ndtype in ndtypes]
-        dt_ps = [p[ndtype][:dt] for ndtype in ndtypes]
+        k_ps = [p[ptype][:k] for ptype in ptypes]
+        x_ps = [p[ptype][:x] for ptype in ptypes]
+        dt_ps = [p[ptype][:dt] for ptype in ptypes]
 
         c0_ps = @.(((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
         c1_ps = @.(((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))

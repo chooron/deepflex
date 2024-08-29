@@ -5,23 +5,25 @@ pas = ComponentVector(params=params, initstates=init_states)
 ts = collect(1:100)
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
 input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]);
-input = reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))'
+
+input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 dtype = eltype(input[1]);
+step_func = HydroModels.step_func
 
 @testset "test hydro element (basic element, Snowpack in Exp-Hydro)" begin
     @variables temp lday prcp pet snowfall rainfall melt snowpack
     @parameters Tmin Tmax Df
 
     snow_funcs = [
-        SimpleFlux([temp, lday] => [pet],
+        HydroModels.SimpleFlux([temp, lday] => [pet],
             exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
-        SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
+        HydroModels.SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
             exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
-        SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
+        HydroModels.SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
             exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
-    snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_dfuncs = [HydroModels.StateFlux([snowfall] => [melt], snowpack)]
+    snow_ele = HydroModels.HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
     @testset "test hydro element info" begin
         @test Set(HydroModels.get_input_names(snow_ele)) == Set((:temp, :lday, :prcp))
         @test Set(HydroModels.get_param_names(snow_ele)) == Set((:Tmin, :Tmax, :Df))
@@ -65,23 +67,36 @@ dtype = eltype(input[1]);
 
     @testset "test all of the output" begin
         snowpack_vec = HydroModels.solve_single_prob(snow_ele, input=input, pas=pas, timeidx=ts)[1, :]
-        pet_vec = snow_funcs[1](reduce(hcat, [input_ntp.temp, input_ntp.lday])', ComponentVector(params=ComponentVector()))[1, :]
-        snow_funcs_2_output = snow_funcs[2](reduce(hcat, [input_ntp.prcp, input_ntp.temp])', ComponentVector(params=(Tmin=params.Tmin,)))
+        pet_vec = snow_funcs[1](Matrix(reduce(hcat, [input_ntp.temp, input_ntp.lday])'), ComponentVector(params=ComponentVector()))[1, :]
+        snow_funcs_2_output = snow_funcs[2](Matrix(reduce(hcat, [input_ntp.prcp, input_ntp.temp])'), ComponentVector(params=(Tmin=params.Tmin,)))
         snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]
-        melt_vec = snow_funcs[3](reduce(hcat, [snowpack_vec, input_ntp.temp])', ComponentVector(params=(Tmax=params.Tmax, Df=params.Df)))[1, :]
+        melt_vec = snow_funcs[3](Matrix(reduce(hcat, [snowpack_vec, input_ntp.temp])'), ComponentVector(params=(Tmax=params.Tmax, Df=params.Df)))[1, :]
         @test reduce(vcat, pet_vec) == collect(result.pet)
         @test reduce(vcat, snowfall_vec) == collect(result.snowfall)
         @test reduce(vcat, rainfall_vec) == collect(result.rainfall)
         @test reduce(vcat, melt_vec) == collect(result.melt)
     end
 
+    @testset "test run with multiple nodes input" begin
+        input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input], 10)), (1, 3, 2))
+        ndtypes = [Symbol("node_$i") for i in 1:10]
+        node_pas = ComponentVector(
+            params=NamedTuple{Tuple(ndtypes)}([params for _ in 1:10]),
+            initstates=NamedTuple{Tuple(ndtypes)}([init_states for _ in 1:10])
+        )
+        node_output = snow_ele(input_arr, node_pas, timeidx=ts, ptypes=ndtypes)
+        single_output = snow_ele(input, pas, timeidx=ts)
+        target_output = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([single_output], 10)), (1, 3, 2))
+        @test node_output == target_output
+    end
+
     @testset "test build state function" begin
         @variables routingstore exch slowflow_routed routedflow
         @parameters x2, x3
         funcs = [
-            SimpleFlux([routingstore] => [exch], [x2, x3],
+            HydroModels.SimpleFlux([routingstore] => [exch], [x2, x3],
                 exprs=[x2 * abs(routingstore / x3)^3.5]),
-            SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
+            HydroModels.SimpleFlux([routingstore, slowflow_routed, exch] => [routedflow], [x3],
                 exprs=[x3^(-4) / 4 * (routingstore + slowflow_routed + exch)^5]),
         ]
         dfunc = HydroModels.StateFlux([slowflow_routed, exch] => [routedflow], routingstore)
@@ -93,4 +108,5 @@ dtype = eltype(input[1]);
         @test flux_func([slg, rgt], [2.42, 69.63], []) ≈ [exch, routedflow]
         @test state_func([slg], [rgt], [2.42, 69.63], []) ≈ [exch + slg - 69.63^(-4) / 4 * (rgt + slg + exch)^5]
     end
+
 end
