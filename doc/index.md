@@ -59,7 +59,7 @@ lines!(ax, ts, result_df[!,"flow"], color=:blue)
 fig
 ```
 
-![1715847407303](image/index/1715847407303.png)
+![figure](doc/picture/predictions.png)
 
 ## 特性
 

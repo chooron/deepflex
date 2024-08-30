@@ -180,6 +180,128 @@ function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, ptypes::
     permutedims(flux_output_arr, (3, 1, 2))
 end
 
+
+"""
+    NeuralFlux <: AbstractNeuralFlux
+
+Represents a neural network-based flux component in a hydrological model.
+
+# Fields
+- `inputs::Vector{Num}`: A vector of input variables.
+- `outputs::Vector{Num}`: A vector of output variables.
+- `nnparam::Symbolics.Arr`: An array of neural network parameters.
+- `expr::Symbolics.Arr{Num,1}`: Expressions describing the formulas for output variables.
+- `func::Function`: A compiled function that calculates the flux using the neural network.
+- `infos::NamedTuple`: Contains metadata about the flux, including input, output, and neural network parameter names.
+- `nnios::NamedTuple`: Contains information about the neural network's input and output structure.
+
+# Description
+`NeuralFlux` is a structure that encapsulates a neural network-based flux calculation in a hydrological model. 
+It combines symbolic mathematics with neural networks to create a flexible and powerful representation of complex hydrological processes.
+
+The structure automatically handles the integration of the neural network into the symbolic framework, 
+allowing for seamless incorporation of machine learning models into traditional hydrological equations.
+
+This structure is particularly useful for representing complex, non-linear relationships in hydrological systems 
+where traditional equations may be insufficient or unknown.
+"""
+struct NeuralFlux <: AbstractNeuralFlux
+    "A map of input names (Symbol) and its variables (Num)"
+    inputs::Vector{Num}
+    "A map of output names (Symbol) and its variables (Num)"
+    outputs::Vector{Num}
+    "A map of neural network names (Symbol) and its variables (Num)"
+    nnparam::Symbolics.Arr
+    "flux expressions to descripe the formula of the output variable"
+    expr::Symbolics.Arr{Num,1}
+    "flux expressions to descripe the formula of the output variable"
+    func::Function
+    "neural network  information: keys contains: input, output, param"
+    infos::NamedTuple
+    "neural network build information: keys contains: input, output, param"
+    nnios::NamedTuple
+
+    function NeuralFlux(
+        fluxes::Pair{Vector{Num},Vector{Num}},
+        chain::Lux.AbstractExplicitContainerLayer,
+    )
+        #* Get input and output variables
+        input_vars, output_vars = fluxes[1], fluxes[2]
+        #* Get the neural network name (neural flux param name) and object
+        chain_name = chain.name
+        #* Initialize model parameter type for model parameter dimension definition
+        init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain))
+        init_params_axes = getaxes(init_params)
+
+        #* Define parameter variables according to initialization parameters: Define type as Vector{parameter length}
+        chain_params = first(@parameters $chain_name[1:length(init_params)] = Vector(init_params))
+        #* Use Symbolics.array_term to define the slow-building parameter variables:
+        #* when the model is called, it is rebuilt into the ComponentVector type according to
+        #* the axes of `init_params` and the Vector type of the parameter as the calculation parameter input
+        lazy_params = Symbolics.array_term((x, axes) -> ComponentVector(x, axes), chain_params, init_params_axes, size=size(chain_params))
+
+        #* Convert to a symbol based on the variable
+        input_names = Symbolics.tosymbol.(input_vars, escape=false)
+        output_names = Symbolics.tosymbol.(output_vars, escape=false)
+
+        #* Constructing neural network input and output variables
+        nn_input_name = Symbol(chain_name, :_input)
+        nn_output_name = Symbol(chain_name, :_output)
+
+        #* The input and output of the model can only be of type Symbolics.Arr{Num, 1},
+        #* so it cannot be defined based on input_vars and output_vars
+        nn_input = first(@variables $(nn_input_name)[1:length(input_names)])
+        nn_output = first(@variables $(nn_output_name)[1:length(output_names)])
+
+        #* Constructing a calculation expression based on a neural network
+        flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
+
+        nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
+
+        #* neuralflux infos
+        infos = (input=input_names, output=output_names, param=Symbol[], nn=[chain_name])
+        new(
+            input_vars,
+            output_vars,
+            chain_params,
+            flux_expr,
+            nn_func,
+            infos,
+            (input=nn_input, output=nn_output, paramlen=length(init_params)),
+        )
+    end
+
+    function NeuralFlux(
+        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
+        chain::Lux.AbstractExplicitContainerLayer,
+    )
+        input_names, output_names = flux_names[1], flux_names[2]
+
+        input_vars = [first(@variables $input_name) for input_name in input_names]
+        output_vars = [first(@variables $output_name) for output_name in output_names]
+
+        return NeuralFlux(input_vars => output_vars, chain)
+    end
+end
+
+function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector; kwargs...)
+    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
+    flux.func(input, nn_params_vec)
+end
+
+function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
+    flux.func(input', nn_params_vec)
+end
+
+function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector, ::AbstractVector{Symbol})
+    nn_params = pas[:nn][flux.infos[:nn][1]]
+    #* array dims: (ts_len * node_names * var_names)
+    flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]
+    flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    permutedims(flux_output_arr, (1, 3, 2))
+end
+
 """
     StateFlux
 
@@ -348,7 +470,7 @@ function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::
 end
 
 """
-    DiscRouteFlux{rtype} <: AbstractDiscRouteFlux
+    VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
 
 Represents a discrete routing flux component in a hydrological model.
 
@@ -363,10 +485,10 @@ Represents a discrete routing flux component in a hydrological model.
 - `rtype`: A symbol representing the specific type of discrete routing flux.
 
 # Constructors
-    DiscRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
+    VectorRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
 
 # Description
-`DiscRouteFlux` is a structure that encapsulates a discrete routing flux calculation in a hydrological model. 
+`VectorRouteFlux` is a structure that encapsulates a discrete routing flux calculation in a hydrological model. 
 It is designed to represent various types of discrete routing processes, with the specific type indicated 
 by the `rtype` parameter.
 
@@ -376,7 +498,7 @@ the information about inputs, outputs, parameters, and states into the `infos` f
 This structure is particularly useful for representing discrete routing processes in hydrological models, 
 where water is transferred from one point to another in the system using discrete time steps or methods.
 """
-struct DiscRouteFlux{rtype} <: AbstractDiscRouteFlux
+struct VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
     "A map of input names (Symbol) and its variables (Num)"
     inputs::Vector{Num}
     "A map of output names (Symbol) and its variables (Num)"
@@ -386,7 +508,7 @@ struct DiscRouteFlux{rtype} <: AbstractDiscRouteFlux
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
-    function DiscRouteFlux(
+    function VectorRouteFlux(
         input::Num,
         params::Vector{Num};
         routetype::Symbol,
@@ -413,7 +535,7 @@ struct DiscRouteFlux{rtype} <: AbstractDiscRouteFlux
 end
 
 """
-    ContRouteFlux{rtype} <: AbstractContRouteFlux
+    GridRouteFlux{rtype} <: AbstractGridRouteFlux
 
 Represents a continuous routing flux component in a hydrological model.
 
@@ -428,10 +550,10 @@ Represents a continuous routing flux component in a hydrological model.
 - `rtype`: A symbol representing the specific type of continuous routing flux.
 
 # Constructors
-    ContRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
+    GridRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
 
 # Description
-`ContRouteFlux` is a structure that encapsulates a continuous routing flux calculation in a hydrological model. 
+`GridRouteFlux` is a structure that encapsulates a continuous routing flux calculation in a hydrological model. 
 It is designed to represent various types of continuous routing processes, with the specific type indicated 
 by the `rtype` parameter.
 
@@ -441,7 +563,7 @@ the information about inputs, outputs, parameters, and states into the `infos` f
 This structure is particularly useful for representing continuous routing processes in hydrological models, 
 where water is transferred from one point to another in the system using continuous time steps.
 """
-struct ContRouteFlux{rtype} <: AbstractContRouteFlux
+struct GridRouteFlux{rtype} <: AbstractGridRouteFlux
     "A map of input names (Symbol) and its variables (Num)"
     inputs::Vector{Num}
     "A map of output names (Symbol) and its variables (Num)"
@@ -451,7 +573,7 @@ struct ContRouteFlux{rtype} <: AbstractContRouteFlux
     "bucket information: keys contains: input, output, param"
     infos::NamedTuple
 
-    function ContRouteFlux(
+    function GridRouteFlux(
         input::Num,
         params::Vector{Num};
         routetype::Symbol,
@@ -608,125 +730,4 @@ function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; ptypes:
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
     return permutedims(sol_arr, (1, 3, 2))
-end
-
-"""
-    NeuralFlux <: AbstractNeuralFlux
-
-Represents a neural network-based flux component in a hydrological model.
-
-# Fields
-- `inputs::Vector{Num}`: A vector of input variables.
-- `outputs::Vector{Num}`: A vector of output variables.
-- `nnparam::Symbolics.Arr`: An array of neural network parameters.
-- `expr::Symbolics.Arr{Num,1}`: Expressions describing the formulas for output variables.
-- `func::Function`: A compiled function that calculates the flux using the neural network.
-- `infos::NamedTuple`: Contains metadata about the flux, including input, output, and neural network parameter names.
-- `nnios::NamedTuple`: Contains information about the neural network's input and output structure.
-
-# Description
-`NeuralFlux` is a structure that encapsulates a neural network-based flux calculation in a hydrological model. 
-It combines symbolic mathematics with neural networks to create a flexible and powerful representation of complex hydrological processes.
-
-The structure automatically handles the integration of the neural network into the symbolic framework, 
-allowing for seamless incorporation of machine learning models into traditional hydrological equations.
-
-This structure is particularly useful for representing complex, non-linear relationships in hydrological systems 
-where traditional equations may be insufficient or unknown.
-"""
-struct NeuralFlux <: AbstractNeuralFlux
-    "A map of input names (Symbol) and its variables (Num)"
-    inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
-    outputs::Vector{Num}
-    "A map of neural network names (Symbol) and its variables (Num)"
-    nnparam::Symbolics.Arr
-    "flux expressions to descripe the formula of the output variable"
-    expr::Symbolics.Arr{Num,1}
-    "flux expressions to descripe the formula of the output variable"
-    func::Function
-    "neural network  information: keys contains: input, output, param"
-    infos::NamedTuple
-    "neural network build information: keys contains: input, output, param"
-    nnios::NamedTuple
-
-    function NeuralFlux(
-        fluxes::Pair{Vector{Num},Vector{Num}},
-        chain::Lux.AbstractExplicitContainerLayer,
-    )
-        #* Get input and output variables
-        input_vars, output_vars = fluxes[1], fluxes[2]
-        #* Get the neural network name (neural flux param name) and object
-        chain_name = chain.name
-        #* Initialize model parameter type for model parameter dimension definition
-        init_params = ComponentVector(Lux.initialparameters(StableRNG(42), chain))
-        init_params_axes = getaxes(init_params)
-
-        #* Define parameter variables according to initialization parameters: Define type as Vector{parameter length}
-        chain_params = first(@parameters $chain_name[1:length(init_params)] = Vector(init_params))
-        #* Use Symbolics.array_term to define the slow-building parameter variables:
-        #* when the model is called, it is rebuilt into the ComponentVector type according to
-        #* the axes of `init_params` and the Vector type of the parameter as the calculation parameter input
-        lazy_params = Symbolics.array_term((x, axes) -> ComponentVector(x, axes), chain_params, init_params_axes, size=size(chain_params))
-
-        #* Convert to a symbol based on the variable
-        input_names = Symbolics.tosymbol.(input_vars, escape=false)
-        output_names = Symbolics.tosymbol.(output_vars, escape=false)
-
-        #* Constructing neural network input and output variables
-        nn_input_name = Symbol(chain_name, :_input)
-        nn_output_name = Symbol(chain_name, :_output)
-
-        #* The input and output of the model can only be of type Symbolics.Arr{Num, 1},
-        #* so it cannot be defined based on input_vars and output_vars
-        nn_input = first(@variables $(nn_input_name)[1:length(input_names)])
-        nn_output = first(@variables $(nn_output_name)[1:length(output_names)])
-
-        #* Constructing a calculation expression based on a neural network
-        flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
-
-        nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
-
-        #* neuralflux infos
-        infos = (input=input_names, output=output_names, param=Symbol[], nn=[chain_name])
-        new(
-            input_vars,
-            output_vars,
-            chain_params,
-            flux_expr,
-            nn_func,
-            infos,
-            (input=nn_input, output=nn_output, paramlen=length(init_params)),
-        )
-    end
-
-    function NeuralFlux(
-        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
-        chain::Lux.AbstractExplicitContainerLayer,
-    )
-        input_names, output_names = flux_names[1], flux_names[2]
-
-        input_vars = [first(@variables $input_name) for input_name in input_names]
-        output_vars = [first(@variables $output_name) for output_name in output_names]
-
-        return NeuralFlux(input_vars => output_vars, chain)
-    end
-end
-
-function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector; kwargs...)
-    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
-    flux.func(input, nn_params_vec)
-end
-
-function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector; kwargs...)
-    nn_params_vec = pas[:nn][flux.infos[:nn][1]]
-    flux.func(input', nn_params_vec)
-end
-
-function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector, ::AbstractVector{Symbol})
-    nn_params = pas[:nn][flux.infos[:nn][1]]
-    #* array dims: (ts_len * node_names * var_names)
-    flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]
-    flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
-    permutedims(flux_output_arr, (1, 3, 2))
 end

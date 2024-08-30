@@ -196,8 +196,8 @@ function solve_single_prob(
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
     params_idx = [getaxes(params)[1][nm].idx for nm in ele.infos[:param]]
-    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
-    ode_param_func = (p) -> [p[:params][idx] for idx in params_idx]
+    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func
+    ode_param_func = (p) -> p[:params][params_idx]
 
     if !isempty(ele.infos[:nn])
         nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
@@ -249,8 +249,8 @@ function solve_multi_prob(
     #* this extraction method is significantly more efficient than extracting by name
     params_idx = [getaxes(params[ptypes[1]])[1][nm].idx for nm in ele.infos[:param]]
     #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
-    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func (see in line 45)
-    ode_param_func = (p) -> [[p[:params][ptype][idx] for idx in params_idx] for ptype in ptypes]
+    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func
+    ode_param_func = (p) -> [p[:params][ptype][params_idx] for ptype in ptypes]
 
     #* 准备神经网络的参数
     if length(ele.infos[:nn]) > 0

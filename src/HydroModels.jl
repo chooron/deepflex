@@ -17,10 +17,10 @@ using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # ModelingToolkit building
-using ModelingToolkit: @variables, @parameters
 using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
+using ModelingToolkit: @variables, @parameters
 
 # graph compute
 using Graphs
@@ -71,8 +71,8 @@ abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
 
 #* routeflux的离散求解和连续求解两种形式
-abstract type AbstractContRouteFlux <: AbstractRouteFlux end
-abstract type AbstractDiscRouteFlux <: AbstractRouteFlux end
+abstract type AbstractGridRouteFlux <: AbstractRouteFlux end
+abstract type AbstractVectorRouteFlux <: AbstractRouteFlux end
 #* 以及单位线求解方式
 abstract type AbstractUnitHydroFlux <: AbstractRouteFlux end
 
@@ -93,7 +93,7 @@ include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, ContRouteFlux, DiscRouteFlux, UnitHydroFlux
+export SimpleFlux, StateFlux, NeuralFlux, GridRouteFlux, VectorRouteFlux, UnitHydroFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 

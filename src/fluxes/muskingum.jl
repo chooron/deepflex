@@ -10,7 +10,7 @@ function MuskingumRouteFlux(
         output = first(@variables $output_name)
     end
 
-    return DiscRouteFlux(
+    return VectorRouteFlux(
         input,
         [k, x, dt],
         routetype=:muskingum,
@@ -18,7 +18,7 @@ function MuskingumRouteFlux(
     )
 end
 
-function (flux::DiscRouteFlux{:muskingum})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::VectorRouteFlux{:muskingum})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     input_len = size(input)[2]
     input_vec = input[1, :]
     params = pas[:params]
@@ -40,11 +40,11 @@ function (flux::DiscRouteFlux{:muskingum})(input::AbstractMatrix, pas::Component
     Array(sol[2,:])
 end
 
-function get_rflux_initstates(::DiscRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_initstates(::VectorRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     [pas[:initstates][ptype][:s_river] for ptype in ptypes]
 end
 
-function get_rflux_func(::DiscRouteFlux{:muskingum}; ::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_func(::VectorRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     function cal_q_out!(du, q_out, q_in, q_gen, p)
         k_ps = [p[ptype][:k] for ptype in ptypes]
         x_ps = [p[ptype][:x] for ptype in ptypes]

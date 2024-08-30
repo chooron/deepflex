@@ -15,7 +15,7 @@ function DischargeRouteFlux(
         output = first(@variables $output_name)
     end
 
-    return ContRouteFlux(
+    return GridRouteFlux(
         input,
         [lag, s_river],
         routetype=:discharge,
@@ -23,7 +23,7 @@ function DischargeRouteFlux(
     )
 end
 
-function (flux::ContRouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::GridRouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     input_len = size(input)[2]
     input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
 
@@ -47,11 +47,11 @@ function (flux::ContRouteFlux{:discharge})(input::AbstractMatrix, pas::Component
     reshape(q_out_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::ContRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_initstates(::GridRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     [pas[:params][ptype][:s_river] for ptype in ptypes]
 end
 
-function get_rflux_func(::ContRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_func(::GridRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     function cal_q_out!(du, s_rivers, q_in, q_gen, p)
         lag_ps = [p[ptype][:lag] for ptype in ptypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))
