@@ -9,18 +9,18 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ComponentArrays
 using StructArrays
-include("../../src/LumpedHydro.jl")
-# using LumpedHydro
+include("../../src/HydroModels.jl")
+# using HydroModels
 
 # load data
 file_path = "data/cemaneige/sample.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:length(df[!, :precipitation]))
-model = LumpedHydro.Cemaneige.SurfaceStorage(name=:cemaneige, mtk=false)
-LumpedHydro.get_input_names(model)
-LumpedHydro.get_state_names(model)
-LumpedHydro.get_param_names(model)
+model = HydroModels.Cemaneige.SurfaceStorage(name=:cemaneige, mtk=false)
+HydroModels.get_input_names(model)
+HydroModels.get_state_names(model)
+HydroModels.get_param_names(model)
 input = (
     prcp=df[!, :precipitation], min_temp=df[!, :min_temp],
     mean_temp=df[!, :mean_temp], max_temp=df[!, :max_temp],

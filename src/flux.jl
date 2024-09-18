@@ -101,6 +101,7 @@ struct SimpleFlux <: AbstractSimpleFlux
 
         #* Convert to a symbol based on the variable
         input_names = Symbolics.tosymbol.(inputs, escape=false)
+        
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = length(params) > 0 ? Symbolics.tosymbol.(params) : Symbol[]
         infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[], state=Symbol[])

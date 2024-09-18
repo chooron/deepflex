@@ -9,8 +9,8 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ComponentArrays
 using StructArrays
-include("../../src/LumpedHydro.jl")
-# using LumpedHydro
+include("../../src/HydroModels.jl")
+# using HydroModels
 
 # test gr4j model
 # load data
@@ -21,11 +21,11 @@ df = DataFrame(data);
 prcp_vec = df[!, "precip"]
 et_vec = df[!, "pet"]
 
-model = LumpedHydro.SIMHYD.Unit(name=:simhyd, mtk=true);
-LumpedHydro.get_input_names(model)
-LumpedHydro.get_output_names(model)
-LumpedHydro.get_param_names(model)
-LumpedHydro.get_state_names(model)
+model = HydroModels.SIMHYD.Unit(name=:simhyd, mtk=true);
+HydroModels.get_input_names(model)
+HydroModels.get_output_names(model)
+HydroModels.get_param_names(model)
+HydroModels.get_state_names(model)
 
 # build model
 input = (prcp=prcp_vec, pet=et_vec)

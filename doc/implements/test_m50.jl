@@ -8,10 +8,10 @@ using DataFrames
 using Lux, LuxCore
 using StableRNGs
 using OrdinaryDiffEq
-# using LumpedHydro
+# using HydroModels
 
-include("../../src/LumpedHydro.jl")
-model = LumpedHydro.M50.Unit(name=:m50, mtk=false, step=false)
+include("../../src/HydroModels.jl")
+model = HydroModels.M50.Unit(name=:m50, mtk=false, step=false)
 # unit_sys = model.units[1]
 # unknowns(unit_sys.system)
 # base param names
@@ -44,7 +44,7 @@ params = ComponentVector(
 initstates = ComponentVector(snowwater=0.0, soilwater=1303.004248)
 pas = ComponentVector(params=params, initstates=initstates, nn=(etnn=et_ann_p, qnn=q_ann_p)) # , weight=1.0
 
-solver = LumpedHydro.ODESolver(alg=Rosenbrock23())
+solver = HydroModels.ODESolver(alg=Rosenbrock23())
 results = model(input, pas, timeidx=ts, solver=solver)
 
 # q_ann = Lux.Chain(

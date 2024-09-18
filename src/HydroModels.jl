@@ -54,8 +54,10 @@ const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.t
 
 ## Abstract Component Types
 abstract type AbstractComponent end
+## this is used for multiple propose running
+abstract type AbstractRunner end
 abstract type AbstractSolver end
-
+ 
 #* 负责某一平衡单元的计算
 abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractElement <: AbstractComponent end
@@ -110,6 +112,9 @@ export param_grad_optim, param_box_optim, nn_param_optim
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
 
+include("runner.jl")
+export HydroRunner
+
 # some route function and special flux
 include("fluxes/cascade.jl")
 export CascadeRouteFlux
@@ -126,7 +131,6 @@ export RenameFlux
 include("implements/cemaneige.jl")
 include("implements/exphydro.jl")
 include("implements/gr4j.jl")
-include("implements/hbv_edu.jl")
 include("implements/hymod.jl")
 include("implements/simhyd.jl")
 include("implements/m50.jl")

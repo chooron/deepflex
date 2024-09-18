@@ -4,7 +4,7 @@ using Random
 using DataFrames
 using BenchmarkTools
 using ComponentArrays
-include("../../src/LumpedHydro.jl")
+include("../../src/HydroModels.jl")
 
 FC, Beta, PWP, L = 177.1, 2.35, 105.89, 4.87
 k0, k1, k2, kp = 0.05, 0.03, 0.02, 0.05
@@ -18,7 +18,7 @@ params = ComponentVector(NamedTuple{Tuple([Symbol(:node, i) for i in 1:node_num]
 init_states = ComponentVector(NamedTuple{Tuple([Symbol(:node, i) for i in 1:node_num])}(repeat([initstates_i], node_num)))
 pas = ComponentVector(params=params, initstates=init_states)
 # pas = ComponentVector(param=params_i, state=initstates_i)
-unit = LumpedHydro.HBV_MAXBAS.Unit(name=:hbv_maxbas)
+unit = HydroModels.HBV_MAXBAS.Unit(name=:hbv_maxbas)
 input = (prcp=ones(100) .* 5, pet=zeros(100))
 inputs = repeat([input], node_num)
 

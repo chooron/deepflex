@@ -7,7 +7,7 @@ using LuxCore
 using StableRNGs
 using Optimization
 using OptimizationOptimisers
-include("../../src/LumpedHydro.jl")
+include("../../src/HydroModels.jl")
 
 #* num of basin grid is 62
 #* set the model parameters

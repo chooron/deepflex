@@ -85,6 +85,10 @@
 - [X] 完成了routeflux的核心构建，实现route模块与routeflux模块的拆分
 - [X] 将routeflux细化成routeflux和unithydroflux两种类型
 - [ ] vectorflux求解方式好像更倾向于discrete求解
+- [ ] 将径流深(mm)转换为流量之后(m3/s),好像都不适用于continous solve, 这个需要进一步明确
+- [ ] 运行需要额外的需求,比如:分段运行(保存上一次运行的中间状态); 持续运行(更新每次计算状态)
+- [ ] 需要添加log信息和运行状态展示,用于前端展示
+
 
 ## 关键功能和实现技术
 
