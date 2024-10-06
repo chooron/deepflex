@@ -62,6 +62,7 @@ function get_objective()
         #*                         tunable parameters axes and default model params
         #* Use merge_ca to replace the tunable parameters inner the model parameters
         component, input, target, timeidx, solver, run_kwargs, default_model_pas, loss_func = p
+        # todo 添加clip方法,约束参数范围
         tmp_pas = update_ca(default_model_pas, x)
         loss = mean(map(eachindex(input, target, timeidx)) do i
             inp, tar, tidx = input[i], target[i], timeidx[i]

@@ -77,7 +77,6 @@ function FreeWaterStorage(; name::Symbol)
     @parameters k1 = 0.0
     @parameters k2 = 0.0
     @parameters kp = 0.0
-    @parameters PWP = 0.0
 
     funcs = [
         SimpleFlux([s1] => [q0], [L, k0], exprs=@.[max(0.0, s1 - L) * k0]),

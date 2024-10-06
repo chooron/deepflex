@@ -85,9 +85,10 @@
 - [X] 完成了routeflux的核心构建，实现route模块与routeflux模块的拆分
 - [X] 将routeflux细化成routeflux和unithydroflux两种类型
 - [ ] vectorflux求解方式好像更倾向于discrete求解
-- [ ] 将径流深(mm)转换为流量之后(m3/s),好像都不适用于continous solve, 这个需要进一步明确
+- [ ] ~~将径流深(mm)转换为流量之后(m3/s),好像都不适用于continous solve, 这个需要进一步明确~~
 - [ ] 运行需要额外的需求,比如:分段运行(保存上一次运行的中间状态); 持续运行(更新每次计算状态)
 - [ ] 需要添加log信息和运行状态展示,用于前端展示
+- [X] 马斯京根算法的连续性方程求解
 
 
 ## 关键功能和实现技术
@@ -101,3 +102,18 @@
   * [X] 参数优化
 * [ ] 参数动态模拟估计，Time-vary parameter estimation
 * [X] 神经网络耦合物理公式计算的混合参数优化(包括普通参数和神经网络参数)
+
+
+## 关于汇流计算的一些思考
+
+vector-based河网汇流计算中, 设定了q_in, q_out, q_gen, 以及riv_st四种变量, 
+
+在计算中:
+- 设定上游流域为i,下游为j, q_out(i,t-1)应该是作为下游入流量q_in(j,t),
+- 其中q_out的计算应该包括两个部分,首先是该流域的入流的汇流计算结果,即:
+- q_out(i,t) = route_func(q_in(i,t), riv_st(i,t)) + q_gen(i,t)
+- q_out可以根据流域入流和河床状态计算出流量,此外还应当包括流域本身的产流量.
+
+在平衡计算中:
+- q_out(i,t-1)就可以作为q_in(j,t)来替换q_in(j,t-1)
+- riv_st(i,t)=riv_st(i,t-1)+q_in(i,t)-q_out(i,t), 注q_gen没有显式参与计算,但其包括在下游j的q_in中参与计算的

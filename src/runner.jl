@@ -17,9 +17,6 @@ mutable struct HydroRunner{runtype} <: AbstractRunner
     end
 end
 
-"""
-代表是一次性输出所有结果
-"""
 function (runner::HydroRunner{:single_run})(
     input::NamedTuple,
     params::ComponentVector,
@@ -31,9 +28,6 @@ function (runner::HydroRunner{:single_run})(
     # processes output
 end
 
-"""
-代表是逐步输出计算结果
-"""
 function (runner::HydroRunner{:multi_run})(
     input::NamedTuple,
     params::ComponentVector,
@@ -46,9 +40,6 @@ function (runner::HydroRunner{:multi_run})(
     # processes output
 end
 
-"""
-代表是持续计算输出
-"""
 function (runner::HydroRunner{:conti_run})(
     input::NamedTuple,
     params::ComponentVector,

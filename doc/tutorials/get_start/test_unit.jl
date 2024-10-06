@@ -20,7 +20,7 @@ data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-solver = HydroModels.ODESolver()
+solver = HydroModels.ManualSolver()
 result = unit(input, pas, timeidx=ts, solver=solver)
 plot(result.flow)
 plot!(df[ts, "flow(mm)"])
