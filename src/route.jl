@@ -1,5 +1,5 @@
-(flux::AbstractRouteFlux)(input::Vector, pas::ComponentVector; kwargs...) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
-(flux::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(flux::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs...) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(flux::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs...) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
 
 """
     WeightSumRoute <: AbstractRouteFlux
@@ -165,14 +165,17 @@ function (route::GridRoute)(
     itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; pas, ptypes)
+    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes)
 
     function grid_route_ode!(du, u, p, t)
-        q_in = u[:q_in]
+        # 提取单元产流
         q_gen = [itp_func(t) for itp_func in itp_funcs]
+        # 计算单元出流,更新单元出流状态
         q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], q_gen, p)
+        # 计算出流的汇流结果
         new_q_in = grid_routing(q_out, route.positions, route.flwdir)
-        du[:q_in] = new_q_in .- q_in
+        # 更新状态
+        du[:q_in] = new_q_in .- u[:q_in]
     end
 
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
@@ -221,7 +224,7 @@ struct VectorRoute <: AbstractVectorRoute
     "Routing function"
     rfunc::AbstractRouteFlux
     "Routing network"
-    network::DiGraph
+    adjacency::AbstractMatrix
     "Routing information: keys contain: input, output, param, state, nn"
     infos::NamedTuple
 
@@ -238,10 +241,12 @@ struct VectorRoute <: AbstractVectorRoute
         nn_names = get_nn_names(rfunc)
         #* Setup the name information of the hydrobucket
         infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        #* generate adjacency matrix from network
+        adjacency = adjacency_matrix(network)'
 
         return new(
             rfunc,
-            network,
+            adjacency,
             infos,
         )
     end
@@ -263,28 +268,26 @@ function (route::VectorRoute)(
     itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; pas, ptypes)
-
-    sorted_idxes = topological_sort(route.network)
-    up_idxes = [inneighbors(route.network, cur_idx) for cur_idx in sorted_idxes]
+    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes)
 
     function vec_route_ode!(du, u, p, t)
         q_in = u[:q_in]
         q_gen = [itp_func(t) for itp_func in itp_funcs]
         q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], q_gen, p)
-        for (sorted_idx, up_idx) in zip(sorted_idxes, up_idxes)
-            q_out[sorted_idx] = sum(q_out[up_idx]) .+ q_out[sorted_idx]
-        end
-        du[:q_in] = q_out .- q_in
+        # update up_in
+        q_in_updated = route.adjacency * q_out
+        du[:q_in] = q_in_updated .- q_in
     end
 
-    init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
-    prob = DiscreteProblem(vec_route_ode!, init_states, (1, size(input_mat)[2]), pas[:params])
-    sol = solve(prob, FunctionMap())
+    init_states = ComponentVector(flux_states=flux_initstates, q_in=input_mat[:, 1])
+    prob = ODEProblem(vec_route_ode!, init_states, (1, size(input_mat)[2]), pas[:params])
+    sol = solve(prob, Tsit5(), saveat=timeidx)
 
     flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
     q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
 
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
-    q_out
+    q_out_mat = reduce(hcat, q_out)
+    q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
+    return q_out_reshaped
 end

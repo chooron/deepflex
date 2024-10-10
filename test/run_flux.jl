@@ -65,6 +65,26 @@ end
     @test HydroModels.get_state_names(state_flux_3) == [:d,]
 end
 
+@testset "test muskingum route flux" begin
+    @variables q1
+
+    # Building the Muskingum routing flux
+    k, x = 3.0, 0.2
+    pas = ComponentVector(params=(k=k, x=x,))
+    msk_flux = HydroModels.MuskingumRouteFlux(q1)
+    input = Float64[1 2 3 2 3 2 5 7 8 3 2 1]
+    re = msk_flux(input, pas, timeidx=collect(1:size(input)[2]))
+
+    # Verifying the input, output, and parameter names
+    @test HydroModels.get_input_names(msk_flux) == [:q1]
+    @test HydroModels.get_output_names(msk_flux) == [:q1_routed]
+    @test HydroModels.get_param_names(msk_flux) == [:k, :x]
+
+    # Checking the size and values of the output
+    @test size(re) == size(input)
+    @test re ≈ [1.0 0.977722 1.30086 1.90343 1.919 2.31884 2.15305 3.07904 4.39488 5.75286 4.83462 3.89097] atol=1e-1
+end
+
 @testset "test unit hydro flux (solve type 1)" begin
     # Define the variables and parameters
     @variables q1
@@ -76,25 +96,25 @@ end
     # Parameter: x1 (routing parameter)
     # Using uh_1_half as the unit hydrograph function
     # Solve type: unithydro1 (convolution method)
-    router = HydroModels.UnitHydroFlux(q1, x1, uh_func, solvetype=:unithydro1)
+    uhflux = HydroModels.UnitHydroFlux(q1, x1, uh_func, solvetype=:unithydro1)
     # Test the input names of the router
-    @test HydroModels.get_input_names(router) == [:q1]
+    @test HydroModels.get_input_names(uhflux) == [:q1]
     # Test the parameter names of the router
-    @test HydroModels.get_param_names(router) == [:x1]
+    @test HydroModels.get_param_names(uhflux) == [:x1]
     # Test the output names of the router
-    @test HydroModels.get_output_names(router) == [:q1_routed]
+    @test HydroModels.get_output_names(uhflux) == [:q1_routed]
     # Test the routing function with sample input
     input_flow = Float32[2 3 4 2 3 1]
     params = ComponentVector(params=(x1=3.5,))
     expected_output = [0.08726897695099571 0.5373023715895905 1.6508571480656808 2.839759323622619 3.2301609643779736 2.7991762465729138]
-    @test router(input_flow, params) ≈ expected_output
+    @test uhflux(input_flow, params) ≈ expected_output
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2 3 4 2 3 1] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
     node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
     node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
     input_pas = ComponentVector(params=node_params, initstates=node_initstates)
-    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
+    @test uhflux(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test unit hydro flux (solve type 2)" begin
@@ -108,25 +128,25 @@ end
     # Parameter: x1 (routing parameter)
     # Using uh_1_half as the unit hydrograph function
     # Solve type: unithydro1 (convolution method)
-    router = HydroModels.UnitHydroFlux(q1, x1, uh_func, solvetype=:unithydro2)
+    uhflux = HydroModels.UnitHydroFlux(q1, x1, uh_func, solvetype=:unithydro2)
     # Test the input names of the router
-    @test HydroModels.get_input_names(router) == [:q1]
+    @test HydroModels.get_input_names(uhflux) == [:q1]
     # Test the parameter names of the router
-    @test HydroModels.get_param_names(router) == [:x1]
+    @test HydroModels.get_param_names(uhflux) == [:x1]
     # Test the output names of the router
-    @test HydroModels.get_output_names(router) == [:q1_routed]
+    @test HydroModels.get_output_names(uhflux) == [:q1_routed]
     # Test the routing function with sample input
     input_flow = Float32[2 3 4 2 3 1]
     params = ComponentVector(params=(x1=3.5,))
     expected_output = [0.08726897695099571 0.5373023715895905 1.6508571480656808 2.839759323622619 3.2301609643779736 2.7991762465729138]
-    @test router(input_flow, params) ≈ expected_output
+    @test uhflux(input_flow, params) ≈ expected_output
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2 3 4 2 3 1] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
     node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
     node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
     input_pas = ComponentVector(params=node_params, initstates=node_initstates)
-    @test router(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
+    @test uhflux(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test neural flux (single output)" begin

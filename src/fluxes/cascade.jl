@@ -11,15 +11,16 @@ function CascadeRouteFlux(
         output = first(@variables $output_name)
     end
 
-    return GridRouteFlux(
+    return RouteFlux(
         input,
         [k, n],
+        Num[],
         routetype=:cascade,
         output=output
     )
 end
 
-function (flux::GridRouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     n = Int(pas[:params].n)
     init_states = zeros(n)
     input_len = size(input)[2]
@@ -39,11 +40,11 @@ function (flux::GridRouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVe
     reshape(sol_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::GridRouteFlux{:cascade}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_initstates(::RouteFlux{:cascade}; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol})
     reduce(vcat, [zeros(eltype(pas), Int(pas[:params][ptype][:n])) for ptype in ptypes])
 end
 
-function get_rflux_func(::GridRouteFlux{:cascade}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_func(::RouteFlux{:cascade}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     #* node_num * ts_len
     node_iuh_nums = [pas[:params][ptype][:n] for ptype in ptypes]
     start_idxes = Int[1; cumsum(node_iuh_nums)[1:end-1] .+ 1]

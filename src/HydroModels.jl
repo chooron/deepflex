@@ -71,12 +71,7 @@ abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
-
-#* routeflux的离散求解和连续求解两种形式
-abstract type AbstractGridRouteFlux <: AbstractRouteFlux end
-abstract type AbstractVectorRouteFlux <: AbstractRouteFlux end
-#* 以及单位线求解方式
-abstract type AbstractUnitHydroFlux <: AbstractRouteFlux end
+abstract type AbstractUnitHydroFlux <: AbstractFlux end
 
 #* route的两种变体
 abstract type AbstractGridRoute <: AbstractRoute end
@@ -95,7 +90,7 @@ include("utils/unithydro.jl")
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, GridRouteFlux, VectorRouteFlux, UnitHydroFlux
+export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, UnitHydroFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 

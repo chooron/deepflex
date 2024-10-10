@@ -101,7 +101,7 @@ struct SimpleFlux <: AbstractSimpleFlux
 
         #* Convert to a symbol based on the variable
         input_names = Symbolics.tosymbol.(inputs, escape=false)
-        
+
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         param_names = length(params) > 0 ? Symbolics.tosymbol.(params) : Symbol[]
         infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[], state=Symbol[])
@@ -453,70 +453,57 @@ They should be incorporated into larger flux structures like SimpleFlux for prop
 (::AbstractStateFlux)(::Array, ::ComponentVector, ::AbstractVector{Symbol}; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
 
 
-(::AbstractRouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
-(route::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
-function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
-    #* array dims: (variable dim, num of node, sequence length)
-    #* Extract the initial state of the parameters and routement in the pas variable
-    pytype_params = [pas[:params][ptype] for ptype in ptypes]
-    pytype_initstates = [pas[:initstates][ptype] for ptype in ptypes]
-
-    sols = map(eachindex(ptypes)) do (idx)
-        tmp_pas = ComponentVector(params=pytype_params[idx], initstates=pytype_initstates[idx])
-        node_sols = reduce(hcat, route(input[:, idx, :], tmp_pas))
-        node_sols
-    end
-    sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-    return permutedims(sol_arr, (1, 3, 2))
-end
-
 """
-    VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
+    RouteFlux{rtype} <: AbstractRouteFlux
 
-Represents a discrete routing flux component in a hydrological model.
+Represents a routing flux component in a hydrological model.
 
 # Fields
 - `inputs::Vector{Num}`: A vector of input variables.
 - `outputs::Vector{Num}`: A vector of output variables.
 - `params::Vector{Num}`: A vector of parameter variables.
-- `states::Vector{Num}`: A vector of state variables.
-- `infos::NamedTuple`: Contains metadata about the flux, including input, output, parameter, and state names.
+- `infos::NamedTuple`: Contains metadata about the flux, including input, output, and parameter names.
 
 # Type Parameters
-- `rtype`: A symbol representing the specific type of discrete routing flux.
+- `rtype`: A symbol representing the specific type of routing flux.
 
 # Constructors
-    VectorRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
+    RouteFlux(input::Num, params::Vector{Num}; routetype::Symbol, output::Union{Num,Nothing}=nothing)
 
 # Description
-`VectorRouteFlux` is a structure that encapsulates a discrete routing flux calculation in a hydrological model. 
-It is designed to represent various types of discrete routing processes, with the specific type indicated 
+`RouteFlux` is a structure that encapsulates a routing flux calculation in a hydrological model. 
+It is designed to represent various types of routing processes, with the specific type indicated 
 by the `rtype` parameter.
 
-The structure automatically generates output variable names based on the input, and organizes 
-the information about inputs, outputs, parameters, and states into the `infos` field.
+The structure automatically generates an output variable name based on the input if not provided,
+and organizes the information about inputs, outputs, and parameters into the `infos` field.
 
-This structure is particularly useful for representing discrete routing processes in hydrological models, 
-where water is transferred from one point to another in the system using discrete time steps or methods.
+This structure is particularly useful for representing routing processes in hydrological models, 
+where water is transferred from one point to another in the system.
 """
-struct VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
+struct RouteFlux{rtype} <: AbstractRouteFlux
     "A map of input names (Symbol) and its variables (Num)"
     inputs::Vector{Num}
     "A map of output names (Symbol) and its variables (Num)"
     outputs::Vector{Num}
     "A map of parameters names (Symbol) and its variables (Num)"
     params::Vector{Num}
-    "bucket information: keys contains: input, output, param"
+    "A map of states names (Symbol) and its variables (Num)"
+    states::Vector{Num}
+    "bucket information: keys contains: input, output, param, state"
     infos::NamedTuple
 
-    function VectorRouteFlux(
+    function RouteFlux(
         input::Num,
-        params::Vector{Num};
+        params::Vector{Num},
+        states::Vector{Num};
         routetype::Symbol,
         output::Union{Num,Nothing}=nothing,
     )
         input_name = Symbolics.tosymbol(input, escape=false)
         param_names = Symbolics.tosymbol.(params, escape=false)
+        state_names = Symbolics.tosymbol.(states, escape=false)
+
         if isnothing(output)
             output_name = Symbol(input_name, :_routed)
             output = first(@variables $output_name)
@@ -524,81 +511,36 @@ struct VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
             output_name = Symbolics.tosymbol(output, escape=false)
         end
         #* Setup the name information of the hydroroutement
-        infos = (input=[input_name], output=[output_name], param=param_names, state=Symbol[])
+        infos = (input=[input_name], output=[output_name], param=param_names, state=state_names)
 
         return new{routetype}(
             [input],
             [output],
             params,
+            states,
             infos
         )
     end
 end
 
-"""
-    GridRouteFlux{rtype} <: AbstractGridRouteFlux
+(::RouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
+(route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...) = @error "Must be implemented with the Route type"
+(route::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; timeidx::AbstractVector, kwargs...) = @error "Must be implemented by subtype"
 
-Represents a continuous routing flux component in a hydrological model.
+# function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
+#     #* array dims: (variable dim, num of node, sequence length)
+#     #* Extract the initial state of the parameters and routement in the pas variable
+#     pytype_params = [pas[:params][ptype] for ptype in ptypes]
+#     pytype_initstates = [pas[:initstates][ptype] for ptype in ptypes]
 
-# Fields
-- `inputs::Vector{Num}`: A vector of input variables.
-- `outputs::Vector{Num}`: A vector of output variables.
-- `params::Vector{Num}`: A vector of parameter variables.
-- `states::Vector{Num}`: A vector of state variables.
-- `infos::NamedTuple`: Contains metadata about the flux, including input, output, parameter, and state names.
-
-# Type Parameters
-- `rtype`: A symbol representing the specific type of continuous routing flux.
-
-# Constructors
-    GridRouteFlux(input::Num, params::Vector{Num}, states::Vector{Num}, routetype::Symbol)
-
-# Description
-`GridRouteFlux` is a structure that encapsulates a continuous routing flux calculation in a hydrological model. 
-It is designed to represent various types of continuous routing processes, with the specific type indicated 
-by the `rtype` parameter.
-
-The structure automatically generates output variable names based on the input, and organizes 
-the information about inputs, outputs, parameters, and states into the `infos` field.
-
-This structure is particularly useful for representing continuous routing processes in hydrological models, 
-where water is transferred from one point to another in the system using continuous time steps.
-"""
-struct GridRouteFlux{rtype} <: AbstractGridRouteFlux
-    "A map of input names (Symbol) and its variables (Num)"
-    inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
-    outputs::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
-    params::Vector{Num}
-    "bucket information: keys contains: input, output, param"
-    infos::NamedTuple
-
-    function GridRouteFlux(
-        input::Num,
-        params::Vector{Num};
-        routetype::Symbol,
-        output::Union{Num,Nothing}=nothing,
-    )
-        input_name = Symbolics.tosymbol(input, escape=false)
-        param_names = Symbolics.tosymbol.(params, escape=false)
-        if isnothing(output)
-            output_name = Symbol(input_name, :_routed)
-            output = first(@variables $output_name)
-        else
-            output_name = Symbolics.tosymbol(output, escape=false)
-        end
-        #* Setup the name information of the hydroroutement
-        infos = (input=[input_name], output=[output_name], param=param_names, state=Symbol[])
-
-        return new{routetype}(
-            [input],
-            [output],
-            params,
-            infos
-        )
-    end
-end
+#     sols = map(eachindex(ptypes)) do (idx)
+#         tmp_pas = ComponentVector(params=pytype_params[idx], initstates=pytype_initstates[idx])
+#         node_sols = reduce(hcat, route(input[:, idx, :], tmp_pas))
+#         node_sols
+#     end
+#     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
+#     return permutedims(sol_arr, (1, 3, 2))
+# end
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux

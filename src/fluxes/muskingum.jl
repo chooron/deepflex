@@ -2,7 +2,7 @@ function MuskingumRouteFlux(
     input::Num,
     output::Union{Num,Nothing}=nothing,
 )
-    @parameters k, x, dt
+    @parameters k, x
 
     if isnothing(output)
         input_name = Symbolics.tosymbol(input, escape=false)
@@ -10,66 +10,58 @@ function MuskingumRouteFlux(
         output = first(@variables $output_name)
     end
 
-    return VectorRouteFlux(
+    return RouteFlux(
         input,
-        [k, x, dt],
+        [k, x],
+        Num[],
         routetype=:muskingum,
         output=output
     )
 end
 
-function (flux::VectorRouteFlux{:muskingum})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; timeidx::AbstractVector, kwargs...)
     input_len = size(input)[2]
-    input_vec = input[1, :]
+    input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
     params = pas[:params]
 
-    k, x, dt = params.k, params.x, params.dt
-    c0 = ((dt / k) - (2 * x)) / ((2 * (1 - x)) + (dt / k))
-    c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
-    c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
-
-    function msk_prob(u, p, t)
-        q_in, q_out = u[1], u[2]
-        c0, c1, c2 = p
-        new_q = (c0 * input_vec[Int(t)]) + (c1 * q_in) + (c2 * q_out)
-        [input_vec[Int(t)], new_q]
+    function msk_prob!(du, u, p, t)
+        s_river = u[1]
+        q_in = input_itp(t)
+        k, x = p
+        q_out = (s_river - k * x * q_in) / (k * (1 - x))
+        du[1] = q_in - q_out
     end
 
-    prob = DiscreteProblem(msk_prob, [input_vec[1], input_vec[1]], (1, input_len), ComponentVector(c0=c0, c1=c1, c2=c2))
-    sol = solve(prob, FunctionMap())
-    Array(sol[2,:])
+    init_states = [params.k * input[1, 1]]
+    prob = ODEProblem(msk_prob!, init_states, (1, input_len), params)
+    sol = solve(prob, Tsit5(), saveat=timeidx)
+
+    s_river_vec = Array(sol)
+    q_out_vec = @.((s_river_vec - params.k * params.x * input) / (params.k * (1 - params.x)))
+    q_out_vec
 end
 
-function get_rflux_initstates(::VectorRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
-    [pas[:initstates][ptype][:s_river] for ptype in ptypes]
+function get_rflux_initstates(::RouteFlux{:muskingum}; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    [pas[:params][ptype][:k] for ptype in ptypes] .* input[:, 1]
 end
 
-function get_rflux_func(::VectorRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
-    function cal_q_out!(du, q_out, q_in, q_gen, p)
+function get_rflux_func(::RouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+
+    function cal_q_out!(du, s_river, q_in, q_gen, p)
         k_ps = [p[ptype][:k] for ptype in ptypes]
         x_ps = [p[ptype][:x] for ptype in ptypes]
-        dt_ps = [p[ptype][:dt] for ptype in ptypes]
 
-        c0_ps = @.(((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c1_ps = @.(((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c2_ps = @.(((2 * (1 - x_ps)) - (dt_ps / k_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-
-        new_q_out = @.((c0_ps * q_in) + (c1_ps * q_in[Int(t)-1]) + (c2_ps * (q_out + q_gen)))
-        du[:flux_states] = new_q_out
-        new_q_out
+        q_out = @.((s_river - k_ps * x_ps * q_in) / (k_ps * (1 - x_ps)))
+        du[:flux_states] = q_in .- q_out
+        q_out .+ q_gen
     end
 
-    function cal_q_out(q_out, q_in, q_gen, p)
+    function cal_q_out(s_river, q_in, q_gen, p)
         k_ps = [p[ptype][:k] for ptype in ptypes]
         x_ps = [p[ptype][:x] for ptype in ptypes]
-        dt_ps = [p[ptype][:dt] for ptype in ptypes]
 
-        c0_ps = @.(((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c1_ps = @.(((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c2_ps = @.(((2 * (1 - x_ps)) - (dt_ps / k_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-
-        new_q_out = @.((c0_ps * q_in) + (c1_ps * q_in[Int(t)-1]) + (c2_ps * (q_out + q_gen)))
-        new_q_out
+        q_out = @.((s_river - k_ps * x_ps * q_in) / (k_ps * (1 - x_ps)))
+        q_out .+ q_gen
     end
 
     return cal_q_out!, cal_q_out

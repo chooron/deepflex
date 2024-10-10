@@ -1,33 +1,27 @@
-include("../src/HydroModels.jl")
-using ModelingToolkit
-using ComponentArrays
-using Graphs
+include("../src/HydroModels.jl")    
 
 @variables q1
 
-k = 3.0
-x = 0.2
-dt = 1.0
-pas = ComponentVector(params=(k=k, x=x, dt=dt,))
+network = DiGraph(9)
+add_edge!(network, 1, 2)
+add_edge!(network, 2, 5)
+add_edge!(network, 3, 5)
+add_edge!(network, 4, 5)
+add_edge!(network, 5, 8)
+add_edge!(network, 6, 9)
+add_edge!(network, 7, 8)
+add_edge!(network, 8, 9)
 
-msk_flux = HydroModels.MuskingumRouteFlux(q1)
+ndtypes = [:ntype1, :ntype2, :ntype3]
+rflux = HydroModels.DischargeRouteFlux(q1)
 
-input = Float64[1 2 3 2 3 2 5 7 8 3 2 1]
+params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(lag=0.2,) for _ in eachindex(ndtypes)]))
+initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.1,) for _ in eachindex(ndtypes)]))
+pas = ComponentVector(; params, initstates)
+route = HydroModels.VectorRoute(:vectorroute; rfunc=rflux, network=network)
 
-re = msk_flux(input, pas)
-
-# function msk_func(input_vec)
-#     c0 = ((dt / k) - (2 * x)) / ((2 * (1 - x)) + (dt / k))
-#     c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
-#     c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
-
-#     q_out = input_vec[1]
-#     q_out_vec = [q_out]
-#     for i in 2:length(input_vec)
-#         q_out = c0 * input_vec[i] + c1 * input_vec[i-1] + c2 * q_out
-#         push!(q_out_vec, q_out)
-#     end
-#     q_out_vec
-# end
-
-# re2 = msk_func(input)'
+input_arr = ones(1, 9, 20)
+timeidx = collect(1:20)
+node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
+output_arr = route(input_arr, pas, timeidx=timeidx, ptypes=node_types)
+# [params[ntype][:k] for ntype in node_types] .* input_arr[1,:,1]

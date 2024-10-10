@@ -7,7 +7,8 @@ function DischargeRouteFlux(
     input::Num,
     output::Union{Num,Nothing}=nothing,
 )
-    @parameters lag s_river
+    @parameters lag
+    @variables s_river
 
     if isnothing(output)
         input_name = Symbolics.tosymbol(input, escape=false)
@@ -15,15 +16,16 @@ function DischargeRouteFlux(
         output = first(@variables $output_name)
     end
 
-    return GridRouteFlux(
+    return RouteFlux(
         input,
-        [lag, s_river],
+        [lag],
+        [s_river],
         routetype=:discharge,
         output=output
     )
 end
 
-function (flux::GridRouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::RouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
     input_len = size(input)[2]
     input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
 
@@ -47,11 +49,11 @@ function (flux::GridRouteFlux{:discharge})(input::AbstractMatrix, pas::Component
     reshape(q_out_vec, 1, input_len)
 end
 
-function get_rflux_initstates(::GridRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
-    [pas[:params][ptype][:s_river] for ptype in ptypes]
+function get_rflux_initstates(::RouteFlux{:discharge}; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    [pas[:initstates][ptype][:s_river] for ptype in ptypes]
 end
 
-function get_rflux_func(::GridRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+function get_rflux_func(::RouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
     function cal_q_out!(du, s_rivers, q_in, q_gen, p)
         lag_ps = [p[ptype][:lag] for ptype in ptypes]
         q_rf = @.((s_rivers + q_in) / (lag_ps + 1))
