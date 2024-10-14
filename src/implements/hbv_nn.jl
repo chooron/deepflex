@@ -19,7 +19,9 @@ function SoilStorage(; name::Symbol)
 
     funcs = [
         #* 直接用prcp替换原模型中的liquidwater
-        NeuralFlux([soilwater, prcp] => [W], Lux.Chain(Lux.Dense(2 => 16), Lux.Dense(16 => 1, Lux.sigmoid_fast), name=:wnn)),
+        NeuralFlux([soilwater, prcp] => [W],
+            Lux.Chain(Lux.Dense(2 => 16), Lux.Dense(16 => 1, Lux.sigmoid_fast), name=:wnn)
+        ),
         SimpleFlux([soilwater, prcp, W] => [prcpeff], exprs=@.[prcp * W]),
         SimpleFlux([soilwater, pet] => [evap], [PWP], exprs=@.[(pet * min(1.0, soilwater / PWP))]),
     ]

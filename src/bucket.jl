@@ -65,6 +65,31 @@ struct HydroBucket <: AbstractBucket
     end
 end
 
+"""
+    (ele::HydroBucket)(input::Matrix, pas::ComponentVector; timeidx::Vector, solver::AbstractSolver=ODESolver())
+    (ele::HydroBucket)(input::Array, pas::ComponentVector; timeidx::Vector, ptypes::AbstractVector{Symbol}, solver::AbstractSolver=ODESolver())
+
+Run the HydroBucket model for given input and parameters.
+
+# Arguments
+- `input`: Input data. Can be a Matrix or an Array.
+- `pas`: ComponentVector containing parameters and initial states.
+- `timeidx`: Vector of time indices.
+- `solver`: AbstractSolver to use for ODE solving. Defaults to ODESolver().
+- `ptypes`: (Only for Array input) AbstractVector of Symbol specifying parameter types.
+
+# Returns
+A matrix (for single node, dims: var_names × ts_len) or array (for multiple nodes, dims: var_names × node_names × ts_len) containing the model outputs and (if applicable) solved states.
+
+# Details
+- For Matrix input: Assumes input dimensions are [variables, time].
+- For Array input: Allows for more complex input structures, requires `ptypes`.
+- If the bucket has an ODE function, it solves the states over time.
+- Calculates fluxes using the model's flux function.
+- Concatenates solved states (if any) with calculated fluxes for output.
+
+"""
+
 function (ele::HydroBucket)(
     input::Matrix,
     pas::ComponentVector;
@@ -74,10 +99,7 @@ function (ele::HydroBucket)(
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_single_prob(ele, input=input, pas=pas, timeidx=timeidx, solver=solver)
-        if solved_states == false
-            solved_states = zeros(length(ele.infos[:state]), length(timeidx))
-        end
+        solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver)
         #* Store the solved bucket state in fluxes
         fluxes = cat(input, solved_states, dims=1)
     else
@@ -85,37 +107,32 @@ function (ele::HydroBucket)(
         solved_states = nothing
     end
 
-    #* excute other fluxes formula
+    #* extract params and nn params
     params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
-    if !isempty(ele.infos[:nn])
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
-    else
-        nn_params_vec = nothing
-    end
+    nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
+
+    #* calculate output, slice input on time dim, then calculate each output
     flux_output = ele.flux_func.(eachslice(fluxes, dims=2), Ref(params_vec), Ref(nn_params_vec))
     #* convert vector{vector} to matrix
     flux_output_matrix = reduce(hcat, flux_output)
 
-    #* merge output and state
-    if isnothing(solved_states)
-        output_matrix = flux_output_matrix
-    else
-        output_matrix = cat(solved_states, flux_output_matrix, dims=1)
-    end
+    #* merge output and state, if solved_states is not nothing, then cat it at the first dim
+    output_matrix = isnothing(solved_states) ? flux_output_matrix : cat(solved_states, flux_output_matrix, dims=1)
     output_matrix
 end
 
 function (ele::HydroBucket)(
     input::Array,
     pas::ComponentVector;
-    timeidx::Vector,
+    timeidx::AbstractVector,
     ptypes::AbstractVector{Symbol},
     solver::AbstractSolver=ODESolver(),
+    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_multi_prob(ele, input=input, pas=pas, timeidx=timeidx, solver=solver)
+        solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver, interpolator=interpolator)
         if solved_states == false
             solved_states = zeros(length(ele.infos[:state]), length(timeidx))
         end
@@ -126,22 +143,16 @@ function (ele::HydroBucket)(
         solved_states = nothing
     end
 
+    #* extract params and nn params
     params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
-    if !isempty(ele.infos[:nn])
-        nn_params_vec = collect([pas[:nn][nm] for nm in ele.infos[:nn]])
-    else
-        nn_params_vec = nothing
-    end
+    nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
+
     #* array dims: (num of node, sequence length, variable dim)
-    ele_output_vec = [ele.flux_func.(eachslice(fluxes[:, i, :], dims=2), Ref(params_vec[i]), Ref(nn_params_vec)) for i in 1:size(input)[2]]
+    ele_output_vec = [ele.flux_func.(eachslice(fluxes[:, i, :], dims=2), Ref(params_vec[i]), Ref(nn_params_vec), timeidx) for i in 1:size(input)[2]]
     ele_output_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec]), (1, 3, 2))
 
-    #* merge state and output
-    if isnothing(solved_states)
-        final_output_arr = ele_output_arr
-    else
-        final_output_arr = cat(solved_states, ele_output_arr, dims=1)
-    end
+    #* merge state and output, if solved_states is not nothing, then cat it at the first dim
+    final_output_arr = isnothing(solved_states) ? ele_output_arr : cat(solved_states, ele_output_arr, dims=1)
     final_output_arr
 end
 
@@ -163,32 +174,29 @@ This function handles two types of input arguments:
 
 # Arguments
 - `ele::HydroBucket`: The HydroBucket model instance
-- `input`: Input data (Matrix for single node, Array for multiple nodes)
+- `input`: Input data (Matrix for single node, dims: var_names × ts_len, Array for multiple nodes, dims: var_names × node_names × ts_len)
 - `pas::ComponentVector`: Parameters and initial states
 - `timeidx::Vector`: Time index vector
 - `ptypes::Vector{Symbol}`: Parameter types (for multiple node input)
 - `solver::AbstractSolver`: ODE solver to use (default: ODESolver())
 
 # Returns
-- `sol`: Solution of the ordinary differential equations
-
-# Dimensions
-- Input: var_names × node_names × ts_len (or var_names × ts_len for single node)
-- Output: var_names × node_names × ts_len (or var_names × ts_len for single node)
+- `sol`: Solution of the ordinary differential equations, dims: state_names × ts_len (or state_names × node_names × ts_len for multiple nodes)
 """
-function solve_single_prob(
-    ele::HydroBucket;
+function solve_prob(
+    ele::HydroBucket,
     input::Matrix,
-    pas::ComponentVector,
+    pas::ComponentVector;
     timeidx::Vector=collect(1:length(input[1])),
     solver::AbstractSolver=ODESolver(),
+    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
     params, init_states = pas[:params], pas[:initstates]
 
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
     itpfunc_list = map(eachrow(input)) do var
-        LinearInterpolation(var, timeidx, extrapolate=true)
+        interpolator(var, timeidx, extrapolate=true)
     end
     #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
     ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
@@ -211,7 +219,7 @@ function solve_single_prob(
         ode_input = ode_input_func(t)
         ode_params = ode_param_func(p)
         nn_params = ode_nn_param_func(p)
-        du[:] = ele.ode_func(ode_input, u, ode_params, nn_params)
+        du[:] = ele.ode_func(ode_input, u, ode_params, nn_params, t)
     end
 
     #* Solve the problem using the solver wrapper
@@ -222,13 +230,14 @@ function solve_single_prob(
     sol
 end
 
-function solve_multi_prob(
-    ele::HydroBucket;
+function solve_prob(
+    ele::HydroBucket,
     input::Array,
-    pas::ComponentVector,
+    pas::ComponentVector;
     timeidx::Vector,
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
-    solver::AbstractSolver=ODESolver()
+    solver::AbstractSolver=ODESolver(),
+    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
     #* 针对多个相同的state function采用并行化计算,这样能够避免神经网络反复多次计算减少梯度计算反馈
     #* 同时将多组state function放到同一个ode function中,这种并行计算或能提高预测性能,
@@ -238,7 +247,7 @@ function solve_multi_prob(
 
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
-    itpfunc_vecs = [LinearInterpolation.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
+    itpfunc_vecs = [interpolator.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
     ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
 
     #* 准备初始状态
@@ -265,7 +274,7 @@ function solve_multi_prob(
         ode_input = ode_input_func(t)
         ode_params = ode_param_func(p)
         nn_params = ode_nn_param_func(p)
-        tmp_output_vec = ele.ode_func.(ode_input, eachslice(u, dims=2), ode_params, Ref(nn_params))
+        tmp_output_vec = ele.ode_func.(ode_input, eachslice(u, dims=2), ode_params, Ref(nn_params), Ref(t))
         tmp_output = reduce(hcat, tmp_output_vec)
         du[:] = tmp_output
     end

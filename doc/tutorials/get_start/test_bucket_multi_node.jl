@@ -4,6 +4,7 @@ using DataFrames
 using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
+using DataInterpolations
 
 include("../../../src/HydroModels.jl")
 
@@ -28,5 +29,5 @@ node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(
 node_input = permutedims(node_input, (2, 3, 1))
 # result = HydroModels.solve_multi_prob(ele, input=node_input, pas=node_pas, timeidx=ts)
 
+result = ele(node_input, node_pas, timeidx=ts, ptypes=node_names, interpolator=LinearInterpolation)
 node_input = cat(node_input, result, dims=1)
-result = ele(node_input, node_pas, timeidx=ts, ptypes=node_names)

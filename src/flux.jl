@@ -3,6 +3,13 @@
 
 Represents a simple flux component in a hydrological model.
 
+# Arguments
+- `inputs::Vector{Num}`: A vector of input variables.
+- `outputs::Vector{Num}`: A vector of output variables.
+- `params::Vector{Num}`: A vector of parameter variables.
+- `exprs::Vector{Num}`: A vector of expressions describing the formulas for output variables.
+- `infos::NamedTuple`: Contains metadata about the flux, including input, output, and parameter names.
+
 # Fields
 - `inputs::Vector{Num}`: A vector of input variables.
 - `outputs::Vector{Num}`: A vector of output variables.
@@ -27,17 +34,17 @@ This structure is particularly useful for representing straightforward hydrologi
 where the relationship between inputs and outputs can be expressed as simple mathematical formulas.
 """
 struct SimpleFlux <: AbstractSimpleFlux
-    "A map of input names (Symbol) and its variables (Num)"
+    "Vector of input variables"
     inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
+    "Vector of output variables"
     outputs::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
+    "Vector of parameter variables"
     params::Vector{Num}
-    "flux expressions to descripe the formula of the output variable"
+    "Vector of expressions describing the formulas for output variables"
     exprs::Vector{Num}
-    "flux expressions to descripe the formula of the output variable"
+    "Compiled function that calculates the flux"
     func::Function
-    "bucket information: keys contains: input, output, param"
+    "Metadata about the flux, including input, output, and parameter names"
     infos::NamedTuple
 
     function SimpleFlux(
@@ -123,60 +130,38 @@ struct SimpleFlux <: AbstractSimpleFlux
 end
 
 """
-    (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; kwargs...)
+    (flux::AbstractSimpleFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
 
-Apply the simple flux model to a vector input.
-
-# Arguments
-- `input::Vector`: A vector of input values.
-- `pas::ComponentVector`: A component vector containing parameter values.
-- `kwargs...`: Additional keyword arguments (unused).
-
-# Returns
-The result of applying the flux function to the input and parameters.
-"""
-
-"""
-    (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; kwargs...)
-
-Apply the simple flux model to a matrix input.
+Apply the simple flux model to input data of various dimensions.
 
 # Arguments
-- `input::Matrix`: A matrix of input values, where each column represents a different input vector.
+- `input`: Input data, which can be:
+  - `Vector`: A vector of input values for a single time step.
+  - `Matrix`: A matrix of input values, where each column represents a different time step.
+  - `Array`: A 3D array of input values, with dimensions (var_names, node_names, ts_len).
 - `pas::ComponentVector`: A component vector containing parameter values.
-- `kwargs...`: Additional keyword arguments (unused).
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories (only used for `Array` input).
+- `kwargs...`: Additional keyword arguments (unused in this function), provided for compatibility with the component callable function API
 
 # Returns
-A matrix where each column is the result of applying the flux function to the corresponding input column.
-"""
-
-"""
-    (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol})
-
-Apply the simple flux model to a 3D array input with multiple parameter types.
-
-# Arguments
-- `input::Array`: A 3D array of input values, with dimensions (var_names, node_names, ts_len).
-- `pas::ComponentVector`: A component vector containing parameter values.
-- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories.
-- `kwargs...`: Additional keyword arguments (unused).
-
-# Returns
-A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
+- For vector input: The result of applying the flux function to the input and parameters.
+- For matrix input: A matrix where each column is the result of applying the flux function to the corresponding input column.
+- For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
 """
 function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; kwargs...)
-    flux.func(input, collect([pas[:params][nm] for nm in flux.infos[:param]]), nothing)
+    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
+    flux.func(input, params_vec)
 end
 
 function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; kwargs...)
     params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), Ref(nothing)))
+    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec)))
 end
 
-function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
+function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, kwargs...)
     param_vec = collect([collect([pas[:params][ptype][pname] for pname in flux.infos[:param]]) for ptype in ptypes])
     #* array dims: (var_names * node_names * ts_len)
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), Ref(nothing))) for i in eachindex(ptypes)]
+    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]))) for i in eachindex(ptypes)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
     permutedims(flux_output_arr, (3, 1, 2))
 end
@@ -196,6 +181,10 @@ Represents a neural network-based flux component in a hydrological model.
 - `infos::NamedTuple`: Contains metadata about the flux, including input, output, and neural network parameter names.
 - `nnios::NamedTuple`: Contains information about the neural network's input and output structure.
 
+# Constructors
+    # 1. Construct a NeuralFlux with specified input/output fluxes and a neural network, the neural network should specify the name
+    NeuralFlux(fluxes::Pair{Vector{Num},Vector{Num}}, chain::Lux.AbstractExplicitContainerLayer)
+
 # Description
 `NeuralFlux` is a structure that encapsulates a neural network-based flux calculation in a hydrological model. 
 It combines symbolic mathematics with neural networks to create a flexible and powerful representation of complex hydrological processes.
@@ -207,19 +196,19 @@ This structure is particularly useful for representing complex, non-linear relat
 where traditional equations may be insufficient or unknown.
 """
 struct NeuralFlux <: AbstractNeuralFlux
-    "A map of input names (Symbol) and its variables (Num)"
+    "Vector of input variables"
     inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
+    "Vector of output variables"
     outputs::Vector{Num}
-    "A map of neural network names (Symbol) and its variables (Num)"
+    "Array of neural network parameters"
     nnparam::Symbolics.Arr
-    "flux expressions to descripe the formula of the output variable"
+    "Array of expressions describing the formulas for output variables"
     expr::Symbolics.Arr{Num,1}
-    "flux expressions to descripe the formula of the output variable"
+    "Compiled function that calculates the flux using the neural network"
     func::Function
-    "neural network  information: keys contains: input, output, param"
+    "Metadata about the flux, including input, output, and neural network parameter names"
     infos::NamedTuple
-    "neural network build information: keys contains: input, output, param"
+    "Information about the neural network's input and output structure"
     nnios::NamedTuple
 
     function NeuralFlux(
@@ -271,20 +260,30 @@ struct NeuralFlux <: AbstractNeuralFlux
             (input=nn_input, output=nn_output, paramlen=length(init_params)),
         )
     end
-
-    function NeuralFlux(
-        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
-        chain::Lux.AbstractExplicitContainerLayer,
-    )
-        input_names, output_names = flux_names[1], flux_names[2]
-
-        input_vars = [first(@variables $input_name) for input_name in input_names]
-        output_vars = [first(@variables $output_name) for output_name in output_names]
-
-        return NeuralFlux(input_vars => output_vars, chain)
-    end
 end
 
+"""
+    (flux::AbstractFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
+
+Apply the flux model (simple or neural) to input data of various dimensions.
+
+# Arguments
+- `input`: Input data, which can be:
+  - `Vector`: A vector of input values for a single time step.
+  - `Matrix`: A matrix of input values, where each column represents a different time step.
+  - `Array`: A 3D array of input values, with dimensions (var_names, node_names, ts_len).
+- `pas::ComponentVector`: A component vector containing parameter values.
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories (only used for `Array` input).
+- `kwargs...`: Additional keyword arguments (unused in this function), provided for compatibility with the component callable function API
+
+# Returns
+- For vector input: The result of applying the flux function to the input and parameters.
+- For matrix input: A matrix where each column is the result of applying the flux function to the corresponding input column.
+- For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
+
+# Note
+For neural flux models, the parameters are accessed from `pas[:nn]` instead of `pas[:params]`.
+"""
 function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector; kwargs...)
     nn_params_vec = pas[:nn][flux.infos[:nn][1]]
     flux.func(input, nn_params_vec)
@@ -304,7 +303,7 @@ function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector, ::Abstra
 end
 
 """
-    StateFlux
+    StateFlux <: AbstractStateFlux
 
 Represents a state flux component in a hydrological model.
 
@@ -317,8 +316,11 @@ Represents a state flux component in a hydrological model.
 - `infos::NamedTuple`: Contains metadata about inputs, state, parameters, and neural networks.
 
 # Constructors
+    # 1. Detailed specification of inputs, state, parameters, and state expression
     StateFlux(fluxes::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num)
+    # 2. Automatic construction of state expression as the difference between sum of input fluxes and sum of output fluxes
     StateFlux(fluxes::Pair{Vector{Num},Vector{Num}}, state::Num)
+    # 3. Simple state update
     StateFlux(states::Pair{Num,Num})
 
 # Description
@@ -389,64 +391,28 @@ struct StateFlux <: AbstractStateFlux
         state_expr = new_state - ori_state
         return StateFlux([new_state], ori_state, expr=state_expr)
     end
-
-    function StateFlux(
-        flux_names::Vector{Symbol},
-        state_name::Symbol,
-        param_names::Vector{Symbol};
-        state_func::Function
-    )
-        #* Create variables by names
-        fluxes = [first(@variables $nm) for nm in flux_names]
-        state = first(@variables $state_name)
-        params = [first(@parameters $nm) for nm in param_names]
-        state_expr = state_func(fluxes, params)
-        return StateFlux(fluxes, state, params, expr=state_expr)
-    end
-
-    function StateFlux(
-        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
-        state_name::Symbol;
-    )
-        influx_names, outflux_names = flux_names[1], flux_names[2]
-        state_input_names = vcat(influx_names, outflux_names)
-        #* Construct the default calculation function: sum of input variables minus sum of output variables
-        state_func = (i, p) -> sum(i[1:length(influx_names)]) - sum(i[length(influx_names)+1:length(influx_names)+length(outflux_names)])
-        return StateFlux(state_input_names, state_name, Symbol[], state_func=state_func)
-    end
-
-    function StateFlux(
-        state_names::Pair{Symbol,Symbol}
-    )
-        ori_state_name, new_state_name = state_names[1], state_names[2]
-        #* Create variables by names
-        ori_state = first(@variables $ori_state_name)
-        new_state = first(@variables $new_state_name)
-        return StateFlux(ori_state => new_state)
-    end
 end
 
 """
-(flux::AbstractStateFlux)(input::Vector, pas::ComponentVector; kwargs...)
-(flux::AbstractStateFlux)(input::Array, pas::ComponentVector; kwargs...)
-(flux::AbstractStateFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+    (flux::AbstractStateFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
 
-Callable functions for AbstractStateFlux, this function is used for avoid not method match error
-
-These methods are not supported for direct invocation. State fluxes should be used within a SimpleFlux or other composite flux structure.
+Apply the state flux model to input data of various dimensions.
 
 # Arguments
-- `input`: Input data (Array, Vector, or Matrix)
-- `pas::ComponentVector`: Parameter vector
-- `kwargs...`: Additional keyword arguments
+- `input`: Input data, which can be:
+  - `Vector`: A vector of input values for a single time step.
+  - `Matrix`: A matrix of input values, where each column represents a different time step.
+  - `Array`: A 3D array of input values, with dimensions (var_names, node_names, ts_len).
+- `pas::ComponentVector`: A component vector containing parameter values.
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories (only used for `Array` input).
+- `kwargs...`: Additional keyword arguments (unused in this function), provided for compatibility with the component callable function API.
 
 # Returns
-Throws an error indicating that State Flux cannot be run directly.
+This function does not actually return a value, as state flux models cannot be run directly.
 
-# Note
-State fluxes represent internal model states and are not meant to be called independently. 
-They should be incorporated into larger flux structures like SimpleFlux for proper execution within a hydrological model.
-
+# Notes
+- State flux models cannot be run directly and will throw an error if attempted.
+- To use state flux models, they should be incorporated into a SimpleFlux or other composite flux model.
 """
 (::AbstractStateFlux)(::Vector, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
 (::AbstractStateFlux)(::Matrix, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
@@ -523,24 +489,31 @@ struct RouteFlux{rtype} <: AbstractRouteFlux
     end
 end
 
+"""
+    (flux::AbstractRouteFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
+
+Apply the route flux model to input data of various dimensions.
+
+# Arguments
+- `input`: Input data, which can be:
+  - `Vector`: A vector of input values for a single time step.
+  - `Matrix`: A matrix of input values, where each column represents a different time step.
+  - `Array`: A 3D array of input values, with dimensions (var_names, node_names, ts_len).
+- `pas::ComponentVector`: A component vector containing parameter values.
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories (only used for `Array` input).
+- `kwargs...`: Additional keyword arguments (unused in this function), provided for compatibility with the component callable function API.
+
+# Returns
+This function does not actually return a value, as route flux models are abstract and cannot be run directly.
+
+# Notes
+- Route flux models are abstract and cannot be run directly. Attempting to do so will throw an error.
+- Specific implementations of route flux models (subtypes of AbstractRouteFlux) should provide their own implementations of this function.
+- Route flux models are typically used to represent water routing processes in hydrological systems.
+"""
 (::RouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
-(route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...) = @error "Must be implemented with the Route type"
-(route::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; timeidx::AbstractVector, kwargs...) = @error "Must be implemented by subtype"
-
-# function (route::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...)
-#     #* array dims: (variable dim, num of node, sequence length)
-#     #* Extract the initial state of the parameters and routement in the pas variable
-#     pytype_params = [pas[:params][ptype] for ptype in ptypes]
-#     pytype_initstates = [pas[:initstates][ptype] for ptype in ptypes]
-
-#     sols = map(eachindex(ptypes)) do (idx)
-#         tmp_pas = ComponentVector(params=pytype_params[idx], initstates=pytype_initstates[idx])
-#         node_sols = reduce(hcat, route(input[:, idx, :], tmp_pas))
-#         node_sols
-#     end
-#     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-#     return permutedims(sol_arr, (1, 3, 2))
-# end
+(::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
+(::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...) = @error "Must be implemented with the Route type"
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux
@@ -555,14 +528,7 @@ Represents a unit hydrograph flux model for routing water through a hydrological
 - `infos::NamedTuple`: A named tuple containing information about inputs, outputs, parameters, and states.
 
 # Constructor
-    UnitHydroFlux(
-        input::Num,
-        param::Num,
-        uhfunc::Function;
-        solvetype::Symbol=:unithydro1
-    )
-
-Constructs a UnitHydroFlux object.
+    UnitHydroFlux(input::Num, param::Num, uhfunc::Function; solvetype::Symbol=:unithydro1)
 
 # Arguments
 - `input::Num`: The input variable.
@@ -575,8 +541,10 @@ UnitHydroFlux represents a unit hydrograph flux model for routing water through 
 It uses a unit hydrograph function to transform input flows into routed output flows.
 
 The structure supports different solving methods, specified by the `solvetype` parameter. 
-Currently, it implements the `:unithydro1` solver type, which uses a discrete problem approach 
-to calculate the routed flow.
+Currently, it implements two solver types:
+- `:unithydro1`: Uses a discrete problem approach to calculate the routed flow.
+- `:unithydro2`: Uses a sparse matrix approach for more efficient computation, especially for longer time series.
+The choice of solver type can affect both the performance and memory usage of the model.
 
 This flux model is particularly useful in hydrological modeling for representing the 
 temporal distribution of runoff as it moves through a watershed. It can account for the 
@@ -593,15 +561,15 @@ to represent various routing processes in different parts of a water system.
 
 """
 struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
-    "A map of input names (Symbol) and its variables (Num)"
+    "A vector of input variables (Num)"
     inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
+    "A vector of output variables (Num)"
     outputs::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
+    "A vector of parameter variables (Num)"
     params::Vector{Num}
-    "unit hydrology function"
+    "The unit hydrograph function"
     uhfunc::Function
-    "bucket information: keys contains: input, output, param"
+    "A named tuple containing information about inputs, outputs, parameters, and states"
     infos::NamedTuple
 
     function UnitHydroFlux(
@@ -632,12 +600,36 @@ struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
     end
 end
 
+"""
+    (flux::UnitHydroFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
+
+Apply the unit hydrograph flux model to input data of various dimensions.
+
+# Arguments
+- `input`: Input data, which can be:
+  - `Vector`: A vector of input values for a single time step (not supported, will throw an error).
+  - `Matrix`: A matrix of input values, where each column represents a different time step.
+  - `Array`: A array of input values, with dimensions (var_names, node_names, ts_len).
+- `pas::ComponentVector`: A component vector containing parameter values.
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter categories (only used for `Array` input).
+- `kwargs...`: Additional keyword arguments (unused in this function), provided for compatibility with the component callable function API.
+
+# Returns
+- For matrix input: A matrix where each column is the result of applying the unit hydrograph to the corresponding input column.
+- For array input: A array of routed outputs, with dimensions (output_var_names, node_names, ts_len).
+
+# Notes
+- The behavior differs based on the `solvetype` specified during the `UnitHydroFlux` construction:
+  - `:unithydro1` uses a discrete problem solver approach.
+  - `:unithydro2` uses a sparse matrix convolution approach.
+- Vector input is not supported and will throw an error.
+"""
+
 (::UnitHydroFlux)(::Vector, ::ComponentVector; kwargs...) = @error "UnitHydroFlux is not support for single timepoint"
 
-#* 一种是用构建Discrete problem的方式求解
 function (flux::UnitHydroFlux{:unithydro1})(input::Matrix, pas::ComponentVector; kwargs...)
     input_vec = input[1, :]
-    #* 首先将lagflux转换为discrete problem
+    #* convert the lagflux to a discrete problem
     function lag_prob(u, p, t)
         u = circshift(u, -1)
         u[end] = 0.0
@@ -646,17 +638,17 @@ function (flux::UnitHydroFlux{:unithydro1})(input::Matrix, pas::ComponentVector;
 
     uh_weight = flux.uhfunc(pas[:params][flux.infos[:param][1]])
     prob = DiscreteProblem(lag_prob, input_vec[1] .* uh_weight, (1, length(input_vec)), ComponentVector(weight=uh_weight))
-    #* 求解这个问题
+    #* solve this problem
     sol = solve(prob, FunctionMap())
     reshape(Array(sol)[1, :], 1, length(input_vec))
 end
-
-#* 一种是用构建稀疏矩阵的方式求和
 function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector; kwargs...)
     input_vec = input[1, :]
     uh_weight = flux.uhfunc(pas[:params][flux.infos[:param][1]])
     uh_result = [-(i - 1) => uh_wi .* input_vec for (i, uh_wi) in enumerate(uh_weight)]
+    #* construct the sparse matrix
     uh_sparse_matrix = spdiagm(uh_result...)
+    #* sum the matrix
     sum_route = sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
     reshape(sum_route, 1, length(input_vec))
 end
@@ -673,4 +665,80 @@ function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; ptypes:
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
     return permutedims(sol_arr, (1, 3, 2))
+end
+
+"""
+# TimeVaryingFlux Documentation
+
+## Overview
+`TimeVaryingFlux` is a structure that represents a flux with time-varying properties. It is a subtype of `AbstractTimeVaryingFlux`.
+
+## Fields
+- `inputs::Vector{Num}`: A vector of input variables.
+- `outputs::Vector{Num}`: A vector of output variables.
+- `params::Vector{Num}`: A vector of parameter variables.
+- `expr::Vector{Num}`: An expression representing the flux.
+- `func::Function`: The flux function.
+- `infos::NamedTuple`: The flux information, containing symbolic representations of inputs, outputs, and parameters.
+
+## Constructor
+
+"""
+struct TimeVaryingFlux <: AbstractTimeVaryingFlux
+    "A vector of input variables (Num)"
+    inputs::Vector{Num}
+    "A vector of output variables (Num)"
+    outputs::Vector{Num}
+    "A vector of parameter variables (Num)"
+    params::Vector{Num}
+    "An expression representing the flux (Num)"
+    expr::Vector{Num}
+    "The flux function"
+    func::Function
+    "The flux information"
+    infos::NamedTuple
+
+    function TimeVaryingFlux(
+        inputs::Vector{Num},
+        outputs::Vector{Num},
+        params::Vector{Num};
+        exprs::Vector{Num},
+    )
+        flux_func = build_flux_func_with_time(inputs, outputs, params, exprs)
+
+        infos = (
+            input=Symbolics.tosymbol.(inputs, escape=false),
+            output=Symbolics.tosymbol.(outputs, escape=false),
+            param=Symbolics.tosymbol.(params, escape=false)
+        )
+
+        return new(
+            inputs,
+            outputs,
+            params,
+            exprs,
+            flux_func,
+            infos,
+        )
+    end
+    
+end
+
+function (flux::TimeVaryingFlux)(input::Vector, pas::ComponentVector; timeidx::Integer, kwargs...)
+    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
+    flux.func(input, params_vec, timeidx)
+end
+
+function (flux::TimeVaryingFlux)(input::Matrix, pas::ComponentVector; timeidx::Vector{Integer}, kwargs...)
+    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
+    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
+end
+
+function (flux::TimeVaryingFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, timeidx::Vector{Integer}, kwargs...)
+    param_vec = collect([collect([pas[:params][ptype][pname] for pname in flux.infos[:param]]) for ptype in ptypes])
+    #* array dims: (var_names * node_names * ts_len)
+    # todo if Zygote supports eachslice with multiple dimensions, we need to modify this
+    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), Ref(timeidx))) for i in eachindex(ptypes)]
+    flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    permutedims(flux_output_arr, (3, 1, 2))
 end

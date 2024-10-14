@@ -82,7 +82,7 @@ end
 
     # Checking the size and values of the output
     @test size(re) == size(input)
-    @test re ≈ [1.0 0.977722 1.30086 1.90343 1.919 2.31884 2.15305 3.07904 4.39488 5.75286 4.83462 3.89097] atol=1e-1
+    @test re ≈ [1.0 0.977722 1.30086 1.90343 1.919 2.31884 2.15305 3.07904 4.39488 5.75286 4.83462 3.89097] atol = 1e-1
 end
 
 @testset "test unit hydro flux (solve type 1)" begin
@@ -211,3 +211,15 @@ end
     func = HydroModels.build_flux_func(inputs, outputs, params, exprs)
     @test func([1, 2, 1], [2, 1]) == [2 * 1 + 1 * 2 + 1, 2 * 1 + 1]
 end
+
+
+@testset "test time varying flux" begin
+    @variables a b c d e
+    @parameters x1 x2
+    inputs = [a, b, c]
+    outputs = [d, e]
+    params = [x1, x2]
+    exprs = [x1 * a * t + x2 * b / t + c, x1 * c + x2 * t]
+    func = HydroModels.build_flux_func(inputs, outputs, params, exprs)
+end
+

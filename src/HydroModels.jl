@@ -21,12 +21,14 @@ using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
 using ModelingToolkit: @variables, @parameters
+using ModelingToolkit: t_nounits as t
 
 # graph compute
 using Graphs
 
 # data interpolataion
 using DataInterpolations
+using DataInterpolations: AbstractInterpolation
 
 # solve ODEProblem
 using SciMLBase
@@ -54,7 +56,7 @@ const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.t
 
 ## Abstract Component Types
 abstract type AbstractComponent end
-## this is used for multiple propose running
+## todo this is used for multiple propose running
 abstract type AbstractRunner end
 abstract type AbstractSolver end
  
@@ -66,12 +68,16 @@ abstract type AbstractRoute <: AbstractElement end
 #* 负责多个平衡联合单元的计算
 abstract type AbstractModel <: AbstractComponent end
 
+#* 参数和状态的估计
+abstract type AbstractEstimator <: AbstractComponent end
+
 #* Flux的多种变体
 abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
 abstract type AbstractUnitHydroFlux <: AbstractFlux end
+abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 
 #* route的两种变体
 abstract type AbstractGridRoute <: AbstractRoute end
@@ -106,9 +112,6 @@ export param_grad_optim, param_box_optim, nn_param_optim
 
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
-
-include("runner.jl")
-export HydroRunner
 
 # some route function and special flux
 include("fluxes/cascade.jl")
