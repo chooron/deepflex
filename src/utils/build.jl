@@ -11,26 +11,6 @@ function build_flux_func(
         DestructuredArgs(inputs),
         #* argument 2: Function neuralnetwork parameters
         DestructuredArgs(params),
-    ]
-    call_func = @RuntimeGeneratedFunction(
-        toexpr(Func(func_args, [], Let(assign_list, outputs_arr, false)))
-    )
-    call_func
-end
-
-function build_flux_func_with_time(
-    inputs::Vector{Num},
-    outputs::Vector{Num},
-    params::Vector{Num},
-    exprs::Vector{Num},
-)
-    assign_list = Assignment.(outputs, exprs)
-    outputs_arr = MakeArray(outputs, Vector)
-    func_args = [
-        #* argument 1: Function calculation parameters
-        DestructuredArgs(inputs),
-        #* argument 2: Function neuralnetwork parameters
-        DestructuredArgs(params),
         #* argument 3: Function time variable
         DestructuredArgs(t)
     ]
