@@ -213,7 +213,7 @@ struct NeuralFlux <: AbstractNeuralFlux
 
     function NeuralFlux(
         fluxes::Pair{Vector{Num},Vector{Num}},
-        chain::Lux.AbstractExplicitContainerLayer,
+        chain, # ::LuxCore.AbstractExplicitContainerLayer
     )
         #* Get input and output variables
         input_vars, output_vars = fluxes[1], fluxes[2]

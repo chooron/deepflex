@@ -66,8 +66,14 @@ function (model::HydroModel)(
 )
     fluxes = Matrix(reduce(hcat, [input[nm] for nm in get_input_names(model)])')
     for (tmp_comp, idx) in zip(model.components, model.input_idx)
-        tmp_fluxes = tmp_comp(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
-        fluxes = cat(fluxes, tmp_fluxes, dims=1)
+        # todo 添加对于estimator的识别
+        if tmp_comp isa AbstractEstimator
+            tmp_pas = tmp_comp(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
+            pas = update_ca(pas, tmp_pas)
+        else
+            tmp_fluxes = tmp_comp(fluxes[idx, :], pas, timeidx=timeidx, solver=solver)
+            fluxes = cat(fluxes, tmp_fluxes, dims=1)
+        end
     end
     if output_type == :namedtuple
         return NamedTuple{Tuple(get_var_names(model))}(eachrow(fluxes))

@@ -110,9 +110,8 @@ function (ele::HydroBucket)(
     #* extract params and nn params
     params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
-
     #* calculate output, slice input on time dim, then calculate each output
-    flux_output = ele.flux_func.(eachslice(fluxes, dims=2), Ref(params_vec), Ref(nn_params_vec))
+    flux_output = ele.flux_func.(eachslice(fluxes, dims=2), Ref(params_vec), Ref(nn_params_vec), timeidx)
     #* convert vector{vector} to matrix
     flux_output_matrix = reduce(hcat, flux_output)
 
