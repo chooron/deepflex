@@ -35,7 +35,7 @@ where the weights are specified by the `param` parameter. This routing method
 is useful for scenarios where the contribution of each input node needs to be
 weighted differently in the cumulative output.
 """
-struct WeightSumRoute <: AbstractRouteFlux
+struct WeightSumRoute <: AbstractSumRoute
     "routing function"
     rfunc::AbstractFlux
     "grid subarea information, km2"
@@ -252,6 +252,8 @@ struct VectorRoute <: AbstractVectorRoute
     "Routing function"
     rfunc::AbstractRouteFlux
     "Routing network"
+    network::DiGraph
+    "Routing adjacency matrix"
     adjacency::AbstractMatrix
     "grid subarea information, km2"
     subareas::AbstractVector
@@ -278,6 +280,7 @@ struct VectorRoute <: AbstractVectorRoute
         subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
         return new(
             rfunc,
+            network,
             adjacency,
             subareas,
             infos,

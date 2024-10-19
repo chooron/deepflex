@@ -79,6 +79,7 @@ abstract type AbstractUnitHydroFlux <: AbstractFlux end
 abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 
 #* route的两种变体
+abstract type AbstractSumRoute <: AbstractRoute end
 abstract type AbstractGridRoute <: AbstractRoute end
 abstract type AbstractVectorRoute <: AbstractRoute end
 

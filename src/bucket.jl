@@ -31,14 +31,31 @@ multiple HydroBucket instances to represent different components of a water syst
 """
 struct HydroBucket <: AbstractBucket
     """
-    Hydrological flux functions
+    Vector of flux functions describing hydrological processes.
+    """
+    funcs::Vector{<:AbstractFlux}
+    """
+    Vector of state derivative functions for ODE calculations.
+    """
+    dfuncs::Vector{<:AbstractStateFlux}
+    """
+    Combined function for calculating all hydrological fluxes.
     """
     flux_func::Function
     """
-    Hydrological ode functions
+    Function for ordinary differential equations (ODE) calculations.
+    Can be `nothing` if no ODE calculations are needed.
     """
     ode_func::Union{Nothing,Function}
-    "bucket information: keys contains: input, output, param, state"
+    """
+    Metadata about the bucket, including:
+    - name: Symbol representing the bucket's name
+    - input: Vector of input variable names
+    - output: Vector of output variable names
+    - state: Vector of state variable names
+    - param: Vector of parameter names
+    - nn: Vector of neural network names (if applicable)
+    """
     infos::NamedTuple
 
     function HydroBucket(
@@ -58,6 +75,8 @@ struct HydroBucket <: AbstractBucket
         flux_func, ode_func = build_ele_func(funcs, dfuncs, infos)
 
         return new(
+            funcs,
+            dfuncs,
             flux_func,
             ode_func,
             infos,
