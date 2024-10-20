@@ -118,6 +118,7 @@ function (ele::HydroBucket)(
     @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
 
+    # todo 需要检查输入维度是否与bucket的输入维度一致
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -138,6 +139,7 @@ function (ele::HydroBucket)(
         @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
     end
 
+    # todo 这块同样需要检查输入参数是否与bucket所需的参数匹配
     params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
     #* calculate output, slice input on time dim, then calculate each output
@@ -161,6 +163,7 @@ function (ele::HydroBucket)(
     @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
 
+    # todo 检查第一维度的输入是否与bucket的输入维度匹配
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -187,6 +190,8 @@ function (ele::HydroBucket)(
     if !isempty(ele.infos[:nn])
         @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
     end
+    # todo 需要匹配每个参数组的参数名称是否匹配
+    params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
 
     #* array dims: (num of node, sequence length, variable dim)
@@ -323,7 +328,9 @@ function solve_prob(
 
     #* Solve the problem using the solver wrapper
     sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
+    #* 如果求解失败了，可以给出求解失败信息然后返回一个为0值的同等维度的数据
     if sol == false
+        # @warn
         sol = zeros(length(ele.infos[:state]), length(timeidx), length(ptypes))
     end
     sol
