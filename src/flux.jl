@@ -121,17 +121,22 @@ function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; timeidx
     flux.func(input, params_vec, timeidx)
 end
 
-function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; timeidx::Vector{Integer}, check_params::Bool=true, kwargs...)
+function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; timeidx::Vector{Integer}, kwargs...)
     # assert the input params must include all the parameters in the flux
-    if check_params
-        @assert all(nm in keys(pas[:params]) for nm in flux.infos[:param]) "Input parameters do not match the flux parameters, the flux parameters should be: $(flux.infos[:param])"
-    end
+    @assert all(nm in keys(pas[:params]) for nm in flux.infos[:param]) "Input parameters do not match the flux parameters, the flux parameters should be: $(flux.infos[:param])"
     params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
     reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
 end
 
 function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, timeidx::Vector{Integer}=1, kwargs...)
-    param_vec = collect([collect([pas[:params][ptype][pname] for pname in flux.infos[:param]]) for ptype in ptypes])
+    #* extract params and nn params
+    params_collect = [collect(pas[:params][ptype]) for ptype in ptypes]
+    #* check params input is correct
+    for (ptype, params_item) in zip(ptypes, params_collect)
+        @assert all(param_name in keys(params_item) for param_name in flux.infos[:param]) "Missing required parameters. Expected all of $(flux.infos[:param]), but got $(keys(params_item)) at param type: $ptype."
+    end
+    params_vec = collect([collect([params_item[pname] for pname in flux.infos[:param]]) for params_item in params_collect])
+
     #* array dims: (var_names * node_names * ts_len)
     flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), timeidx)) for i in eachindex(ptypes)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
@@ -231,6 +236,7 @@ struct NeuralFlux <: AbstractNeuralFlux
             flux_expr,
             nn_func,
             infos,
+            # todo 这个部分太冗余了,考虑改进
             (input=nn_input, output=nn_output, paramlen=length(init_params)),
         )
     end

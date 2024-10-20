@@ -112,9 +112,12 @@ A matrix (for single node, dims: var_names × ts_len) or array (for multiple nod
 function (ele::HydroBucket)(
     input::Matrix,
     pas::ComponentVector;
-    timeidx::Vector,
+    timeidx::Vector=collect(1:size(input, 2)),
     solver::AbstractSolver=ODESolver(),
 )
+    @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
+    @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
+
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -127,6 +130,14 @@ function (ele::HydroBucket)(
     end
 
     #* extract params and nn params
+    # Check if all required parameter names are present in pas[:params]
+    @assert all(param_name in keys(pas[:params]) for param_name in ele.infos[:param]) "Missing required parameters. Expected all of $(ele.infos[:param]), but got $(keys(pas[:params]))."
+
+    # Check if all required neural network names are present in pas[:nn] (if any)
+    if !isempty(ele.infos[:nn])
+        @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
+    end
+
     params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
     #* calculate output, slice input on time dim, then calculate each output
@@ -147,6 +158,9 @@ function (ele::HydroBucket)(
     solver::AbstractSolver=ODESolver(),
     interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
+    @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
+    @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
+
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -162,7 +176,17 @@ function (ele::HydroBucket)(
     end
 
     #* extract params and nn params
-    params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
+    params_collect = [collect(pas[:params][ptype]) for ptype in ptypes]
+    #* check params input is correct
+    for (ptype, params_item) in zip(ptypes, params_collect)
+        @assert all(param_name in keys(params_item) for param_name in ele.infos[:param]) "Missing required parameters. Expected all of $(ele.infos[:param]), but got $(keys(params_item)) at param type: $ptype."
+    end
+    params_vec = collect([collect([params_item[pname] for pname in ele.infos[:param]]) for params_item in params_collect])
+
+    # Check if all required neural network names are present in pas[:nn] (if any)
+    if !isempty(ele.infos[:nn])
+        @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
+    end
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
 
     #* array dims: (num of node, sequence length, variable dim)
