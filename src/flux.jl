@@ -67,38 +67,6 @@ struct SimpleFlux <: AbstractSimpleFlux
     end
 
     function SimpleFlux(
-        flux_names::Pair{Vector{Symbol},Vector{Symbol}},
-        param_names::Vector{Symbol}=Symbol[];
-        flux_funcs::Vector{<:Function}=Function[],
-    )
-        #* Get input and output names
-        input_names, output_names = flux_names[1], flux_names[2]
-        infos = (input=input_names, output=output_names, param=param_names, nn=Symbol[], state=Symbol[])
-        if length(flux_funcs) > 0
-            #* Create variables by names
-            inputs = [first(@variables $var) for var in input_names]
-            outputs = [first(@variables $var) for var in output_names]
-            params = [first(@parameters $var) for var in param_names]
-            #* When a calculation function is provided, exprs are constructed based on the calculation function and variables
-            exprs = [flux_func(inputs, params) for flux_func in flux_funcs]
-        else
-            #* Get the corresponding calculation formula according to the input and output parameter names
-            hydro_equation = HydroEquation(input_names, output_names, param_names)
-            inputs, outputs, params = hydro_equation.inputs, hydro_equation.outputs, hydro_equation.params
-            exprs = HydroEquations.expr(hydro_equation)
-        end
-
-        #* Building the struct
-        return SimpleFlux(
-            inputs,
-            outputs,
-            params,
-            exprs,
-            infos
-        )
-    end
-
-    function SimpleFlux(
         fluxes::Pair{Vector{Num},Vector{Num}},
         params::Vector{Num}=Num[];
         exprs::Vector{Num}=Num[]
@@ -148,20 +116,24 @@ Apply the simple flux model to input data of various dimensions.
 - For matrix input: A matrix where each column is the result of applying the flux function to the corresponding input column.
 - For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
 """
-function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; kwargs...)
+function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; timeidx::Integer=1, kwargs...)
     params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    flux.func(input, params_vec)
+    flux.func(input, params_vec, timeidx)
 end
 
-function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; timeidx::Vector{Integer}, check_params::Bool=true, kwargs...)
+    # assert the input params must include all the parameters in the flux
+    if check_params
+        @assert all(nm in keys(pas[:params]) for nm in flux.infos[:param]) "Input parameters do not match the flux parameters, the flux parameters should be: $(flux.infos[:param])"
+    end
     params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec)))
+    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
 end
 
-function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, kwargs...)
+function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, timeidx::Vector{Integer}=1, kwargs...)
     param_vec = collect([collect([pas[:params][ptype][pname] for pname in flux.infos[:param]]) for ptype in ptypes])
     #* array dims: (var_names * node_names * ts_len)
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]))) for i in eachindex(ptypes)]
+    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), timeidx)) for i in eachindex(ptypes)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
     permutedims(flux_output_arr, (3, 1, 2))
 end
@@ -213,8 +185,10 @@ struct NeuralFlux <: AbstractNeuralFlux
 
     function NeuralFlux(
         fluxes::Pair{Vector{Num},Vector{Num}},
-        chain::Lux.AbstractExplicitContainerLayer,
+        chain, # ::LuxCore.AbstractExplicitContainerLayer
     )
+        #* assert the chain has a name
+        @assert chain.name isa Symbol "Neural network chain should have a name with Symbol type"
         #* Get input and output variables
         input_vars, output_vars = fluxes[1], fluxes[2]
         #* Get the neural network name (neural flux param name) and object
@@ -665,80 +639,4 @@ function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; ptypes:
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
     return permutedims(sol_arr, (1, 3, 2))
-end
-
-"""
-# TimeVaryingFlux Documentation
-
-## Overview
-`TimeVaryingFlux` is a structure that represents a flux with time-varying properties. It is a subtype of `AbstractTimeVaryingFlux`.
-
-## Fields
-- `inputs::Vector{Num}`: A vector of input variables.
-- `outputs::Vector{Num}`: A vector of output variables.
-- `params::Vector{Num}`: A vector of parameter variables.
-- `expr::Vector{Num}`: An expression representing the flux.
-- `func::Function`: The flux function.
-- `infos::NamedTuple`: The flux information, containing symbolic representations of inputs, outputs, and parameters.
-
-## Constructor
-
-"""
-struct TimeVaryingFlux <: AbstractTimeVaryingFlux
-    "A vector of input variables (Num)"
-    inputs::Vector{Num}
-    "A vector of output variables (Num)"
-    outputs::Vector{Num}
-    "A vector of parameter variables (Num)"
-    params::Vector{Num}
-    "An expression representing the flux (Num)"
-    expr::Vector{Num}
-    "The flux function"
-    func::Function
-    "The flux information"
-    infos::NamedTuple
-
-    function TimeVaryingFlux(
-        inputs::Vector{Num},
-        outputs::Vector{Num},
-        params::Vector{Num};
-        exprs::Vector{Num},
-    )
-        flux_func = build_flux_func_with_time(inputs, outputs, params, exprs)
-
-        infos = (
-            input=Symbolics.tosymbol.(inputs, escape=false),
-            output=Symbolics.tosymbol.(outputs, escape=false),
-            param=Symbolics.tosymbol.(params, escape=false)
-        )
-
-        return new(
-            inputs,
-            outputs,
-            params,
-            exprs,
-            flux_func,
-            infos,
-        )
-    end
-    
-end
-
-function (flux::TimeVaryingFlux)(input::Vector, pas::ComponentVector; timeidx::Integer, kwargs...)
-    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    flux.func(input, params_vec, timeidx)
-end
-
-function (flux::TimeVaryingFlux)(input::Matrix, pas::ComponentVector; timeidx::Vector{Integer}, kwargs...)
-    params_vec = collect([pas[:params][nm] for nm in flux.infos[:param]])
-    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
-end
-
-function (flux::TimeVaryingFlux)(input::Array, pas::ComponentVector; ptypes::AbstractVector{Symbol}, timeidx::Vector{Integer}, kwargs...)
-    param_vec = collect([collect([pas[:params][ptype][pname] for pname in flux.infos[:param]]) for ptype in ptypes])
-    #* array dims: (var_names * node_names * ts_len)
-    # todo if Zygote supports eachslice with multiple dimensions, we need to modify this
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), Ref(timeidx))) for i in eachindex(ptypes)]
-    flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
-    permutedims(flux_output_arr, (3, 1, 2))
 end

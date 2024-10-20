@@ -25,6 +25,7 @@ function param_box_optim(
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(kwargs, :ub, ones(length(tunable_pas)) .* 100)
     maxiters = get(kwargs, :maxiters, 10)
+    warmup = get(kwargs, :warmup, 100)
     solver = get(kwargs, :solver, ODESolver())
     solve_alg = get(kwargs, :solve_alg, BBO_adaptive_de_rand_1_bin_radiuslimited())
 
@@ -41,7 +42,7 @@ function param_box_optim(
         loss = mean(map(eachindex(input, target, timeidx)) do i
             inp, tar, tidx = input[i], target[i], timeidx[i]
             tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver; run_kwargs...)
-            tmp_loss = mean([loss_func(tar[key], tmp_pred[key]) for key in keys(tar)])
+            tmp_loss = mean([loss_func(tar[key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(tar)])
             tmp_loss
         end)
         loss

@@ -16,13 +16,12 @@ using IterTools: ncycle
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
-# ModelingToolkit building
+# Symbolic building
 using Symbolics
 using SymbolicUtils
 using SymbolicUtils.Code
 using ModelingToolkit: @variables, @parameters
 using ModelingToolkit: t_nounits as t
-
 # graph compute
 using Graphs
 
@@ -37,6 +36,7 @@ using SciMLSensitivity
 
 # deep learning
 using Lux
+using LuxCore
 using NNlib
 using Zygote
 
@@ -44,7 +44,6 @@ using Zygote
 using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
-
 # HydroErrors
 using HydroErrors
 
@@ -80,6 +79,7 @@ abstract type AbstractUnitHydroFlux <: AbstractFlux end
 abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 
 #* route的两种变体
+abstract type AbstractSumRoute <: AbstractRoute end
 abstract type AbstractGridRoute <: AbstractRoute end
 abstract type AbstractVectorRoute <: AbstractRoute end
 
@@ -90,7 +90,7 @@ include("utils/name.jl")
 include("utils/show.jl")
 include("utils/graph.jl")
 include("utils/smooth.jl")
-include("utils/runtime_build.jl")
+include("utils/build.jl")
 # some unit hydro function
 include("utils/unithydro.jl")
 
@@ -106,6 +106,9 @@ export WeightSumRoute, GridRoute, VectorRoute
 
 include("model.jl")
 export HydroModel #, update_unit!, add_elements!, remove_elements!
+
+include("estimator.jl")
+export HydroEstimator
 
 include("optimize.jl")
 export param_grad_optim, param_box_optim, nn_param_optim

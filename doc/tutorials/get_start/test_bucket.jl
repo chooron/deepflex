@@ -4,7 +4,6 @@ using DataFrames
 using ComponentArrays
 using BenchmarkTools
 using NamedTupleTools
-using ModelingToolkit
 
 include("../../../src/HydroModels.jl")
 
@@ -22,5 +21,5 @@ df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 input_matrix = Matrix(reduce(hcat, [input[1], input[2], input[3]])') # (var nm * ts len)
-solver = HydroModels.DiscreteSolver()
-@btime results = ele(input_matrix, pas, timeidx=ts, solver=solver)
+solver = HydroModels.ODESolver()
+results = ele(input_matrix, pas, timeidx=ts, solver=solver)
