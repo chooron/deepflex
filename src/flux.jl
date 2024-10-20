@@ -225,10 +225,15 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* Constructing a calculation expression based on a neural network
         flux_expr = LuxCore.stateless_apply(chain, nn_input, lazy_params)
 
+        #* Define the neural network calculation function without Symbolics definition
         nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, init_params_axes))
 
-        #* neuralflux infos
+        #* neuralflux metadata infos
         infos = (input=input_names, output=output_names, param=Symbol[], nn=[chain_name])
+
+        #* neuralflux nnios
+        nnios = (input=nn_input, output=nn_output, paramlen=length(init_params))
+
         new(
             input_vars,
             output_vars,
@@ -236,8 +241,7 @@ struct NeuralFlux <: AbstractNeuralFlux
             flux_expr,
             nn_func,
             infos,
-            # todo 这个部分太冗余了,考虑改进
-            (input=nn_input, output=nn_output, paramlen=length(init_params)),
+            nnios
         )
     end
 end
@@ -274,7 +278,7 @@ function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector; kwargs.
     flux.func(input', nn_params_vec)
 end
 
-function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector, ::AbstractVector{Symbol})
+function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector; kwargs...)
     nn_params = pas[:nn][flux.infos[:nn][1]]
     #* array dims: (ts_len * node_names * var_names)
     flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]
@@ -300,8 +304,6 @@ Represents a state flux component in a hydrological model.
     StateFlux(fluxes::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num)
     # 2. Automatic construction of state expression as the difference between sum of input fluxes and sum of output fluxes
     StateFlux(fluxes::Pair{Vector{Num},Vector{Num}}, state::Num)
-    # 3. Simple state update
-    StateFlux(states::Pair{Num,Num})
 
 # Description
 StateFlux is a structure that represents a state flux in a hydrological model. It encapsulates 

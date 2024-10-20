@@ -163,7 +163,6 @@ function (ele::HydroBucket)(
     @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
 
-    # todo 检查第一维度的输入是否与bucket的输入维度匹配
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
@@ -190,7 +189,7 @@ function (ele::HydroBucket)(
     if !isempty(ele.infos[:nn])
         @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
     end
-    # todo 需要匹配每个参数组的参数名称是否匹配
+
     params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
     nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
 
@@ -272,6 +271,7 @@ function solve_prob(
     #* Solve the problem using the solver wrapper
     sol = solver(single_ele_ode_func!, pas, collect(init_states[ele.infos[:state]]), timeidx)
     if sol == false
+        @warn "The ODE solver failed to solve the problem, please check the formulas of the $(ele.infos[:name]) bucket, or check the input data and parameters."
         sol = zeros(length(ele.infos[:state]), length(timeidx))
     end
     sol
@@ -330,7 +330,7 @@ function solve_prob(
     sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
     #* 如果求解失败了，可以给出求解失败信息然后返回一个为0值的同等维度的数据
     if sol == false
-        # @warn
+        @warn "The ODE solver failed to solve the problem, please check the formulas of the $(ele.infos[:name]) bucket, or check the input data and parameters."
         sol = zeros(length(ele.infos[:state]), length(timeidx), length(ptypes))
     end
     sol

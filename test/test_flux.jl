@@ -29,6 +29,13 @@ flwdir = rand(3, 3)
 positions = [(1, 1), (2, 2), (3, 3)]
 subareas = [1.0, 2.0, 3.0]
 route = HydroModels.GridRoute(:gridmr, rfunc=mr_flux, flwdir=flwdir, positions=positions, subareas=subareas)
+network = Graphs.DiGraph(3)
+subareasv2 = [1.0, 2.0, 3.0]
 route = HydroModels.VectorRoute(:gridmr, rfunc=mr_flux, network=network, subareas=subareasv2)
 
 model = HydroModels.HydroModel(:test, components=[bucket, route])
+
+nn_expr = nn_flux.expr
+all_vars = ModelingToolkit.get_variables(nn_expr)
+
+all_vars[1]
