@@ -307,8 +307,6 @@ Represents a state flux component in a hydrological model.
     StateFlux(fluxes::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num)
     # 2. Automatic construction of state expression as the difference between sum of input fluxes and sum of output fluxes
     StateFlux(fluxes::Pair{Vector{Num},Vector{Num}}, state::Num)
-    # 3. Simple state update
-    StateFlux(states::Pair{Num,Num})
 
 # Description
 StateFlux is a structure that represents a state flux in a hydrological model. It encapsulates 
