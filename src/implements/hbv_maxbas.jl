@@ -23,7 +23,7 @@ function SoilStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_soil_),
+        name=Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
     )
@@ -50,7 +50,7 @@ function FreeWaterStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_zone_),
+        name=Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
     )
@@ -79,13 +79,12 @@ function OutputElement(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_lag_),
+        name=Symbol(name, :_lag_),
         funcs=funcs,
     )
 end
 
 function Model(; name::Symbol)
-    @info "hello"
     components = [
         SoilStorage(name=name),
         FreeWaterStorage(name=name),

@@ -52,18 +52,17 @@ struct WeightSumRoute <: AbstractSumRoute
     function WeightSumRoute(
         name::Symbol;
         rfunc::AbstractFlux=SimpleFlux([flow] => [flow_routed], exprs=[flow]),
-        subareas::Union{AbstractVector,Number},
+        subareas::AbstractVector,
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)
         #* Extract all parameters names of funcs and dfuncs
         param_names = get_param_names(rfunc)
+        push!(param_names, :route_weight)
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(rfunc)
         #* Setup the name information of the hydrobucket
         infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
-        #* Convert subareas to a vector if it's a single value
-        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
         return new(
             rfunc,
             subareas,
@@ -74,15 +73,16 @@ end
 
 function (route::WeightSumRoute)(
     input::AbstractArray,
-    pas::ComponentVector;
-    ptypes::AbstractVector{Symbol},
+    pas::ComponentVector,
+    timeidx::Vector{<:Number};
     kwargs...
 )
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
 
-    rfunc_output = route.rfunc(input, pas, ptypes=ptypes)
-    weight_params = [pas[:params][ptype][route.infos[:param][:route_weight]] for ptype in ptypes]
+    rfunc_output = route.rfunc(input, pas, timeidx, ptypes=ptypes)
+    weight_params = [pas[:params][ptype][:route_weight] for ptype in ptypes]
     weight_result = sum(rfunc_output[1, :, :] .* weight_params .* area_coefs, dims=1)
     # expand dims
     output_arr = reduce(vcat, repeat(weight_result, size(input_mat)[1]))
@@ -179,11 +179,13 @@ end
 
 function (route::GridRoute)(
     input::AbstractArray,
-    pas::ComponentVector;
-    timeidx::AbstractVector,
-    ptypes::AbstractVector{Symbol},
+    pas::ComponentVector,
+    timeidx::Vector{<:Number};
     kwargs...
 )
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    solver = get(kwargs, :solver, ODESolver())
+
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
@@ -205,14 +207,19 @@ function (route::GridRoute)(
         # 更新状态
         du[:q_in] = new_q_in .- u[:q_in]
     end
-
+    #* prepare init states
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
-    prob = ODEProblem(grid_route_ode!, init_states, (1, size(input_mat)[2]), pas[:params])
-    sol = solve(prob, Tsit5(), saveat=timeidx)
-
-    # Extract flux_states and q_in for each time step
-    flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
-    q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
+    #* solve the ode
+    sol = solver(grid_route_ode!,  pas[:params], init_states, timeidx, convert_to_array=false)
+    if SciMLBase.successful_retcode(sol)
+        # Extract flux_states and q_in for each time step
+        flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
+        q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
+    else
+        @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
+        flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
+        q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
+    end
 
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out_mat = reduce(hcat, q_out)
@@ -264,7 +271,7 @@ struct VectorRoute <: AbstractVectorRoute
         name::Symbol;
         rfunc::AbstractRouteFlux,
         network::DiGraph,
-        subareas::Union{AbstractVector, Number},
+        subareas::Union{AbstractVector,Number},
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)
@@ -298,6 +305,9 @@ function (route::VectorRoute)(
     ptypes::AbstractVector{Symbol},
     kwargs...
 )
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    solver = get(kwargs, :solver, ODESolver())
+
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
@@ -318,12 +328,19 @@ function (route::VectorRoute)(
         du[:q_in] = q_in_updated .- q_in
     end
 
-    init_states = ComponentVector(flux_states=flux_initstates, q_in=input_mat[:, 1])
-    prob = ODEProblem(vec_route_ode!, init_states, (1, size(input_mat)[2]), pas[:params])
-    sol = solve(prob, Tsit5(), saveat=timeidx)
-
-    flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
-    q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
+    #* prepare init states
+    init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
+    #* solve the ode
+    sol = solver(vec_route_ode!,  pas[:params], init_states, timeidx, convert_to_array=false)
+    if SciMLBase.successful_retcode(sol)
+        # Extract flux_states and q_in for each time step
+        flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
+        q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
+    else
+        @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
+        flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
+        q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
+    end
 
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out_mat = reduce(hcat, q_out)

@@ -9,8 +9,6 @@ d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
 d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
 
 """
-$(SIGNATURES)
-
 Construct calculation graphs based on all common hydrological fluxes in hydrological components
 """
 function sort_fluxes(fluxes::AbstractVector{<:AbstractComponent})
@@ -53,8 +51,6 @@ function sort_fluxes(fluxes::AbstractVector{<:AbstractComponent})
 end
 
 """
-$(SIGNATURES)
-
 Construct a calculation graph based on all hydrological components in the hydrological unit
 """
 function sort_components(components::AbstractVector{<:AbstractComponent})

@@ -23,12 +23,12 @@ nn_flux =HydroModels.NeuralFlux([a, b] => [c], chain)
 mr_flux = HydroModels.MuskingumRouteFlux(a)
 dc_flux = HydroModels.DischargeRouteFlux(a)
 uh_flux = HydroModels.UnitHydroFlux(a, p1, HydroModels.uh_1_half)
-bucket = HydroModels.HydroBucket(:test, funcs=[tv_flux_1, tv_flux_2], dfuncs=[state_flux_1, state_flux_2])
+bucket = HydroModels.HydroBucket(name=:test, funcs=[tv_flux_1, tv_flux_2], dfuncs=[state_flux_1, state_flux_2])
 
-flwdir = rand(3, 3)
-positions = [(1, 1), (2, 2), (3, 3)]
-subareas = [1.0, 2.0, 3.0]
-route = HydroModels.GridRoute(:gridmr, rfunc=mr_flux, flwdir=flwdir, positions=positions, subareas=subareas)
-route = HydroModels.VectorRoute(:gridmr, rfunc=mr_flux, network=network, subareas=subareasv2)
+# flwdir = rand(3, 3)
+# positions = [(1, 1), (2, 2), (3, 3)]
+# subareas = [1.0, 2.0, 3.0]
+# route = HydroModels.GridRoute(:gridmr, rfunc=mr_flux, flwdir=flwdir, positions=positions, subareas=subareas)
+# route = HydroModels.VectorRoute(:gridmr, rfunc=mr_flux, network=network, subareas=subareasv2)
 
-model = HydroModels.HydroModel(:test, components=[bucket, route])
+# model = HydroModels.HydroModel(:test, components=[bucket, route])

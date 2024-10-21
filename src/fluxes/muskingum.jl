@@ -34,7 +34,7 @@ function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; time
 
     init_states = [params.k * input[1, 1]]
     prob = ODEProblem(msk_prob!, init_states, (1, input_len), params)
-    sol = solve(prob, Tsit5(), saveat=timeidx)
+    sol = solve(prob, Rosenbrock23(), saveat=timeidx)
 
     s_river_vec = Array(sol)
     q_out_vec = @.((s_river_vec - params.k * params.x * input) / (params.k * (1 - params.x)))

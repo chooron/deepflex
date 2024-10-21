@@ -68,10 +68,9 @@ function SurfaceStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     HydroBucket(
-        Symbol(name, :_surface),
+        name=Symbol(name, :_surface),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk
     )
 end
 end

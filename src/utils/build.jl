@@ -24,15 +24,15 @@ end
 function build_ele_func(
     funcs::Vector{<:AbstractFlux},
     dfuncs::Vector{<:AbstractStateFlux},
-    infos::NamedTuple
+    meta::HydroMeta
 )
     #* prepare variables namedtuple
     funcs_vars = reduce(union, get_all_vars.(vcat(funcs, dfuncs)))
     funcs_vars_names = Symbolics.tosymbol.(funcs_vars, escape=false)
     funcs_vars_ntp = NamedTuple{Tuple(funcs_vars_names)}(funcs_vars)
     #* prepare variables for function building
-    funcs_inputs = collect(funcs_vars_ntp[infos.input])
-    funcs_states = collect(funcs_vars_ntp[infos.state])
+    funcs_inputs = collect(funcs_vars_ntp[meta.inputs])
+    funcs_states = collect(funcs_vars_ntp[meta.states])
     funcs_params = reduce(union, get_param_vars.(funcs))
     funcs_nns = reduce(union, get_nnparam_vars.(funcs))
 

@@ -1,8 +1,5 @@
 """
-$(TYPEDEF)
 A custom ODEProblem solver
-# Fields
-$(FIELDS)
 """
 @kwdef struct ODESolver <: AbstractSolver
     alg = Tsit5()
@@ -16,7 +13,8 @@ function (solver::ODESolver)(
     ode_func!::Function,
     pas::ComponentVector,
     initstates::AbstractArray,
-    timeidx::AbstractVector
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
 )
     #* build problem
     # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
@@ -35,19 +33,21 @@ function (solver::ODESolver)(
         abstol=solver.abstol,
         sensealg=solver.sensealg
     )
-    sol_arr = Array(sol)
-    if SciMLBase.successful_retcode(sol)
+    if convert_to_array
+        if SciMLBase.successful_retcode(sol)
+            sol_arr = Array(sol)
+        else
+            @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
+            sol_arr = zeros(size(initstates)..., length(timeidx))
+        end
         return sol_arr
     else
-        return false
+        return sol
     end
 end
 
 """
-$(TYPEDEF)
 A custom ODEProblem solver
-# Fields
-$(FIELDS)
 """
 @kwdef struct DiscreteSolver <: AbstractSolver
     alg = FunctionMap()
@@ -56,7 +56,7 @@ end
 
 function (solver::DiscreteSolver)(
     ode_func!::Function,
-    pas::ComponentVector,
+    params::ComponentVector,
     initstates::AbstractArray,
     timeidx::AbstractVector
 )
@@ -66,19 +66,20 @@ function (solver::DiscreteSolver)(
         ode_func!,
         initstates,
         (timeidx[1], timeidx[end]),
-        pas
+        params
     )
     #* solve problem
     sol = solve(
         prob,
         solver.alg,
     )
-    sol_arr = Array(sol)
     if SciMLBase.successful_retcode(sol)
-        return sol_arr
+        sol_arr = Array(sol)
     else
-        return false
+        @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
+        sol_arr = zeros(size(initstates)..., length(timeidx))
     end
+    sol_arr
 end
 
 @kwdef struct ManualSolver <: AbstractSolver

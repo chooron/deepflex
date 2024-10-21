@@ -56,10 +56,10 @@ struct HydroBucket <: AbstractBucket
     - param: Vector of parameter names
     - nn: Vector of neural network names (if applicable)
     """
-    infos::NamedTuple
+    meta::HydroMeta
 
-    function HydroBucket(
-        name::Symbol;
+    function HydroBucket(;
+        name::Symbol,
         funcs::Vector,
         dfuncs::Vector=StateFlux[],
     )
@@ -70,16 +70,16 @@ struct HydroBucket <: AbstractBucket
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(funcs)
         #* Setup the name information of the hydrobucket
-        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        meta = HydroMeta(name=name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         #* Construct a function for ordinary differential calculation based on dfunc and funcs
-        flux_func, ode_func = build_ele_func(funcs, dfuncs, infos)
+        flux_func, ode_func = build_ele_func(funcs, dfuncs, meta)
 
         return new(
             funcs,
             dfuncs,
             flux_func,
             ode_func,
-            infos,
+            meta,
         )
     end
 end
@@ -111,18 +111,20 @@ A matrix (for single node, dims: var_names × ts_len) or array (for multiple nod
 
 function (ele::HydroBucket)(
     input::Matrix,
-    pas::ComponentVector;
-    timeidx::Vector=collect(1:size(input, 2)),
-    solver::AbstractSolver=ODESolver(),
+    pas::ComponentVector,
+    timeidx::Vector{<:Number}=collect(1:size(input, 2));
+    kwargs...
 )
-    @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
+    solver = get(kwargs, :solver, ODESolver())
+    interp = get(kwargs, :interp, LinearInterpolation)
+
+    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
 
-    # todo 需要检查输入维度是否与bucket的输入维度一致
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver)
+        solved_states = solve_prob(ele, input, pas, timeidx, solver=solver, interp=interp)
         #* Store the solved bucket state in fluxes
         fluxes = cat(input, solved_states, dims=1)
     else
@@ -132,16 +134,15 @@ function (ele::HydroBucket)(
 
     #* extract params and nn params
     # Check if all required parameter names are present in pas[:params]
-    @assert all(param_name in keys(pas[:params]) for param_name in ele.infos[:param]) "Missing required parameters. Expected all of $(ele.infos[:param]), but got $(keys(pas[:params]))."
+    @assert all(param_name in keys(pas[:params]) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params]))."
 
     # Check if all required neural network names are present in pas[:nn] (if any)
-    if !isempty(ele.infos[:nn])
-        @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
+    if !isempty(get_nn_names(ele))
+        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(ele)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
     end
 
-    # todo 这块同样需要检查输入参数是否与bucket所需的参数匹配
-    params_vec = collect([pas[:params][nm] for nm in ele.infos[:param]])
-    nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
+    params_vec = collect([pas[:params][nm] for nm in get_param_names(ele)])
+    nn_params_vec = !isempty(get_nn_names(ele)) ? collect(pas[:nn][nm] for nm in get_nn_names(ele)) : nothing
     #* calculate output, slice input on time dim, then calculate each output
     flux_output = ele.flux_func.(eachslice(fluxes, dims=2), Ref(params_vec), Ref(nn_params_vec), timeidx)
     #* convert vector{vector} to matrix
@@ -154,22 +155,25 @@ end
 
 function (ele::HydroBucket)(
     input::Array,
-    pas::ComponentVector;
-    timeidx::AbstractVector,
-    ptypes::AbstractVector{Symbol},
-    solver::AbstractSolver=ODESolver(),
-    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
+    pas::ComponentVector,
+    timeidx::Vector{<:Number}=collect(1:size(input, 3));
+    kwargs...
 )
-    @assert size(input, 1) == length(ele.infos[:input]) "Input dimensions mismatch. Expected $(length(ele.infos[:input])) variables, got $(size(input, 1))."
+    #* get kwargs
+    solver = get(kwargs, :solver, ODESolver())
+    interp = get(kwargs, :interp, LinearInterpolation)
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+
+    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
 
     # todo 检查第一维度的输入是否与bucket的输入维度匹配
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver, interpolator=interpolator)
+        solved_states = solve_prob(ele, input, pas, timeidx, solver=solver, interp=interp)
         if solved_states == false
-            solved_states = zeros(length(ele.infos[:state]), length(timeidx))
+            solved_states = zeros(length(get_state_names(ele)), length(timeidx))
         end
         #* Store the solved bucket state in fluxes
         fluxes = cat(input, solved_states, dims=1)
@@ -179,20 +183,18 @@ function (ele::HydroBucket)(
     end
 
     #* extract params and nn params
-    params_collect = [collect(pas[:params][ptype]) for ptype in ptypes]
+    params_collect = [pas[:params][ptype] for ptype in ptypes]
     #* check params input is correct
     for (ptype, params_item) in zip(ptypes, params_collect)
-        @assert all(param_name in keys(params_item) for param_name in ele.infos[:param]) "Missing required parameters. Expected all of $(ele.infos[:param]), but got $(keys(params_item)) at param type: $ptype."
+        @assert all(param_name in keys(params_item) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(params_item)) at param type: $ptype."
     end
-    params_vec = collect([collect([params_item[pname] for pname in ele.infos[:param]]) for params_item in params_collect])
+    params_vec = collect([collect([params_item[pname] for pname in get_param_names(ele)]) for params_item in params_collect])
 
     # Check if all required neural network names are present in pas[:nn] (if any)
-    if !isempty(ele.infos[:nn])
-        @assert all(nn_name in keys(pas[:nn]) for nn_name in ele.infos[:nn]) "Missing required neural networks. Expected all of $(ele.infos[:nn]), but got $(keys(pas[:nn]))."
+    if !isempty(get_nn_names(ele))
+        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(ele)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
     end
-    # todo 需要匹配每个参数组的参数名称是否匹配
-    params_vec = collect([collect([pas[:params][ptype][pname] for pname in ele.infos[:param]]) for ptype in ptypes])
-    nn_params_vec = !isempty(ele.infos[:nn]) ? collect(pas[:nn][nm] for nm in ele.infos[:nn]) : nothing
+    nn_params_vec = !isempty(get_nn_names(ele)) ? collect(pas[:nn][nm] for nm in get_nn_names(ele)) : nothing
 
     #* array dims: (num of node, sequence length, variable dim)
     ele_output_vec = [ele.flux_func.(eachslice(fluxes[:, i, :], dims=2), Ref(params_vec[i]), Ref(nn_params_vec), timeidx) for i in 1:size(input)[2]]
@@ -233,29 +235,29 @@ This function handles two types of input arguments:
 function solve_prob(
     ele::HydroBucket,
     input::Matrix,
-    pas::ComponentVector;
-    timeidx::Vector=collect(1:length(input[1])),
+    pas::ComponentVector,
+    timeidx::Vector{<:Number}=collect(1:size(input, 2));
     solver::AbstractSolver=ODESolver(),
-    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
+    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
     params, init_states = pas[:params], pas[:initstates]
 
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
     itpfunc_list = map(eachrow(input)) do var
-        interpolator(var, timeidx, extrapolate=true)
+        interp(var, timeidx, extrapolate=true)
     end
     #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
     ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
 
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
-    params_idx = [getaxes(params)[1][nm].idx for nm in ele.infos[:param]]
+    params_idx = [getaxes(params)[1][nm].idx for nm in get_param_names(ele)]
     #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func
     ode_param_func = (p) -> p[:params][params_idx]
 
-    if !isempty(ele.infos[:nn])
-        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
+    if !isempty(get_nn_names(ele))
+        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(ele)]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
         ode_nn_param_func = (_) -> nothing
@@ -270,21 +272,18 @@ function solve_prob(
     end
 
     #* Solve the problem using the solver wrapper
-    sol = solver(single_ele_ode_func!, pas, collect(init_states[ele.infos[:state]]), timeidx)
-    if sol == false
-        sol = zeros(length(ele.infos[:state]), length(timeidx))
-    end
+    sol = solver(single_ele_ode_func!, pas, collect(init_states[get_state_names(ele)]), timeidx)
     sol
 end
 
 function solve_prob(
     ele::HydroBucket,
     input::Array,
-    pas::ComponentVector;
-    timeidx::Vector,
+    pas::ComponentVector,
+    timeidx::Vector{<:Number}=collect(1:size(input, 3));
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
     solver::AbstractSolver=ODESolver(),
-    interpolator::Type{<:AbstractInterpolation}=LinearInterpolation,
+    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
     #* 针对多个相同的state function采用并行化计算,这样能够避免神经网络反复多次计算减少梯度计算反馈
     #* 同时将多组state function放到同一个ode function中,这种并行计算或能提高预测性能,
@@ -294,23 +293,23 @@ function solve_prob(
 
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
-    itpfunc_vecs = [interpolator.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
+    itpfunc_vecs = [interp.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
     ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
 
     #* 准备初始状态
-    init_states_vec = collect([collect(init_states[ptype][ele.infos[:state]]) for ptype in ptypes])
+    init_states_vec = collect([collect(init_states[ptype][get_state_names(ele)]) for ptype in ptypes])
     init_states_matrix = reduce(hcat, init_states_vec)
 
     #* Extract the idx range of each variable in params,
     #* this extraction method is significantly more efficient than extracting by name
-    params_idx = [getaxes(params[ptypes[1]])[1][nm].idx for nm in ele.infos[:param]]
+    params_idx = [getaxes(params[ptypes[1]])[1][nm].idx for nm in get_param_names(ele)]
     #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
     #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func
     ode_param_func = (p) -> [p[:params][ptype][params_idx] for ptype in ptypes]
 
     #* 准备神经网络的参数
-    if length(ele.infos[:nn]) > 0
-        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in ele.infos[:nn]]
+    if length(get_nn_names(ele)) > 0
+        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(ele)]
         ode_nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
         ode_nn_param_func = (_) -> nothing
@@ -328,11 +327,6 @@ function solve_prob(
 
     #* Solve the problem using the solver wrapper
     sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
-    #* 如果求解失败了，可以给出求解失败信息然后返回一个为0值的同等维度的数据
-    if sol == false
-        # @warn
-        sol = zeros(length(ele.infos[:state]), length(timeidx), length(ptypes))
-    end
     sol
 end
 

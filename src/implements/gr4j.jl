@@ -41,15 +41,14 @@ function Soil(; name::Symbol, mtk::Bool=true)
     ]
 
     HydroBucket(
-        Symbol(name, :_soil_),
+        name=Symbol(name, :_soil_),
         funcs=fluxes,
         dfuncs=dfluxes,
         lfuncs=lfluxes,
-        mtk=mtk
     )
 end
 
-function FreeWater(; name::Symbol, mtk::Bool=true)
+function FreeWater(; name::Symbol)
 
     fluxes = [
         SimpleFlux([:routingstore] => [:recharge], [:x2, :x3, :ω]),
@@ -62,19 +61,18 @@ function FreeWater(; name::Symbol, mtk::Bool=true)
     ]
 
     HydroBucket(
-        Symbol(name, :_zone_),
+        name=Symbol(name, :_zone_),
         funcs=fluxes,
         dfuncs=dfluxes,
-        mtk=mtk
     )
 end
 
-function Model(; name::Symbol, mtk::Bool=true)
+function Model(; name::Symbol)
 
     elements = [
-        Surface(name=name, mtk=mtk),
-        Soil(name=name, mtk=mtk),
-        FreeWater(name=name, mtk=mtk)
+        Surface(name=name),
+        Soil(name=name),
+        FreeWater(name=name)
     ]
 
     HydroModel(

@@ -2,17 +2,17 @@ module HydroModels
 
 ## External packages
 # common packages
-using TOML
-using Dates
-using Reexport
-using StableRNGs
-using Statistics
-using SparseArrays
 using ComponentArrays
 using ComponentArrays: indexmap, getval
-using NamedTupleTools
-using DocStringExtensions
 using IterTools: ncycle
+using NamedTupleTools
+using Reexport
+using SparseArrays
+using StableRNGs
+using Statistics
+using TOML
+
+# runtime generated functions
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
@@ -82,6 +82,35 @@ abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 abstract type AbstractSumRoute <: AbstractRoute end
 abstract type AbstractGridRoute <: AbstractRoute end
 abstract type AbstractVectorRoute <: AbstractRoute end
+
+"""
+Metadata about the component, including:
+- name: Symbol representing the component's name
+- inputs: Vector of input variable names
+- outputs: Vector of output variable names
+- params: Vector of parameter names
+- states: Vector of state variable names
+- nns: Vector of neural network names
+"""
+struct HydroMeta
+    name::Symbol
+    inputs::Vector{Symbol}
+    outputs::Vector{Symbol}
+    params::Vector{Symbol}
+    states::Vector{Symbol}
+    nns::Vector{Symbol}
+
+    function HydroMeta(;
+        name::Symbol,
+        inputs::Vector{Symbol}=Symbol[],
+        outputs::Vector{Symbol}=Symbol[],
+        params::Vector{Symbol}=Symbol[],
+        states::Vector{Symbol}=Symbol[],
+        nns::Vector{Symbol}=Symbol[],
+    )
+        return new(name, inputs, outputs, params, states, nns)
+    end
+end
 
 # utils
 include("utils/attr.jl")

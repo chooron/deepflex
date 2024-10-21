@@ -1,33 +1,33 @@
-get_input_names(func::AbstractFlux) = func.infos[:input]
-get_input_names(ele::AbstractBucket) = ele.infos[:input]
-get_input_names(route::AbstractRoute) = route.infos[:input]
-get_input_names(unit::AbstractModel) = unit.infos[:input]
+get_input_names(func::AbstractFlux) = func.meta.inputs
+get_input_names(ele::AbstractBucket) = ele.meta.inputs
+get_input_names(route::AbstractRoute) = route.meta.inputs
+get_input_names(unit::AbstractModel) = unit.meta.inputs
 
-get_output_names(func::AbstractFlux) = func.infos[:output]
+get_output_names(func::AbstractFlux) = func.meta.outputs
 get_output_names(::AbstractStateFlux) = Symbol[]
-get_output_names(ele::AbstractBucket) = ele.infos[:output]
-get_output_names(route::AbstractRoute) = route.infos[:output]
-get_output_names(unit::AbstractModel) = unit.infos[:output]
+get_output_names(ele::AbstractBucket) = ele.meta.outputs
+get_output_names(route::AbstractRoute) = route.meta.outputs
+get_output_names(unit::AbstractModel) = unit.meta.outputs
 
-get_state_names(flux::AbstractFlux) = flux.infos[:state]
+get_state_names(flux::AbstractFlux) = flux.meta.states
 get_state_names(fluxes::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(fluxes))
-get_state_names(ele::AbstractBucket) = ele.infos[:state]
-get_state_names(route::AbstractRoute) = route.infos[:state]
-get_state_names(unit::AbstractModel) = unit.infos[:state]
+get_state_names(ele::AbstractBucket) = ele.meta.states
+get_state_names(route::AbstractRoute) = route.meta.states
+get_state_names(unit::AbstractModel) = unit.meta.states
 
-get_param_names(func::AbstractFlux) = func.infos[:param]
+get_param_names(func::AbstractFlux) = func.meta.params
 get_param_names(::AbstractNeuralFlux) = Symbol[]
 get_param_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_param_names.(funcs))
-get_param_names(ele::AbstractBucket) = ele.infos[:param]
-get_param_names(route::AbstractRoute) = route.infos[:param]
-get_param_names(unit::AbstractModel) = unit.infos[:param]
+get_param_names(ele::AbstractBucket) = ele.meta.params
+get_param_names(route::AbstractRoute) = route.meta.params
+get_param_names(unit::AbstractModel) = unit.meta.params
 
 get_nn_names(::AbstractFlux) = Symbol[]
-get_nn_names(func::AbstractNeuralFlux) = func.infos[:nn]
+get_nn_names(func::AbstractNeuralFlux) = func.meta.nns
 get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs))
-get_nn_names(ele::AbstractBucket) = ele.infos[:nn]
-get_nn_names(route::AbstractRoute) = route.infos[:nn]
-get_nn_names(unit::AbstractModel) = unit.infos[:nn]
+get_nn_names(ele::AbstractBucket) = ele.meta.nns
+get_nn_names(route::AbstractRoute) = route.meta.nns
+get_nn_names(unit::AbstractModel) = unit.meta.nns
 
 get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
@@ -45,8 +45,8 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     input_names, output_names, state_names
 end
 #* elements name utils
-get_var_names(ele::AbstractBucket) = ele.infos[:input], ele.infos[:output], ele.infos[:state]
-get_var_names(route::AbstractRoute) = route.infos[:input], route.infos[:output], route.infos[:state]
+get_var_names(ele::AbstractBucket) = ele.meta.inputs, ele.meta.outputs, ele.meta.states
+get_var_names(route::AbstractRoute) = route.meta.inputs, route.meta.outputs, route.meta.states
 
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()
@@ -65,4 +65,4 @@ function get_var_names(components::Vector{<:AbstractComponent})
     input_names, output_names, state_names
 end
 
-get_var_names(unit::AbstractModel) = unit.infos[:var]
+get_var_names(unit::AbstractModel) = unit.meta.inputs, unit.meta.outputs, unit.meta.states

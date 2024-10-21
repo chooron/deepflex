@@ -57,7 +57,7 @@ function SoilStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_soil_),
+        name=Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
     )
@@ -92,7 +92,7 @@ function FreeWaterStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_zone_),
+        name=Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
     )

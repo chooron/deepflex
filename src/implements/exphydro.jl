@@ -25,7 +25,7 @@ function SurfaceStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_surface),
+        name=Symbol(name, :_surface),
         funcs=fluxes,
         dfuncs=dfluxes,
     )
@@ -53,7 +53,7 @@ function SoilStorage(; name::Symbol)
     ]
 
     HydroBucket(
-        Symbol(name, :_soil),
+        name=Symbol(name, :_soil),
         funcs=fluxes,
         dfuncs=dfluxes,
     )

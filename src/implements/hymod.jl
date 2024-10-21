@@ -39,10 +39,9 @@ function SoilStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     HydroBucket(
-        Symbol(name, :_soil_),
+        name=Symbol(name, :_soil_),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk,
     )
 end
 
@@ -95,17 +94,16 @@ function FreeWaterStorage(; name::Symbol, mtk::Bool=true)
     ]
 
     HydroBucket(
-        Symbol(name, :_zone_),
+        name=Symbol(name, :_zone_),
         funcs=funcs,
         dfuncs=dfuncs,
-        mtk=mtk,
     )
 end
 
-function Model(; name::Symbol, mtk::Bool=true)
+function Model(; name::Symbol)
     elements = [
-        SoilStorage(name=name, mtk=mtk),
-        FreeWaterStorage(name=name, mtk=mtk),
+        SoilStorage(name=name),
+        FreeWaterStorage(name=name),
     ]
 
     HydroModel(

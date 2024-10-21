@@ -14,10 +14,12 @@ struct HydroEstimator <: AbstractEstimator
     eflux::AbstractFlux
     "待用于预测的params"
     params::Vector{Num}
+    "输出的参数尺度"
+    initstates::Vector{Num}
     "MetaData"
-    infos::NamedTuple
+    meta::HydroMeta
 
-    function HydroEstimator(eflux::AbstractFlux, params::Vector{Num})
+    function HydroEstimator(eflux::AbstractFlux, output_axes, data_stats::Function)
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(eflux)
         #* Extract all parameters names of funcs and dfuncs
@@ -25,17 +27,31 @@ struct HydroEstimator <: AbstractEstimator
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(eflux)
         #* Setup the name information of the hydrobucket
-        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        meta = HydroMeta(name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
 
-        return new(eflux, params, infos)
+        return new(eflux, params, meta)
     end
 end
 
-function (est::HydroEstimator)!(input::AbstractArray, params::ComponentVector)
-    #* 计算后需要执行替换工作
-    updated_params = est.eflux(input, params)
-    #* 生成用于合并的ComponentVector
-    return est.eflux(input, params)
+function (est::HydroEstimator)(input::Matrix, params::ComponentVector, timeidx::Vector{<:Number})
+    #* 处理input数据
+    stats_input = est.data_stats(input, dims=2)
+    #* 计算参数
+    predict_params = est.eflux(stats_input, params, timeidx)
+    @assert length(predict_params) == length(typeof(est.output_axes).parameters) "predict_params length must be equal to output_axes length"
+    #* 构建ComponentVector
+    return ComponentVector(predict_params, est.output_axes)
 end
 
+function (est::HydroEstimator)(input::Array, params::ComponentVector, timeidx::Vector{<:Number})
+    #* 处理input数据
+    stats_input = est.data_stats(input, dims=3)
+    #* 计算参数
+    predict_params_vec = est.eflux.(eachslice(stats_input, dims=2), Ref(params), Ref(timeidx))
+    params_ca_vec = [ComponentVector(predict_params, est.output_axes) for predict_params in predict_params_vec]
+    #! 这一块,根据输入数据的维度,会生成针对多个node的参数值,这里的node的key很有可能是跟ptypes不匹配的,
+    #! 也就是说不同组的参数可能会分在不同组的ptypes下这个时候应该如何处理？
+    #* 构建ComponentVector
+    return params_ca_vec
+end
 

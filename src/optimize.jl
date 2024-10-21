@@ -5,8 +5,6 @@ default_callback_func(state, l) = begin
 end
 
 """
-$(SIGNATURES)
-
 Parameter optimization for global search of hydrological units, nodes
 """
 function param_box_optim(
@@ -78,8 +76,6 @@ end
 const objective_func = get_objective()
 
 """
-$(SIGNATURES)
-
 Parameter optimization for local search of hydrological units, nodes
 """
 function param_grad_optim(
