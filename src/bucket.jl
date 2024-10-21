@@ -117,6 +117,7 @@ function (ele::HydroBucket)(
 )
     solver = get(kwargs, :solver, ODESolver())
     interp = get(kwargs, :interp, LinearInterpolation)
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
@@ -150,7 +151,11 @@ function (ele::HydroBucket)(
 
     #* merge output and state, if solved_states is not nothing, then cat it at the first dim
     output_matrix = isnothing(solved_states) ? flux_output_matrix : cat(solved_states, flux_output_matrix, dims=1)
-    output_matrix
+    if convert_to_ntp
+        return NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(output_matrix, dims=1))
+    else
+        return output_matrix
+    end
 end
 
 function (ele::HydroBucket)(
@@ -202,6 +207,25 @@ function (ele::HydroBucket)(
     #* merge state and output, if solved_states is not nothing, then cat it at the first dim
     final_output_arr = isnothing(solved_states) ? ele_output_arr : cat(solved_states, ele_output_arr, dims=1)
     final_output_arr
+end
+
+function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector, timeidx::Vector; kwargs...)
+    @assert all(input_name in keys(input) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input))."
+    for k in keys(input)
+        @assert length(input[k]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[k])) at input: $k."
+    end
+    input_matrix = Matrix(reduce(hcat, [input[k] for k in keys(input)])')
+    ele(input_matrix, pas, timeidx; kwargs...)
+end
+
+function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector, timeidx::Vector; kwargs...)
+    for i in eachindex(input)
+        @assert all(input_name in keys(input[i]) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input[i])) at $i input."
+        @assert length(input[i]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[i])) at $i input."
+    end
+    input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(ele))) for i in eachindex(input)]
+    input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
+    ele(input_arr, pas, timeidx; kwargs...)
 end
 
 

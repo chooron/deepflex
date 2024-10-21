@@ -1,7 +1,6 @@
 # simplified hydrological discharge model
 #= 
 Hydrological discharge model: (https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2023WR036170)
-! 这个模型的route flux是在hydro model的简化基础上完成的,但存在一些问题, 当某个节点没有入流时, 该节点的s_river不会继续增加,只会持续减少,直至为0
 =#
 function DischargeRouteFlux(
     input::Num,

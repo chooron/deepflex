@@ -50,9 +50,9 @@ function get_rflux_func(::VectorRouteFlux{:muskingum}; pas::ComponentVector, pty
         x_ps = [p[ptype][:x] for ptype in ptypes]
         dt_ps = [p[ptype][:dt] for ptype in ptypes]
 
-        c0_ps = @.(((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c1_ps = @.(((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
-        c2_ps = @.(((2 * (1 - x_ps)) - (dt_ps / k_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps)))
+        c0_ps = @. ((dt_ps / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps))
+        c1_ps = @. ((dt_ps / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps))
+        c2_ps = @. ((2 * (1 - x_ps)) - (dt_ps / k_ps)) / ((2 * (1 - x_ps)) + (dt_ps / k_ps))
 
         new_q_out = @.((c0_ps * q_in) + (c1_ps * q_in[Int(t)-1]) + (c2_ps * (q_out + q_gen)))
         du[:flux_states] = new_q_out

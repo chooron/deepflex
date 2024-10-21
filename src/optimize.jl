@@ -38,9 +38,8 @@ function param_box_optim(
         #* Use merge_ca to replace the tunable parameters inner the model parameters
         tmp_pas = update_ca(default_model_pas, ComponentVector(x, tunable_axes))
         loss = mean(map(eachindex(input, target, timeidx)) do i
-            inp, tar, tidx = input[i], target[i], timeidx[i]
-            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver; run_kwargs...)
-            tmp_loss = mean([loss_func(tar[key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(tar)])
+            tmp_pred = component(input[i], tmp_pas, timeidx[i]; run_kwargs...)
+            tmp_loss = mean([loss_func(target[i][key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(target[i])])
             tmp_loss
         end)
         loss
@@ -60,12 +59,12 @@ function get_objective()
         #* Optimization arguments: hydro component, input data, time index, ode solver,
         #*                         tunable parameters axes and default model params
         #* Use merge_ca to replace the tunable parameters inner the model parameters
-        component, input, target, timeidx, solver, run_kwargs, default_model_pas, loss_func = p
+        component, input, target, timeidx, run_kwargs, default_model_pas, loss_func = p
         # todo 添加clip方法,约束参数范围
         tmp_pas = update_ca(default_model_pas, x)
         loss = mean(map(eachindex(input, target, timeidx)) do i
             inp, tar, tidx = input[i], target[i], timeidx[i]
-            tmp_pred = component(inp, tmp_pas, timeidx=tidx, solver=solver; run_kwargs...)
+            tmp_pred = component(inp, tmp_pas, tidx; run_kwargs...)
             tmp_loss = mean([loss_func(tar[key], tmp_pred[key]) for key in keys(tar)])
             tmp_loss
         end)
@@ -85,7 +84,7 @@ function param_grad_optim(
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
     timeidx::AbstractVector,
-    run_kwargs::Dict=Dict(),
+    run_kwargs::NamedTuple=NamedTuple(),
     kwargs...,
 )
     #* Get the argument for parameter optimization
@@ -94,17 +93,15 @@ function param_grad_optim(
     loss_func = get(kwargs, :loss_func, HydroErrors.mse)
     callback_func = get(kwargs, :callback_func, default_callback_func)
     maxiters = get(kwargs, :maxiters, 10)
-    #* 把这个放到run kwargs里面, timeidx也是
-    solver = get(kwargs, :solver, ODESolver())
 
     #* Construct default model parameters based on tunbale parameters and constant parameters for subsequent merging
     default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(objective_func, adtype)
-    prob_args = (component, input, target, timeidx, solver, run_kwargs, default_model_pas, loss_func)
+    prob_args = (component, input, target, timeidx, run_kwargs, default_model_pas, loss_func)
     optprob = Optimization.OptimizationProblem(optf, tunable_pas, prob_args)
-    sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
+    sol = Optimization.solve(optprob, solve_alg,  maxiters=maxiters) # callback=callback_func,
     #* Returns the optimized model parameters
     sol.u
 end
