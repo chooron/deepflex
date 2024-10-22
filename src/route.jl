@@ -1,5 +1,5 @@
-(flux::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs...) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
-(flux::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs...) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(flux::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(flux::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
 
 """
     WeightSumRoute <: AbstractRouteFlux
@@ -75,7 +75,7 @@ function (route::WeightSumRoute)(
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector{<:Number};
-    kwargs...
+    kwargs::NamedTuple=NamedTuple()
 )
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     #* 计算出每个节点的面积转换系数
@@ -181,7 +181,7 @@ function (route::GridRoute)(
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector{<:Number};
-    kwargs...
+    kwargs::NamedTuple=NamedTuple()
 )
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     solver = get(kwargs, :solver, ODESolver())
@@ -302,8 +302,7 @@ function (route::VectorRoute)(
     input::AbstractArray,
     pas::ComponentVector;
     timeidx::AbstractVector,
-    ptypes::AbstractVector{Symbol},
-    kwargs...
+    kwargs::NamedTuple=NamedTuple()
 )
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     solver = get(kwargs, :solver, ODESolver())

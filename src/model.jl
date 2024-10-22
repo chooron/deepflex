@@ -62,28 +62,43 @@ struct HydroModel <: AbstractModel
     end
 end
 
-# 求解并计算
 function (model::HydroModel)(
     input::NamedTuple,
     pas::ComponentVector,
     timeidx::Vector;
-    compkwargs::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
-    convert_to_ntp::Bool=false,
+    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    kwargs...
+)   
+    @assert all(nm -> nm in keys(input), get_input_names(model)) "input must contain all input names"
+    input_matrix = Matrix(reduce(hcat, [input[nm] for nm in get_input_names(model)])')
+    return model(input_matrix, pas, timeidx; config=config, kwargs...)
+end
+
+# 求解并计算
+function (model::HydroModel)(
+    input::Matrix,
+    pas::ComponentVector,
+    timeidx::Vector;
+    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    kwargs...
 )
     #* 如果compkwargs是NamedTuple,则将其填充为Vector{NamedTuple}
-    compkwargs = compkwargs isa NamedTuple ? fill(compkwargs, length(model.components)) : compkwargs
-    @assert length(compkwargs) == length(model.components) "compkwargs length must be equal to components length"
-
-    fluxes = Matrix(reduce(hcat, [input[nm] for nm in get_input_names(model)])')
-    for (tmp_comp, idx, kwargs) in zip(model.components, model.varindices, compkwargs)
-        if tmp_comp isa AbstractEstimator
-            tmp_pas = tmp_comp(fluxes[idx, :], pas, timeidx; kwargs...)
+    comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
+    @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
+    @assert size(input, 1) == length(get_input_names(model)) "input matrix must have the same number of columns as the input names"
+    @assert size(input, 2) == length(timeidx) "input matrix must have the same number of rows as the timeidx length"
+    fluxes = input
+    for (comp_, idx, config_) in zip(model.components, model.varindices, comp_configs)
+        # Ensure convert_to_ntp is false for inner component computation
+        if comp_ isa AbstractEstimator
+            tmp_pas = comp_(fluxes[idx, :], pas, timeidx; config=config_, convert_to_ntp=false)
             pas = update_ca(pas, tmp_pas)
         else
-            tmp_fluxes = tmp_comp(fluxes[idx, :], pas, timeidx; kwargs...)
+            tmp_fluxes = comp_(fluxes[idx, :], pas, timeidx; config=config_, convert_to_ntp=false)
             fluxes = cat(fluxes, tmp_fluxes, dims=1)
         end
     end
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
         model_var_names = reduce(vcat, get_var_names(model))
         return NamedTuple{Tuple(model_var_names)}(eachrow(fluxes))
@@ -97,24 +112,25 @@ function (model::HydroModel)(
     inputs::Vector{<:NamedTuple},
     pas::ComponentVector,
     timeidx::Vector;
-    compkwargs::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
-    convert_to_ntp::Bool=false,
+    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    kwargs...
 )
     #* 如果compkwargs是NamedTuple,则将其填充为Vector{NamedTuple}
-    compkwargs = compkwargs isa NamedTuple ? fill(compkwargs, length(model.components)) : compkwargs
-    @assert length(compkwargs) == length(model.components) "compkwargs length must be equal to components length"
+    comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
+    @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
 
     fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in get_input_names(model)]) for input in inputs])
     fluxes = permutedims(fluxes, (2, 3, 1))
-    for (tmp_comp, idx, kwargs) in zip(model.components, model.varindices, compkwargs)
-        if tmp_comp isa AbstractEstimator
-            tmp_pas = tmp_comp(fluxes[idx, :, :], pas, timeidx; kwargs...)
+    for (comp_, idx_, config_) in zip(model.components, model.varindices, comp_configs)
+        if comp_ isa AbstractEstimator
+            tmp_pas = comp_(fluxes[idx_, :, :], pas, timeidx; config=config_, convert_to_ntp=false)
             pas = update_ca(pas, tmp_pas)
         else
-            tmp_fluxes = tmp_comp(fluxes[idx, :, :], pas, timeidx; kwargs...)
+            tmp_fluxes = comp_(fluxes[idx_, :, :], pas, timeidx; config=config_, convert_to_ntp=false)
             fluxes = cat(fluxes, tmp_fluxes, dims=1)
         end
     end
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
         return [NamedTuple{Tuple(get_var_names(model))}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
     else

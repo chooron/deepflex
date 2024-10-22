@@ -18,7 +18,7 @@ function MuskingumRouteFlux(
     )
 end
 
-function (flux::VectorRouteFlux{:muskingum})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::VectorRouteFlux{:muskingum})(input::AbstractMatrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple())
     input_len = size(input)[2]
     input_vec = input[1, :]
     params = pas[:params]

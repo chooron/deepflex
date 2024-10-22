@@ -28,4 +28,4 @@ init_states = ComponentVector(NamedTuple{Tuple([Symbol(:node, i) for i in 1:node
 pas = ComponentVector(params=params, initstates=init_states)
 
 #* run models
-results = unit(inputs, pas, ts, compkwargs=(solver=solver,), convert_to_ntp=true)
+results = unit(inputs, pas, ts, kwargs=(solver=solver,), convert_to_ntp=true)

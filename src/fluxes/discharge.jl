@@ -24,7 +24,7 @@ function DischargeRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::RouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple())
     input_len = size(input)[2]
     input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
 

@@ -35,10 +35,9 @@ flow_vec = df[timeidx, "SnowWater"]
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec,)
 output = (melt=flow_vec,)
 input_matrix = Matrix(reduce(hcat, [input[k] for k in keys(input)])')
-run_kwargs = (solver=HydroModels.ODESolver(), convert_to_ntp=true)
+run_kwargs = (convert_to_ntp=true,)
 
-# todo log有问题记得看一下
-best_pas = HydroModels.param_grad_optim(
+best_pas = HydroModels.param_batch_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
@@ -46,7 +45,8 @@ best_pas = HydroModels.param_grad_optim(
     target=repeat([output], 10),
     timeidx=repeat([timeidx], 10),
     adtype=Optimization.AutoZygote(),
-    maxiters=100,
+    maxiters=10,
     loss_func=HydroErrors.mse,
-    run_kwargs=run_kwargs
+    config=(solver=HydroModels.ODESolver(),),
+    run_kwargs=(convert_to_ntp=true,)
 )

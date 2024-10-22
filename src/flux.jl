@@ -638,9 +638,10 @@ function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector,
     reshape(sum_route, 1, length(input_vec))
 end
 
-function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[3]); ptypes::AbstractVector{Symbol}, kwargs...)
+function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...)
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     pytype_params = [pas[:params][ptype] for ptype in ptypes]
 
     sols = map(eachindex(ptypes)) do (idx)

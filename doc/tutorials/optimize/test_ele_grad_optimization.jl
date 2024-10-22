@@ -27,7 +27,7 @@ snow_funcs = [
 ]
 snow_dfuncs = [HydroModels.StateFlux([snowfall] => [melt], snowpack)]
 
-model = HydroModels.HydroBucket(:sf, funcs=snow_funcs, dfuncs=snow_dfuncs)
+model = HydroModels.HydroBucket(name=:sf, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 # predefine the parameters
 tunable_pas = ComponentVector(params=(f=0.01674478, Smax=1709.461015, Qmax=18.46996175, Df=2.674548848, Tmax=0.175739196, Tmin=-2.092959084))
@@ -50,16 +50,22 @@ flow_vec = df[timeidx, "SnowWater"]
 # parameters optimization
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec,)
 output = (melt=flow_vec,)
+run_kwargs = (solver=HydroModels.ODESolver(), convert_to_ntp=true)
 
-best_pas = HydroModels.param_grad_optim(
+function mse2(simulated_array::AbstractVector{<:T}, observed_array::AbstractVector{<:T}) where {T}
+    mean((simulated_array .- observed_array) .^ 2)
+end
+
+best_pas, loss_df = HydroModels.param_grad_optim(
     model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
     input=repeat([input], 10),
     target=repeat([output], 10),
     timeidx=repeat([timeidx], 10),
-    adtype=Optimization.AutoZygote(),
+    adtype=Optimization.AutoForwardDiff(),
     maxiters=100,
-    loss_func=HydroErrors.mse
+    run_kwargs=run_kwargs,
+    loss_func=mse2
 )
 # ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))

@@ -20,7 +20,7 @@ function CascadeRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs...)
+function (flux::RouteFlux{:cascade})(input::AbstractMatrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple())
     n = Int(pas[:params].n)
     init_states = zeros(n)
     input_len = size(input)[2]

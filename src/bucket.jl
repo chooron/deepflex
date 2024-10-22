@@ -113,10 +113,12 @@ function (ele::HydroBucket)(
     input::Matrix,
     pas::ComponentVector,
     timeidx::Vector{<:Number}=collect(1:size(input, 2));
+    config::NamedTuple=NamedTuple(),
     kwargs...
 )
-    solver = get(kwargs, :solver, ODESolver())
-    interp = get(kwargs, :interp, LinearInterpolation)
+    #* get kwargs
+    solver = get(config, :solver, ODESolver())
+    interp = get(config, :interp, LinearInterpolation)
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
@@ -162,12 +164,14 @@ function (ele::HydroBucket)(
     input::Array,
     pas::ComponentVector,
     timeidx::Vector{<:Number}=collect(1:size(input, 3));
+    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
     kwargs...
 )
     #* get kwargs
-    solver = get(kwargs, :solver, ODESolver())
-    interp = get(kwargs, :interp, LinearInterpolation)
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    solver = get(config, :solver, ODESolver())
+    interp = get(config, :interp, LinearInterpolation)
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
@@ -209,23 +213,23 @@ function (ele::HydroBucket)(
     final_output_arr
 end
 
-function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector, timeidx::Vector; kwargs...)
+function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector, timeidx::Vector; config::NamedTuple=NamedTuple(), kwargs...)
     @assert all(input_name in keys(input) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input))."
     for k in keys(input)
         @assert length(input[k]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[k])) at input: $k."
     end
     input_matrix = Matrix(reduce(hcat, [input[k] for k in keys(input)])')
-    ele(input_matrix, pas, timeidx; kwargs...)
+    ele(input_matrix, pas, timeidx; config=config, kwargs...)
 end
 
-function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector, timeidx::Vector; kwargs...)
+function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector, timeidx::Vector; config::NamedTuple=NamedTuple(), kwargs...)
     for i in eachindex(input)
         @assert all(input_name in keys(input[i]) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input[i])) at $i input."
         @assert length(input[i]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[i])) at $i input."
     end
     input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(ele))) for i in eachindex(input)]
     input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
-    ele(input_arr, pas, timeidx; kwargs...)
+    ele(input_arr, pas, timeidx; config=config, kwargs...)
 end
 
 

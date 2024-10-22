@@ -30,8 +30,12 @@ flow_vec = df[ts, "flow(mm)"]
 
 # parameters optimization
 input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
-input_matrix = reduce(hcat, collect(input))'
+
+input_matrix = Matrix(reduce(hcat, collect(input))')
 output = (flow=flow_vec,)
+pas = ComponentVector(tunable_pas; const_pas...)
+result = model(input_matrix, pas, ts, kwargs=run_kwargs)
+
 
 best_pas = HydroModels.param_grad_optim(
     model,
@@ -40,5 +44,7 @@ best_pas = HydroModels.param_grad_optim(
     input=repeat([input], 10),
     target=repeat([output], 10),
     timeidx=repeat([ts], 10),
-    adtype=Optimization.AutoZygote()
+    adtype=Optimization.AutoZygote(),
+    maxiters=10,
+    loss_func=HydroErrors.mse,
 )
