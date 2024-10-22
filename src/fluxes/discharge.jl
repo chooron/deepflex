@@ -24,14 +24,15 @@ function DischargeRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple())
-    input_len = size(input)[2]
-    input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
+function (flux::RouteFlux{:discharge})(input::Matrix, pas::ComponentVector, timeidx::AbstractVector; kwargs...)
+    input_vec = input[1, :]
+    input_itp = LinearInterpolation(input_vec, timeidx)
+    params = pas[:params]
+    initstates = pas[:initstates]
 
     function hdm_ode!(du, u, p, t)
         s_river, q_in = u[1], u[2]
-        lag = p[1]
-        q_rf = (s_river + q_in) / (lag + 1)
+        q_rf = (s_river + q_in) / (p[1] + 1)
         # no other spatial route
         q_out = q_rf + input_itp(t)
         du[1] = q_in - q_rf
@@ -39,13 +40,14 @@ function (flux::RouteFlux{:discharge})(input::AbstractMatrix, pas::ComponentVect
     end
 
     #* init s_river and inflow
-    init_states = zeros(2)
+    init_states = [initstates[:s_river], input_vec[1]]
     prob = ODEProblem(hdm_ode!, init_states, (1, length(input_vec)), (params.lag,))
-    sol = solve(prob, Tsit5())
-    s_river_vec = sol.u[:, 1]
-    q_in_vec = sol.u[:, 2]
-    q_out_vec = (s_river_vec .+ q_in_vec) ./ (lag + 1) .+ input_vec
-    reshape(q_out_vec, 1, input_len)
+    sol = solve(prob, Tsit5(), saveat=timeidx)
+    sol_arr = Array(sol)
+    s_river_vec = sol_arr[1, :]
+    q_in_vec = sol_arr[2, :]
+    q_out_vec = @. (s_river_vec + q_in_vec) / (params.lag + 1) + input_vec
+    sol, reshape(q_out_vec, 1, length(timeidx))
 end
 
 function get_rflux_initstates(::RouteFlux{:discharge}; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol})

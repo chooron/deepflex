@@ -494,9 +494,9 @@ This function does not actually return a value, as route flux models are abstrac
 - Specific implementations of route flux models (subtypes of AbstractRouteFlux) should provide their own implementations of this function.
 - Route flux models are typically used to represent water routing processes in hydrological systems.
 """
-(::RouteFlux)(::Vector, ::ComponentVector, timeidx::Integer=1; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
-(::AbstractRouteFlux)(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...) = @error "Must be implemented by subtype"
-(::AbstractRouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...) = @error "Must be implemented with the Route type"
+# (::RouteFlux)(::Vector, ::ComponentVector, timeidx::Integer=1; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
+# (::RouteFlux)(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...) = @error "Must be implemented by subtype"
+# (::RouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...) = @error "Must be implemented with the Route type"
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux

@@ -205,6 +205,7 @@ function (route::GridRoute)(
         # 计算出流的汇流结果
         new_q_in = grid_routing(q_out, route.positions, route.flwdir)
         # 更新状态
+        # todo 这一块问题很大,因为DQ_in = new_q_in - q_in, 但是函数中du变量应该是dq_in/dt而不是dq_in
         du[:q_in] = new_q_in .- u[:q_in]
     end
     #* prepare init states

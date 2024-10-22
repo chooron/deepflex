@@ -19,7 +19,7 @@ function MuskingumRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; timeidx::AbstractVector, kwargs::NamedTuple=NamedTuple())
+function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector, timeidx::AbstractVector; kwargs...)
     input_len = size(input)[2]
     input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
     params = pas[:params]
