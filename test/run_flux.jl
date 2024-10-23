@@ -12,26 +12,7 @@
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2.0 3.0 1.0; 3.0 2.0 2.0] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
     input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(p1=3.0, p2=4.0)], 10)))
-    @test simple_flux_1(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (3, 1, 2))
-end
-
-@testset "test simple flux (build by symbol)" begin
-    # test with single output
-    simple_flux_1 = HydroModels.SimpleFlux([:a, :b] => [:c, :d], [:p1, :p2],
-        flux_funcs=[(i, p) -> i[1] * p[1] + i[2] * p[2], (i, p) -> i[1] / p[1] + i[2] / p[2]])
-    @test HydroModels.get_input_names(simple_flux_1) == [:a, :b]
-    @test HydroModels.get_param_names(simple_flux_1) == [:p1, :p2]
-    @test HydroModels.get_output_names(simple_flux_1) == [:c, :d]
-    @test simple_flux_1([2.0, 3.0], ComponentVector(params=(p1=3.0, p2=4.0))) == [2.0 * 3.0 + 3.0 * 4.0, 2.0 / 3.0 + 3.0 / 4.0]
-    # test with multiple outputs
-    output_mat = [2.0*3.0+3.0*4.0 3.0*3.0+2.0*4.0 1.0*3.0+2.0*4.0;
-        2.0/3.0+3.0/4.0 3.0/3.0+2.0/4.0 1.0/3.0+2.0/4.0]
-    @test simple_flux_1([2.0 3.0 1.0; 3.0 2.0 2.0], ComponentVector(params=(p1=3.0, p2=4.0))) == output_mat
-    # test with multiple nodes
-    input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2.0 3.0 1.0; 3.0 2.0 2.0] for _ in 1:10), (1, 3, 2))
-    ndtypes = [Symbol("node_$i") for i in 1:10]
-    input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(p1=3.0, p2=4.0)], 10)))
-    @test simple_flux_1(input_arr, input_pas, ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (3, 1, 2))
+    @test simple_flux_1(input_arr, input_pas, ptypes=ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (3, 1, 2))
 end
 
 @testset "test state flux (build by Symbolics.jl)" begin
@@ -73,7 +54,7 @@ end
     pas = ComponentVector(params=(k=k, x=x,))
     msk_flux = HydroModels.MuskingumRouteFlux(q1)
     input = Float64[1 2 3 2 3 2 5 7 8 3 2 1]
-    re = msk_flux(input, pas, timeidx=collect(1:size(input)[2]))
+    re = msk_flux(input, pas, collect(1:size(input)[2]))
 
     # Verifying the input, output, and parameter names
     @test HydroModels.get_input_names(msk_flux) == [:q1]
@@ -165,14 +146,14 @@ end
     @test HydroModels.get_param_names(nn_flux_1) == Symbol[]
     @test HydroModels.get_nn_names(nn_flux_1) == [:testnn]
     @test HydroModels.get_output_names(nn_flux_1) == [:d]
-    @test nn_flux_1([1, 2, 3], ComponentVector(nn=(testnn=nn_ps_vec,))) ≈ func_1([1, 2, 3], nn_ps)
+    @test nn_flux_1([1, 2, 3], ComponentVector(nn=(testnn=nn_ps_vec,)), 1) ≈ func_1([1, 2, 3], nn_ps)
     test_input = [1 3 3; 2 2 2; 1 2 1; 3 1 2]
     expected_output = func_1(test_input', nn_ps)
-    @test nn_flux_1(test_input, ComponentVector(nn=(testnn=nn_ps_vec,))) ≈ expected_output
+    @test nn_flux_1(test_input, ComponentVector(nn=(testnn=nn_ps_vec,)), collect(1:size(test_input)[2])) ≈ expected_output
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_input for _ in 1:10), (2, 3, 1))
     input_pas = ComponentVector(nn=(testnn=nn_ps_vec,))
-    @test nn_flux_1(input_arr, input_pas, Symbol[]) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
+    @test nn_flux_1(input_arr, input_pas, collect(1:size(test_input)[2])) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test neural flux (multiple output)" begin
@@ -193,12 +174,12 @@ end
     @test HydroModels.get_output_names(nn_flux) == [:d, :e]
     test_input = [1 3 3; 2 2 2; 1 2 1; 3 1 2]
     test_output = func(test_input', nn_ps)
-    @test nn_flux([1, 2, 3], ComponentVector(nn=(testnn=nn_ps_vec,))) ≈ func([1, 2, 3], nn_ps)
-    @test nn_flux(test_input, ComponentVector(nn=(testnn=nn_ps_vec,))) ≈ test_output
+    @test nn_flux([1, 2, 3], ComponentVector(nn=(testnn=nn_ps_vec,)), 1) ≈ func([1, 2, 3], nn_ps)
+    @test nn_flux(test_input, ComponentVector(nn=(testnn=nn_ps_vec,)), collect(1:size(test_input)[2])) ≈ test_output
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_input for _ in 1:10), (2, 3, 1))
     input_pas = ComponentVector(nn=(testnn=nn_ps_vec,))
-    @test nn_flux(input_arr, input_pas, Symbol[]) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_output for _ in 1:10), (1, 3, 2))
+    @test nn_flux(input_arr, input_pas, collect(1:size(test_input)[2])) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), test_output for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test runtime flux function building" begin
@@ -209,17 +190,5 @@ end
     params = [x1, x2]
     exprs = [x1 * a + x2 * b + c, x1 * c + x2]
     func = HydroModels.build_flux_func(inputs, outputs, params, exprs)
-    @test func([1, 2, 1], [2, 1]) == [2 * 1 + 1 * 2 + 1, 2 * 1 + 1]
+    @test func([1, 2, 1], [2, 1], 1) == [2 * 1 + 1 * 2 + 1, 2 * 1 + 1]
 end
-
-
-@testset "test time varying flux" begin
-    @variables a b c d e
-    @parameters x1 x2
-    inputs = [a, b, c]
-    outputs = [d, e]
-    params = [x1, x2]
-    exprs = [x1 * a * t + x2 * b / t + c, x1 * c + x2 * t]
-    func = HydroModels.build_flux_func(inputs, outputs, params, exprs)
-end
-

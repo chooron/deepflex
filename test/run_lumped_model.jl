@@ -1,3 +1,5 @@
+step_func = HydroModels.step_func
+
 @testset "test lumped hydro model (exp-hydro with no neural network and no unit hydrograph)" begin
     @parameters Tmin Tmax Df Smax f Qmax
     @variables prcp temp lday pet snowpack soilwater rainfall snowfall evap melt baseflow surfaceflow flow
@@ -19,7 +21,7 @@
         SimpleFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
     snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_ele = HydroBucket(funcs=snow_funcs, dfuncs=snow_dfuncs)
 
     #! define the soil water reservoir
     soil_funcs = [
@@ -29,10 +31,10 @@
         SimpleFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
     ]
     soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-    soil_ele = HydroBucket(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+    soil_ele = HydroBucket(funcs=soil_funcs, dfuncs=soil_dfuncs)
 
     #! define the Exp-Hydro model
-    model = HydroModel(:exphydro, components=[snow_ele, soil_ele])
+    model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele])
 
     @test Set(HydroModels.get_input_names(model)) == Set([:temp, :lday, :prcp])
     @test Set(HydroModels.get_param_names(model)) == Set([:Tmin, :Tmax, :Df, :Smax, :f, :Qmax])
@@ -40,10 +42,10 @@
     @test Set(HydroModels.get_output_names(model)) == Set([:pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow])
     @test Set(HydroModels.get_var_names(model)) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater])
 
-    result_ntp = model(input_ntp, pas, timeidx=ts)
+    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
-    result_mat = model(input_ntp, pas, timeidx=ts, output_type=:matrix)
+    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     input_ntp_vec = repeat([input_ntp], 10)
@@ -51,11 +53,11 @@
     node_params = NamedTuple{Tuple(node_names)}(repeat([params], 10))
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 10))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
-    result_ntp_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:namedtuple)
+    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
-    result_mat_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:array)
+    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
 
@@ -95,7 +97,7 @@ end
     uh_flux_1 = UnitHydroFlux(slowflow, x4, HydroModels.uh_1_half)
     uh_flux_2 = UnitHydroFlux(fastflow, x4, HydroModels.uh_2_full)
 
-    prod_ele = HydroBucket(:gr4j_prod, funcs=prod_funcs, dfuncs=prod_dfuncs)
+    prod_ele = HydroBucket(funcs=prod_funcs, dfuncs=prod_dfuncs)
     #* define the routing store
     rst_funcs = [
         SimpleFlux([routingstore] => [exch], [x2, x3], exprs=[x2 * abs(routingstore / x3)^3.5]),
@@ -104,9 +106,9 @@ end
         SimpleFlux([slowflow_routed, exch, routedflow, routingstore] => [new_routingstore], exprs=[routingstore + slowflow_routed + exch - routedflow])
     ]
     rst_dfuncs = [StateFlux(routingstore => new_routingstore)]
-    rst_ele = HydroBucket(:gr4j_rst, funcs=rst_funcs, dfuncs=rst_dfuncs)
+    rst_ele = HydroBucket(funcs=rst_funcs, dfuncs=rst_dfuncs)
     #* define the gr4j model
-    model = HydroModel(:gr4j, components=[prod_ele, uh_flux_1, uh_flux_2, rst_ele])
+    model = HydroModel(name=:gr4j, components=[prod_ele, uh_flux_1, uh_flux_2, rst_ele])
 
     @test Set(HydroModels.get_input_names(model)) == Set([:prcp, :ep])
     @test Set(HydroModels.get_param_names(model)) == Set([:x1, :x2, :x3, :x4])
@@ -117,10 +119,10 @@ end
         :fastflow, :slowflow_routed, :fastflow_routed, :exch, :routedflow, :flow, :new_routingstore, :routingstore])
 
     # Test single-node model run
-    result_ntp = model(input_ntp, pas, timeidx=ts)
+    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
-    result_mat = model(input_ntp, pas, timeidx=ts, output_type=:matrix)
+    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     # Test multi-node model run
@@ -131,12 +133,12 @@ end
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
     # Test output as vector of NamedTuples
-    result_ntp_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:namedtuple)
+    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
     # Test output as 3D array
-    result_mat_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:array)
+    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
 
@@ -179,7 +181,7 @@ end
         SimpleFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
     snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_ele = HydroBucket(name=:m50_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
     #! define the ET NN and Q NN
     et_nn = Lux.Chain(Lux.Dense(3 => 16, Lux.tanh), Lux.Dense(16 => 16, Lux.leakyrelu), Lux.Dense(16 => 1, Lux.leakyrelu), name=:etnn)
@@ -204,10 +206,10 @@ end
 
     state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
     soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
-    soil_ele = HydroBucket(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+    soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
     #! define the Exp-Hydro model
-    model = HydroModel(:m50, components=[snow_ele, soil_ele])
+    model = HydroModel(name=:m50, components=[snow_ele, soil_ele])
 
     @test Set(HydroModels.get_input_names(model)) == Set([:prcp, :temp, :lday])
     @test Set(HydroModels.get_param_names(model)) == Set([:Tmin, :Tmax, :Df, :snowpack_std, :snowpack_mean, :soilwater_std, :soilwater_mean, :prcp_std, :prcp_mean, :temp_std, :temp_mean])
@@ -226,11 +228,11 @@ end
     pas = ComponentVector(initstates=initstates, params=params, nn=nn_params)
     input_ntp = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
     # Run the model for a single set of inputs and parameters
-    result_ntp = model(input_ntp, pas, timeidx=ts)
+    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
     # Run the model and get results as a matrix
-    result_mat = model(input_ntp, pas, timeidx=ts, output_type=:matrix)
+    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     # Prepare inputs and parameters for multiple nodes
@@ -241,11 +243,11 @@ end
     node_pas = ComponentVector(params=node_params, initstates=node_initstates, nn=nn_params)
 
     # Run the model for multiple nodes and get results as a vector of NamedTuples
-    result_ntp_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:namedtuple)
+    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
     # Run the model for multiple nodes and get results as a 3D array
-    result_mat_vec = model(input_ntp_vec, node_pas, timeidx=ts, output_type=:array)
+    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end

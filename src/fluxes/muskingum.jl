@@ -3,6 +3,7 @@ function MuskingumRouteFlux(
     output::Union{Num,Nothing}=nothing,
 )
     @parameters k, x
+    @variables s_river
 
     if isnothing(output)
         input_name = Symbolics.tosymbol(input, escape=false)
@@ -13,7 +14,7 @@ function MuskingumRouteFlux(
     return RouteFlux(
         input,
         [k, x],
-        Num[],
+        [s_river],
         routetype=:muskingum,
         output=output
     )

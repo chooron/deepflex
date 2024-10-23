@@ -44,12 +44,12 @@ function build_ele_func(
     for func in funcs
         if func isa AbstractNeuralFlux
             #* For NeuralFlux, use nn_input to match the input variable
-            push!(assign_list, Assignment(func.nnios[:input], MakeArray(func.inputs, Vector)))
+            push!(assign_list, Assignment(func.nninfos[:inputs], MakeArray(func.inputs, Vector)))
             #* For NeuralFlux, use nn_output to match the calculation result of nn expr
-            push!(assign_list, Assignment(func.nnios[:output], get_exprs(func)[1]))
+            push!(assign_list, Assignment(func.nninfos[:outputs], get_exprs(func)[1]))
             #* According to the output variable name, match each index of nn_output
             for (idx, output) in enumerate(get_output_vars(func))
-                push!(assign_list, Assignment(output, func.nnios[:output][idx]))
+                push!(assign_list, Assignment(output, func.nninfos[:outputs][idx]))
                 push!(output_list, output)
             end
         else

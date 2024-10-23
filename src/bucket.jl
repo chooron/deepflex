@@ -59,9 +59,9 @@ struct HydroBucket <: AbstractBucket
     meta::HydroMeta
 
     function HydroBucket(;
-        name::Symbol,
         funcs::Vector,
         dfuncs::Vector=StateFlux[],
+        name::Union{Symbol, Nothing}=nothing,
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(funcs, dfuncs)
@@ -70,7 +70,8 @@ struct HydroBucket <: AbstractBucket
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(funcs)
         #* Setup the name information of the hydrobucket
-        meta = HydroMeta(name=name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
+        bucket_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), state_names)), :_bucket) : name
+        meta = HydroMeta(name=bucket_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         #* Construct a function for ordinary differential calculation based on dfunc and funcs
         flux_func, ode_func = build_ele_func(funcs, dfuncs, meta)
 

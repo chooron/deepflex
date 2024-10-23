@@ -41,7 +41,6 @@ using SciMLSensitivity
 using Lux
 using LuxCore
 using NNlib
-using Zygote
 
 # parameters Optimization
 using Optimization

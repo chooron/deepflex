@@ -1,5 +1,5 @@
-(flux::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Vector input in $(typeof(flux)) subtype of the AbstractRouteFlux")
-(flux::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Matrix input in $(typeof(flux)) subtype of the AbstractRouteFlux")
+(route::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Vector input in $(typeof(route)) subtype of the AbstractRoute")
+(route::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Matrix input in $(typeof(route)) subtype of the AbstractRoute")
 
 """
     WeightSumRoute <: AbstractRouteFlux
@@ -40,8 +40,8 @@ struct WeightSumRoute <: AbstractSumRoute
     rfunc::AbstractFlux
     "grid subarea information, km2"
     subareas::AbstractVector
-    "Routing information: keys contain: input, output, param, state, nn"
-    infos::NamedTuple
+    "Metadata: contains keys for input, output, param, state, and nn"
+    meta::HydroMeta
     # "output identifier" 
     #=     
     This part doesn't need to add an output id, because the matrix cannot be directly modified,
@@ -49,10 +49,10 @@ struct WeightSumRoute <: AbstractSumRoute
     =#
     # outid::Symbol
 
-    function WeightSumRoute(
-        name::Symbol;
+    function WeightSumRoute(;
         rfunc::AbstractFlux=SimpleFlux([flow] => [flow_routed], exprs=[flow]),
         subareas::AbstractVector,
+        name::Union{Symbol,Nothing}=nothing
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)
@@ -62,11 +62,12 @@ struct WeightSumRoute <: AbstractSumRoute
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(rfunc)
         #* Setup the name information of the hydrobucket
-        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), output_names)), :_weight_route) : name
+        meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         return new(
             rfunc,
             subareas,
-            infos,
+            meta,
         )
     end
 end
@@ -75,7 +76,7 @@ function (route::WeightSumRoute)(
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector{<:Number};
-    kwargs::NamedTuple=NamedTuple()
+    kwargs...
 )
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
     #* 计算出每个节点的面积转换系数
@@ -128,14 +129,14 @@ struct GridRoute <: AbstractGridRoute
     "grid subarea information, km2"
     subareas::AbstractVector
     "Metadata: contains keys for input, output, param, state, and nn"
-    infos::NamedTuple
+    meta::HydroMeta
 
-    function GridRoute(
-        name::Symbol;
+    function GridRoute(;
         rfunc::AbstractRouteFlux,
         flwdir::AbstractMatrix,
         positions::AbstractVector,
         subareas::Union{AbstractVector,Number},
+        name::Union{Symbol,Nothing}=nothing,
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)
@@ -144,7 +145,8 @@ struct GridRoute <: AbstractGridRoute
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(rfunc)
         #* Setup the name information of the hydrobucket
-        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_grid_route) : name
+        meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         #* Convert subareas to a vector if it's a single value
         subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
         return new(
@@ -152,7 +154,7 @@ struct GridRoute <: AbstractGridRoute
             flwdir,
             positions,
             subareas,
-            infos,
+            meta,
         )
     end
 end
@@ -181,15 +183,17 @@ function (route::GridRoute)(
     input::AbstractArray,
     pas::ComponentVector,
     timeidx::Vector{<:Number};
-    kwargs::NamedTuple=NamedTuple()
+    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    kwargs...
 )
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
-    solver = get(kwargs, :solver, ODESolver())
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    interp = get(config, :interp, LinearInterpolation)
+    solver = get(config, :solver, ODESolver())
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
-    itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
+    itp_funcs = interp.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
@@ -205,13 +209,12 @@ function (route::GridRoute)(
         # 计算出流的汇流结果
         new_q_in = grid_routing(q_out, route.positions, route.flwdir)
         # 更新状态
-        # todo 这一块问题很大,因为DQ_in = new_q_in - q_in, 但是函数中du变量应该是dq_in/dt而不是dq_in
         du[:q_in] = new_q_in .- u[:q_in]
     end
     #* prepare init states
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
-    sol = solver(grid_route_ode!,  pas[:params], init_states, timeidx, convert_to_array=false)
+    sol = solver(grid_route_ode!, pas[:params], init_states, timeidx, convert_to_array=false)
     if SciMLBase.successful_retcode(sol)
         # Extract flux_states and q_in for each time step
         flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
@@ -224,9 +227,11 @@ function (route::GridRoute)(
 
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out_mat = reduce(hcat, q_out)
-    # Convert q_out_mat to 1 x mat size
+    # Convert q_out_mat and flux_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
-    return q_out_reshaped
+    flux_states_matrix_reshaped = reshape(flux_states_matrix, 1, size(flux_states_matrix)...)
+    #  return flux_states and q_out
+    return cat(flux_states_matrix_reshaped, q_out_reshaped, dims=1)
 end
 
 """
@@ -265,14 +270,14 @@ struct VectorRoute <: AbstractVectorRoute
     adjacency::AbstractMatrix
     "grid subarea information, km2"
     subareas::AbstractVector
-    "Routing information: keys contain: input, output, param, state, nn"
-    infos::NamedTuple
+    "Metadata: contains keys for input, output, param, state, and nn"
+    meta::HydroMeta
 
-    function VectorRoute(
-        name::Symbol;
+    function VectorRoute(;
         rfunc::AbstractRouteFlux,
         network::DiGraph,
         subareas::Union{AbstractVector,Number},
+        name::Union{Symbol,Nothing}=nothing
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)
@@ -281,17 +286,18 @@ struct VectorRoute <: AbstractVectorRoute
         #* Extract all neuralnetwork names of the funcs
         nn_names = get_nn_names(rfunc)
         #* Setup the name information of the hydrobucket
-        infos = (name=name, input=input_names, output=output_names, state=state_names, param=param_names, nn=nn_names)
+        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_vector_route) : name
+        meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         #* generate adjacency matrix from network
         adjacency = adjacency_matrix(network)'
         #* Convert subareas to a vector if it's a single value
-        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
+        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(nv(network)))
         return new(
             rfunc,
             network,
             adjacency,
             subareas,
-            infos,
+            meta,
         )
     end
 end
@@ -301,17 +307,19 @@ step route
 """
 function (route::VectorRoute)(
     input::AbstractArray,
-    pas::ComponentVector;
-    timeidx::AbstractVector,
-    kwargs::NamedTuple=NamedTuple()
+    pas::ComponentVector,
+    timeidx::AbstractVector;
+    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    kwargs...
 )
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
-    solver = get(kwargs, :solver, ODESolver())
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    interp = get(config, :interp, LinearInterpolation)
+    solver = get(config, :solver, ODESolver())
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
-    itp_funcs = LinearInterpolation.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
+    itp_funcs = interp.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
@@ -331,7 +339,7 @@ function (route::VectorRoute)(
     #* prepare init states
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
-    sol = solver(vec_route_ode!,  pas[:params], init_states, timeidx, convert_to_array=false)
+    sol = solver(vec_route_ode!, pas[:params], init_states, timeidx, convert_to_array=false)
     if SciMLBase.successful_retcode(sol)
         # Extract flux_states and q_in for each time step
         flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
@@ -344,6 +352,8 @@ function (route::VectorRoute)(
 
     q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
     q_out_mat = reduce(hcat, q_out)
+    # Convert q_out_mat and flux_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
-    return q_out_reshaped
+    flux_states_matrix_reshaped = reshape(flux_states_matrix, 1, size(flux_states_matrix)...)
+    return cat(flux_states_matrix_reshaped, q_out_reshaped, dims=1)
 end

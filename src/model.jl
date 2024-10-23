@@ -32,8 +32,10 @@ struct HydroModel <: AbstractModel
     components::Vector{<:AbstractComponent}
     "input variables index for each components"
     varindices::Vector
+    "all variables names"
+    var_names::Vector{Symbol}
 
-    function HydroModel(name; components::Vector{<:AbstractComponent})
+    function HydroModel(;name::Symbol, components::Vector{<:AbstractComponent})
         #* 获取每个element的输出结果,然后与输入结果逐次拼接,获取每次输入的matrix的idx
         input_names, output_names, state_names = get_var_names(components)
         nn_names = reduce(union, get_nn_names.(components))
@@ -58,6 +60,7 @@ struct HydroModel <: AbstractModel
             model_meta,
             components,
             input_idx,
+            var_names,
         )
     end
 end
@@ -100,8 +103,7 @@ function (model::HydroModel)(
     end
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        model_var_names = reduce(vcat, get_var_names(model))
-        return NamedTuple{Tuple(model_var_names)}(eachrow(fluxes))
+        return NamedTuple{Tuple(model.var_names)}(eachrow(fluxes))
     else
         return fluxes
     end
@@ -132,7 +134,7 @@ function (model::HydroModel)(
     end
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        return [NamedTuple{Tuple(get_var_names(model))}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
+        return [NamedTuple{Tuple(model.var_names)}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:length(inputs)]
     else
         return fluxes
     end

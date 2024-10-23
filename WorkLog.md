@@ -92,6 +92,7 @@
 - [ ] 插值方法这类的时变函数,可以设计成一个TimeVaryingFlux, 这样就可以直接参与连续性方程的求解了,没有构建的必要，需要在生成function时注意t的输入
 - [X] 设置基于TimeVaryingFlux的插值Flux的可行性,由于对于不同模块,需要重新构建插值函数了,所以插值函数这块我认为是没必要构建的
 - [ ] 不同组的参数可能会分在不同组的ptypes下这个时候应该如何处理
+- [ ] 可以将flux, implements, 这些内容单独弄一个库, 名为HydroModelLibrary.jl
 
 ## 关键功能和实现技术
 

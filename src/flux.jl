@@ -133,7 +133,7 @@ function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, timeidx:
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
 
     #* extract params and nn params
-    params_collect = [collect(pas[:params][ptype]) for ptype in ptypes]
+    params_collect = [pas[:params][ptype] for ptype in ptypes]
     #* check params input is correct
     for (ptype, params_item) in zip(ptypes, params_collect)
         @assert all(param_name in keys(params_item) for param_name in get_param_names(flux)) "Missing required parameters. Expected all of $(get_param_names(flux)), but got $(keys(params_item)) at param type: $ptype."
@@ -141,7 +141,7 @@ function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, timeidx:
     params_vec = collect([collect([params_item[pname] for pname in get_param_names(flux)]) for params_item in params_collect])
 
     #* array dims: (var_names * node_names * ts_len)
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(param_vec[i]), timeidx)) for i in eachindex(ptypes)]
+    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(params_vec[i]), timeidx)) for i in eachindex(ptypes)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
     permutedims(flux_output_arr, (3, 1, 2))
 end

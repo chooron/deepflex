@@ -65,4 +65,4 @@ function get_var_names(components::Vector{<:AbstractComponent})
     input_names, output_names, state_names
 end
 
-get_var_names(unit::AbstractModel) = unit.meta.inputs, unit.meta.outputs, unit.meta.states
+get_var_names(unit::AbstractModel) = reduce(vcat, (unit.meta.inputs, unit.meta.outputs, unit.meta.states))
