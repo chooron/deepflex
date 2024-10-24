@@ -21,8 +21,8 @@
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types)
-    output_arr = route(input_arr, pas, timeidx, config=config)
+    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types, timeidx=timeidx)
+    output_arr = route(input_arr, pas, config=config)
     #* we cannot get test data for now, thus we just test it is run success
 
     @test size(output_arr) == size(ones(2, 9, 20))
@@ -38,15 +38,15 @@ end
     rflux = HydroModels.MuskingumRouteFlux(q1)
 
     params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(k=1.0, x=0.2) for _ in eachindex(ndtypes)]))
-    initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.0) for _ in eachindex(ndtypes)]))
+    initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river = 0.0) for _ in eachindex(ndtypes)]))
     pas = ComponentVector(; params, initstates)
     route = HydroModels.GridRoute(rfunc=rflux, flwdir=flwdir, positions=positions, subareas=10.0)
 
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types)
-    output_arr = route(input_arr, pas, timeidx, config=config)
+    config = (solver=HydroModels.ODESolver(), interp=LinearInterpolation, ptypes=node_types, timeidx=timeidx)
+    output_arr = route(input_arr, pas, config=config)
 
     @test size(output_arr) == size(ones(2, 9, 20))
 end
@@ -75,8 +75,8 @@ end
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types)
-    output_arr = route(input_arr, pas, timeidx, config=config)
+    config = (solver=HydroModels.ODESolver(), interp=LinearInterpolation, ptypes=node_types, timeidx=timeidx)
+    output_arr = route(input_arr, pas, config=config)
     @test size(output_arr) == size(ones(2, 9, 20))
 end
 
@@ -97,15 +97,15 @@ end
     rflux = HydroModels.MuskingumRouteFlux(q1)
 
     params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(k=1.0, x=0.2) for _ in eachindex(ndtypes)]))
-    initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.0) for _ in eachindex(ndtypes)]))
+    initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river = 0.0) for _ in eachindex(ndtypes)]))
     pas = ComponentVector(; params, initstates)
     route = HydroModels.VectorRoute(rfunc=rflux, network=network, subareas=10.0)
 
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types)
-    output_arr = route(input_arr, pas, timeidx, config=config)
+    config = (solver=HydroModels.ODESolver(), interp=LinearInterpolation, ptypes=node_types, timeidx=timeidx)
+    output_arr = route(input_arr, pas, config=config)
     @test size(output_arr) == size(ones(2, 9, 20))
 end
 

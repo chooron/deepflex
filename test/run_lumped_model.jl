@@ -1,3 +1,10 @@
+SimpleFlux = HydroModels.SimpleFlux
+StateFlux = HydroModels.StateFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
+UnitHydroFlux = HydroModels.UnitHydroFlux
+NeuralFlux = HydroModels.NeuralFlux
+StdMeanNormFlux = HydroModels.StdMeanNormFlux
 step_func = HydroModels.step_func
 
 @testset "test lumped hydro model (exp-hydro with no neural network and no unit hydrograph)" begin
@@ -42,10 +49,10 @@ step_func = HydroModels.step_func
     @test Set(HydroModels.get_output_names(model)) == Set([:pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow])
     @test Set(HydroModels.get_var_names(model)) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater])
 
-    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
+    result_ntp = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
-    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
+    result_mat = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     input_ntp_vec = repeat([input_ntp], 10)
@@ -53,11 +60,11 @@ step_func = HydroModels.step_func
     node_params = NamedTuple{Tuple(node_names)}(repeat([params], 10))
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 10))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
-    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
+    result_ntp_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
-    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
+    result_mat_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
 
@@ -119,10 +126,10 @@ end
         :fastflow, :slowflow_routed, :fastflow_routed, :exch, :routedflow, :flow, :new_routingstore, :routingstore])
 
     # Test single-node model run
-    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
+    result_ntp = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
-    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
+    result_mat = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     # Test multi-node model run
@@ -133,12 +140,12 @@ end
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
     # Test output as vector of NamedTuples
-    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
+    result_ntp_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
     # Test output as 3D array
-    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
+    result_mat_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
 
@@ -228,11 +235,11 @@ end
     pas = ComponentVector(initstates=initstates, params=params, nn=nn_params)
     input_ntp = (prcp=prcp_vec, lday=dayl_vec, temp=temp_vec)
     # Run the model for a single set of inputs and parameters
-    result_ntp = model(input_ntp, pas, ts, convert_to_ntp=true)
+    result_ntp = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp isa NamedTuple
 
     # Run the model and get results as a matrix
-    result_mat = model(input_ntp, pas, ts, convert_to_ntp=false)
+    result_mat = model(input_ntp, pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat) == (length(HydroModels.get_var_names(model)), length(ts))
 
     # Prepare inputs and parameters for multiple nodes
@@ -243,11 +250,11 @@ end
     node_pas = ComponentVector(params=node_params, initstates=node_initstates, nn=nn_params)
 
     # Run the model for multiple nodes and get results as a vector of NamedTuples
-    result_ntp_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=true)
+    result_ntp_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=true)
     @test result_ntp_vec isa Vector
     @test result_ntp_vec[1] isa NamedTuple
 
     # Run the model for multiple nodes and get results as a 3D array
-    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false)
+    result_mat_vec = model(input_ntp_vec, node_pas, config=(timeidx=ts,), convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end

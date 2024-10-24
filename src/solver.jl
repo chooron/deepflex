@@ -28,7 +28,7 @@ function (solver::ODESolver)(
     sol = solve(
         prob,
         solver.alg,
-        saveat=solver.saveat,
+        saveat=timeidx,
         reltol=solver.reltol,
         abstol=solver.abstol,
         sensealg=solver.sensealg

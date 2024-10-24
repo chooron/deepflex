@@ -20,9 +20,9 @@ function MuskingumRouteFlux(
     )
 end
 
-function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector, timeidx::AbstractVector; kwargs...)
-    input_len = size(input)[2]
-    input_itp = LinearInterpolation(input[1, :], collect(1:input_len))
+function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; kwargs...)
+    timeidx = get(kwargs, :timeidx, collect(1:size(input)[2]))
+    input_itp = LinearInterpolation(input[1, :], timeidx)
     params = pas[:params]
 
     function msk_prob!(du, u, p, t)
@@ -34,7 +34,7 @@ function (flux::RouteFlux{:muskingum})(input::Matrix, pas::ComponentVector, time
     end
 
     init_states = [params.k * input[1, 1]]
-    prob = ODEProblem(msk_prob!, init_states, (1, input_len), params)
+    prob = ODEProblem(msk_prob!, init_states, (timeidx[1], timeidx[end]), params)
     sol = solve(prob, Rosenbrock23(), saveat=timeidx)
 
     s_river_vec = Array(sol)

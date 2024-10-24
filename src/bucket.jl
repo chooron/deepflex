@@ -112,14 +112,14 @@ A matrix (for single node, dims: var_names × ts_len) or array (for multiple nod
 
 function (ele::HydroBucket)(
     input::Matrix,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number}=collect(1:size(input, 2));
+    pas::ComponentVector;
     config::NamedTuple=NamedTuple(),
     kwargs...
 )
     #* get kwargs
     solver = get(config, :solver, ODESolver())
     interp = get(config, :interp, LinearInterpolation)
+    timeidx = get(config, :timeidx, collect(1:size(input, 2)))
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
@@ -128,7 +128,7 @@ function (ele::HydroBucket)(
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_prob(ele, input, pas, timeidx, solver=solver, interp=interp)
+        solved_states = solve_prob(ele, input, pas; timeidx=timeidx, solver=solver, interp=interp)
         #* Store the solved bucket state in fluxes
         fluxes = cat(input, solved_states, dims=1)
     else
@@ -163,15 +163,15 @@ end
 
 function (ele::HydroBucket)(
     input::Array,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number}=collect(1:size(input, 3));
-    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    pas::ComponentVector;
+    config::NamedTuple=NamedTuple(),
     kwargs...
 )
     #* get kwargs
     solver = get(config, :solver, ODESolver())
     interp = get(config, :interp, LinearInterpolation)
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
@@ -180,7 +180,7 @@ function (ele::HydroBucket)(
     #* Extract the initial state of the parameters and bucket in the pas variable
     if !isnothing(ele.ode_func)
         #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-        solved_states = solve_prob(ele, input, pas, timeidx, solver=solver, interp=interp)
+        solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver, interp=interp)
         if solved_states == false
             solved_states = zeros(length(get_state_names(ele)), length(timeidx))
         end
@@ -214,19 +214,15 @@ function (ele::HydroBucket)(
     final_output_arr
 end
 
-function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector, timeidx::Vector; config::NamedTuple=NamedTuple(), kwargs...)
+function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
     @assert all(input_name in keys(input) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input))."
-    for k in keys(input)
-        @assert length(input[k]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[k])) at input: $k."
-    end
     input_matrix = Matrix(reduce(hcat, [input[k] for k in keys(input)])')
     ele(input_matrix, pas, timeidx; config=config, kwargs...)
 end
 
-function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector, timeidx::Vector; config::NamedTuple=NamedTuple(), kwargs...)
+function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
     for i in eachindex(input)
         @assert all(input_name in keys(input[i]) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input[i])) at $i input."
-        @assert length(input[i]) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(length(input[i])) at $i input."
     end
     input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(ele))) for i in eachindex(input)]
     input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
@@ -263,8 +259,8 @@ This function handles two types of input arguments:
 function solve_prob(
     ele::HydroBucket,
     input::Matrix,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number}=collect(1:size(input, 2));
+    pas::ComponentVector;
+    timeidx::Vector{<:Number}=collect(1:size(input, 2)),
     solver::AbstractSolver=ODESolver(),
     interp::Type{<:AbstractInterpolation}=LinearInterpolation,
 )
@@ -307,8 +303,8 @@ end
 function solve_prob(
     ele::HydroBucket,
     input::Array,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number}=collect(1:size(input, 3));
+    pas::ComponentVector;
+    timeidx::Vector{<:Number}=collect(1:size(input, 3)),
     ptypes::Vector{Symbol}=collect(keys(pas[:params])),
     solver::AbstractSolver=ODESolver(),
     interp::Type{<:AbstractInterpolation}=LinearInterpolation,

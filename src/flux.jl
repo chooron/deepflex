@@ -116,21 +116,26 @@ Apply the simple flux model to input data of various dimensions.
 - For matrix input: A matrix where each column is the result of applying the flux function to the corresponding input column.
 - For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
 """
-function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector, timeidx::Integer=1; kwargs...)
+function (flux::AbstractSimpleFlux)(input::Vector, pas::ComponentVector; kwargs...)
+    timeidx = get(kwargs, :timeidx, 1)
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
     flux.func(input, params_vec, timeidx)
 end
 
-function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...)
+function (flux::AbstractSimpleFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+    timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
     # assert the input params must include all the parameters in the flux
+    @assert length(timeidx) == size(input, 2) "Time index length does not match the number of time steps"
     @assert all(nm in keys(pas[:params]) for nm in get_param_names(flux)) "Input parameters do not match the flux parameters, the flux parameters should be: $(get_param_names(flux))"
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
     reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
 end
 
-function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...)
+function (flux::AbstractSimpleFlux)(input::Array, pas::ComponentVector; kwargs...)
     #* get kwargs
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    timeidx = get(kwargs, :timeidx, collect(1:size(input, 3)))
+    @assert length(timeidx) == size(input, 3) "Time index length does not match the number of time steps"
 
     #* extract params and nn params
     params_collect = [pas[:params][ptype] for ptype in ptypes]
@@ -271,17 +276,17 @@ Apply the flux model (simple or neural) to input data of various dimensions.
 # Note
 For neural flux models, the parameters are accessed from `pas[:nn]` instead of `pas[:params]`.
 """
-function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector, timeidx::Integer=1; kwargs...)
+function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector; kwargs...)
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
     flux.func(input, nn_params_vec)
 end
 
-function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...)
+function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector; kwargs...)
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
     flux.func(input', nn_params_vec)
 end
 
-function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...)
+function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector; kwargs...)
     nn_params = pas[:nn][get_nn_names(flux)[1]]
     #* array dims: (ts_len * node_names * var_names)
     flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]
@@ -399,9 +404,9 @@ This function does not actually return a value, as state flux models cannot be r
 - State flux models cannot be run directly and will throw an error if attempted.
 - To use state flux models, they should be incorporated into a SimpleFlux or other composite flux model.
 """
-(::AbstractStateFlux)(::Vector, ::ComponentVector, ::Integer=1; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
-(::AbstractStateFlux)(::Matrix, ::ComponentVector, ::Vector{<:Number}=collect(1:size(input)[2]); kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
-(::AbstractStateFlux)(::Array, ::ComponentVector, ::Vector{<:Number}=collect(1:size(input)[3]); kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
+(::AbstractStateFlux)(::Vector, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
+(::AbstractStateFlux)(::Matrix, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
+(::AbstractStateFlux)(::Array, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using SimpleFlux to run"
 
 
 """
@@ -494,9 +499,9 @@ This function does not actually return a value, as route flux models are abstrac
 - Specific implementations of route flux models (subtypes of AbstractRouteFlux) should provide their own implementations of this function.
 - Route flux models are typically used to represent water routing processes in hydrological systems.
 """
-# (::RouteFlux)(::Vector, ::ComponentVector, timeidx::Integer=1; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
-# (::RouteFlux)(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...) = @error "Must be implemented by subtype"
-# (::RouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...) = @error "Must be implemented with the Route type"
+# (::RouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
+# (::RouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
+# (::RouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...) = @error "Must be implemented with the Route type"
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux
@@ -610,8 +615,9 @@ Apply the unit hydrograph flux model to input data of various dimensions.
 
 (::UnitHydroFlux)(::Vector, ::ComponentVector; kwargs...) = @error "UnitHydroFlux is not support for single timepoint"
 
-function (flux::UnitHydroFlux{:unithydro1})(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...)
+function (flux::UnitHydroFlux{:unithydro1})(input::Matrix, pas::ComponentVector; kwargs...)
     solver = get(kwargs, :solver, DiscreteSolver())
+    timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
     input_vec = input[1, :]
     #* convert the lagflux to a discrete problem
     function lag_prob(u, p, t)
@@ -627,7 +633,7 @@ function (flux::UnitHydroFlux{:unithydro1})(input::Matrix, pas::ComponentVector,
     reshape(sol[1, :], 1, length(input_vec))
 end
 
-function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[2]); kwargs...)
+function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector; kwargs...)
     input_vec = input[1, :]
     uh_weight = flux.uhfunc(pas[:params][get_param_names(flux)[1]])
     uh_result = [-(i - 1) => uh_wi .* input_vec for (i, uh_wi) in enumerate(uh_weight)]
@@ -638,7 +644,7 @@ function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector,
     reshape(sum_route, 1, length(input_vec))
 end
 
-function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, timeidx::Vector{<:Number}=collect(1:size(input)[3]); kwargs...)
+function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; kwargs...)
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
@@ -646,7 +652,7 @@ function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector, timeidx
 
     sols = map(eachindex(ptypes)) do (idx)
         tmp_pas = ComponentVector(params=pytype_params[idx])
-        node_sols = reduce(hcat, uh(input[:, idx, :], tmp_pas, timeidx))
+        node_sols = reduce(hcat, uh(input[:, idx, :], tmp_pas))
         node_sols
     end
     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)

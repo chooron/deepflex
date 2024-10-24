@@ -1,5 +1,5 @@
-(route::AbstractRoute)(input::Vector, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Vector input in $(typeof(route)) subtype of the AbstractRoute")
-(route::AbstractRoute)(input::Matrix, pas::ComponentVector; kwargs::NamedTuple=NamedTuple()) = error("This struct does not support Matrix input in $(typeof(route)) subtype of the AbstractRoute")
+(route::AbstractRoute)(input::Vector, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) = error("This struct does not support Vector input in $(typeof(route)) subtype of the AbstractRoute")
+(route::AbstractRoute)(input::Matrix, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) = error("This struct does not support Matrix input in $(typeof(route)) subtype of the AbstractRoute")
 
 """
     WeightSumRoute <: AbstractRouteFlux
@@ -74,15 +74,15 @@ end
 
 function (route::WeightSumRoute)(
     input::AbstractArray,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number};
+    pas::ComponentVector;
+    config::NamedTuple=NamedTuple(),
     kwargs...
 )
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
 
-    rfunc_output = route.rfunc(input, pas, timeidx, ptypes=ptypes)
+    rfunc_output = route.rfunc(input, pas, ptypes=ptypes)
     weight_params = [pas[:params][ptype][:route_weight] for ptype in ptypes]
     weight_result = sum(rfunc_output[1, :, :] .* weight_params .* area_coefs, dims=1)
     # expand dims
@@ -181,14 +181,14 @@ end
 
 function (route::GridRoute)(
     input::AbstractArray,
-    pas::ComponentVector,
-    timeidx::Vector{<:Number};
-    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    pas::ComponentVector;
+    config::NamedTuple=NamedTuple(),
     kwargs...
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
@@ -307,14 +307,14 @@ step route
 """
 function (route::VectorRoute)(
     input::AbstractArray,
-    pas::ComponentVector,
-    timeidx::AbstractVector;
-    config::NamedTuple=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation),
+    pas::ComponentVector;
+    config::NamedTuple=NamedTuple(),
     kwargs...
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数

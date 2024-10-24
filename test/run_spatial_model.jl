@@ -61,7 +61,8 @@ step_func = HydroModels.step_func
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 9))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
-    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false, ptypes=node_names)
+    config = (timeidx=ts, ptypes=node_names)
+    result_mat_vec = model(input_ntp_vec, node_pas, config=config)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
 
@@ -119,6 +120,7 @@ end
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 9))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
-    result_mat_vec = model(input_ntp_vec, node_pas, ts, convert_to_ntp=false, ptypes=node_names)
+    config = (timeidx=ts, ptypes=node_names)
+    result_mat_vec = model(input_ntp_vec, node_pas, config=config, convert_to_ntp=false)
     @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
 end
