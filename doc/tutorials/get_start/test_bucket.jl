@@ -6,8 +6,9 @@ using BenchmarkTools
 using NamedTupleTools
 
 include("../../../src/HydroModels.jl")
+include("../models/exphydro.jl")
 
-ele = HydroModels.ExpHydro.SurfaceStorage(name=:sf)
+ele = bucket_1
 
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
 ps = [f, Smax, Qmax, Df, Tmax, Tmin]
@@ -20,7 +21,6 @@ data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-input_matrix = Matrix(reduce(hcat, [input[1], input[2], input[3]])') # (var nm * ts len)
-solver = HydroModels.ODESolver()
+solver = HydroModels.ManualSolver()
 config = (solver=solver, )
-results = ele(input_matrix, pas, ts, config=config, convert_to_ntp=false)
+@btime results = ele(input, pas, config=config, convert_to_ntp=false)

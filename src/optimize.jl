@@ -6,13 +6,13 @@ function get_objective()
     function objective(x::AbstractVector{T}, p) where {T}
         #* Optimization arguments: hydro component, input data, time index, ode solver,
         #*                         tunable parameters axes and default model params
-        component, input, target, timeidx, config, run_kwargs, default_model_pas, loss_func, warmup = p
+        component, input, target, config, run_kwargs, default_model_pas, loss_func, warmup = p
         # todo 添加clip方法,约束参数范围
         #* Use merge_ca to replace the tunable parameters inner the model parameters
         tmp_pas = update_ca(default_model_pas, x)
-        loss = mean(map(eachindex(input, target, timeidx)) do i
-            inp, tar, tidx = input[i], target[i], timeidx[i]
-            tmp_pred = component(inp, tmp_pas, tidx; config=config, run_kwargs...)
+        loss = mean(map(eachindex(input, target, config)) do i
+            inp, tar, cfg = input[i], target[i], config[i]
+            tmp_pred = component(inp, tmp_pas; config=cfg, run_kwargs...)
             tmp_loss = mean([loss_func(tar[key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(tar)])
             tmp_loss
         end)
@@ -62,13 +62,12 @@ function param_box_optim(
     const_pas::ComponentVector,
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
-    timeidx::AbstractVector,
-    config::Union{NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
+    config::Vector{<:NamedTuple}=fill(NamedTuple(), length(input)),
     run_kwargs::NamedTuple=(convert_to_ntp=true,),
     opt_kwargs...,
 )
-    @assert length(input) == length(target) == length(timeidx) "The length of input, target and timeidx must be the same,
-     while $(length(input)) input, $(length(target)) target, $(length(timeidx)) timeidx are given."
+    @assert length(input) == length(target) == length(config) "The length of input, target and config must be the same,
+     while $(length(input)) input, $(length(target)) target, $(length(config)) config are given."
     #* Get the argument for parameter optimization
     loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
     loss_recorder = NamedTuple[]
@@ -84,7 +83,7 @@ function param_box_optim(
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(objective_func)
-    prob_args = (component, input, target, timeidx, config, run_kwargs, default_model_pas, loss_func, warmup)
+    prob_args = (component, input, target, config, run_kwargs, default_model_pas, loss_func, warmup)
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args, lb=lb, ub=ub)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     #* convert loss_recorder to DataFrame
@@ -130,13 +129,12 @@ function param_grad_optim(
     const_pas::ComponentVector,
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
-    timeidx::AbstractVector,
-    config::Union{NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
+    config::Vector{<:NamedTuple}=fill(NamedTuple(), length(input)),
     run_kwargs::NamedTuple=(convert_to_ntp=true,),
     opt_kwargs...,
 )
-    @assert length(input) == length(target) == length(timeidx) "The length of input, target and timeidx must be the same,
-     while $(length(input)) input, $(length(target)) target, $(length(timeidx)) timeidx are given."
+    @assert length(input) == length(target) == length(config) "The length of input, target and config must be the same,
+     while $(length(input)) input, $(length(target)) target, $(length(config)) config are given."
 
     #* Get the argument for parameter optimization
     loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
@@ -153,7 +151,7 @@ function param_grad_optim(
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(objective_func, adtype)
-    prob_args = (component, input, target, timeidx, config, run_kwargs, default_model_pas, loss_func, warmup)
+    prob_args = (component, input, target, config, run_kwargs, default_model_pas, loss_func, warmup)
     optprob = Optimization.OptimizationProblem(optf, tunable_pas, prob_args)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     #* convert loss_recorder to DataFrame
@@ -168,8 +166,7 @@ function param_batch_optim(
     const_pas::ComponentVector,
     input::Vector{<:NamedTuple},
     target::Vector{<:NamedTuple},
-    timeidx::AbstractVector,
-    config::Union{NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
+    config::Vector{<:NamedTuple}=[NamedTuple()],
     run_kwargs::NamedTuple=(convert_to_ntp=true,),
     opt_kwargs...,
 )
@@ -180,21 +177,20 @@ function param_batch_optim(
     warmup = get(opt_kwargs, :warmup, 100)
     solve_alg = get(opt_kwargs, :solve_alg, Adam())
 
-
     #* prepare the batch data
-    train_batch = [(input_i, target_i, timeidx_i) for (input_i, target_i, timeidx_i) in zip(input, target, timeidx)]
+    train_batch = [(input_i, target_i, cfg_i) for (input_i, target_i, cfg_i) in zip(input, target, config)]
 
     #* Construct default model parameters based on tunbale parameters and constant parameters for subsequent merging
     default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
 
     #* Constructing the objective function for optimization
-    function objective(x::AbstractVector{T}, p, batch_input, batch_target, batch_time) where {T}
+    function objective(x::AbstractVector{T}, p, batch_input, batch_target, batch_cfg) where {T}
         #* Optimization arguments: hydro component, input data, time index, ode solver,
         #*                         tunable parameters axes and default model params
         #* Use merge_ca to replace the tunable parameters inner the model parameters
         _component, __default_model_pas = p
         tmp_pas = update_ca(__default_model_pas, x)
-        tmp_pred = _component(batch_input, tmp_pas, batch_time; config=config, run_kwargs...)
+        tmp_pred = _component(batch_input, tmp_pas; config=batch_cfg, run_kwargs...)
         loss = mean([loss_func(batch_target[key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(batch_target)])
         loss
     end

@@ -58,7 +58,8 @@ function (solver::DiscreteSolver)(
     ode_func!::Function,
     params::ComponentVector,
     initstates::AbstractArray,
-    timeidx::AbstractVector
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
 )
     #* build problem
     # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
@@ -73,13 +74,17 @@ function (solver::DiscreteSolver)(
         prob,
         solver.alg,
     )
-    if SciMLBase.successful_retcode(sol)
-        sol_arr = Array(sol)
+    if convert_to_array
+        if SciMLBase.successful_retcode(sol)
+            sol_arr = Array(sol)
+        else
+            @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
+            sol_arr = zeros(size(initstates)..., length(timeidx))
+        end
+        return sol_arr
     else
-        @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
-        sol_arr = zeros(size(initstates)..., length(timeidx))
+        return sol
     end
-    sol_arr
 end
 
 @kwdef struct ManualSolver <: AbstractSolver
@@ -92,12 +97,14 @@ function (solver::ManualSolver)(
     initstates::AbstractVector,
     timeidx::AbstractVector
 )
-    init_du = zeros(size(initstates))
-    states_results = AbstractVector[]
-    for i in timeidx
-        ode_func!(init_du, initstates, pas, i)
-        initstates = initstates .+ init_du
-        states_results = vcat(states_results, initstates)
+    T = promote_type(eltype(pas), eltype(initstates))
+    init_du = zeros(T, size(initstates))
+    itegration(st, pas, t) = begin
+        state, states_results = st
+        ode_func!(init_du, state, pas, t)
+        state = state .+ init_du
+        return state, (states_results..., state)
     end
+    final_states, states_results = reduce((acc, t) -> itegration(acc, pas, t), timeidx, init=(initstates, (initstates,)))
     reduce(hcat, states_results)
 end

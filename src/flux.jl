@@ -477,6 +477,20 @@ struct RouteFlux{rtype} <: AbstractRouteFlux
     end
 end
 
+function RiverRouteFlux(input::Num, output::Union{Num,Nothing}=nothing)
+    @parameters k x
+    @variables s_river
+
+    if isnothing(output)
+        input_name = Symbolics.tosymbol(input, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+    end
+
+    return RouteFlux(input, [k, x], [s_river]; routetype=:river, output=output)
+end
+
+
 """
     (flux::AbstractRouteFlux)(input::Union{Vector,Matrix,Array}, pas::ComponentVector; ptypes::AbstractVector{Symbol}=Symbol[], kwargs...)
 
@@ -499,9 +513,106 @@ This function does not actually return a value, as route flux models are abstrac
 - Specific implementations of route flux models (subtypes of AbstractRouteFlux) should provide their own implementations of this function.
 - Route flux models are typically used to represent water routing processes in hydrological systems.
 """
-# (::RouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
-# (::RouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
-# (::RouteFlux)(input::Array, pas::ComponentVector, ptypes::AbstractVector{Symbol}; kwargs...) = @error "Must be implemented with the Route type"
+(::AbstractRouteFlux)(::Vector, ::ComponentVector; kwargs...) = @error "Abstract RouteFlux is not support for single timepoint"
+(::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
+(::AbstractRouteFlux)(input::Array, pas::ComponentVector; kwargs...) = @error "Must be implemented with the Route type"
+
+"""
+    get_rflux_func(::AbstractRouteFlux; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+
+Get the function for calculating the outflow process of a route flux model.
+
+This function should be implemented by different types of RouteFlux. It returns a function that calculates the outflow process.
+
+The returned function should have the following input parameters:
+- `du`: Change in state variables
+- `s_rivers`: State values of the RouteFlux
+- `q_in`: Input flow for each time step
+- `q_gen`: Generated runoff for each time step (after area conversion)
+- `p`: Parameters
+
+The returned function should output:
+- `q_out`: Outflow for each time step
+- Updates to `du` representing changes in `s_rivers`
+
+# Arguments
+- `::AbstractRouteFlux`: The RouteFlux instance
+- `pas::ComponentVector`: Component vector containing parameters
+- `ptypes::AbstractVector{Symbol}`: Vector of parameter type symbols
+
+# Returns
+A function that calculates the outflow process based on the specific RouteFlux implementation.
+
+# Note
+This function must be implemented by subtypes of AbstractRouteFlux to provide the specific outflow calculation logic for each routing method.
+"""
+get_rflux_func(::AbstractRouteFlux; pas::ComponentVector, ptypes::AbstractVector{Symbol}) = @error "Must be implemented by subtype"
+
+function get_rflux_func(::RouteFlux{:river}; pas::ComponentVector, ptypes::AbstractVector{Symbol})
+
+    function rflux_func(s_river, q_in, q_gen, p)
+        k_ps = [p[ptype][:k] for ptype in ptypes]
+        x_ps = [p[ptype][:x] for ptype in ptypes]
+
+        q_rf = @.((s_river - k_ps * x_ps * q_in) / (k_ps * (1 - x_ps)))
+        d_state = q_in .- q_rf
+        q_out = q_rf .+ q_gen
+        q_out, d_state
+    end
+
+    return rflux_func
+end
+
+"""
+    get_rflux_initstates(::AbstractRouteFlux; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol}, stypes::AbstractVector{Symbol})
+
+Get the initial states for a route flux model.
+
+This function is designed to accommodate different subclasses of `AbstractRouteFlux` that may have varying methods of constructing initial states. It provides a flexible interface for generating initial state vectors based on input data, parameters, parameter types, and state types.
+
+# Arguments
+- `::AbstractRouteFlux`: The route flux model instance.
+- `input::AbstractMatrix`: Input data matrix, typically representing time series of hydrological variables.
+- `pas::ComponentVector`: A component vector containing parameter values.
+- `ptypes::AbstractVector{Symbol}`: A vector of symbols representing parameter types.
+- `stypes::AbstractVector{Symbol}`: A vector of symbols representing state types.
+
+# Returns
+A vector representing the initial states for the route flux model.
+
+# Notes
+- This function must be implemented by subtypes of `AbstractRouteFlux` to provide specific initialization logic for each routing method.
+- The function allows for flexibility in how initial states are constructed, which can vary depending on the specific requirements of each routing method.
+- By taking input data, parameters, and type information as arguments, the function can create initial states that are appropriately tailored to the specific model configuration and data characteristics.
+
+"""
+get_rflux_initstates(::AbstractRouteFlux; input::AbstractMatrix, pas::ComponentVector, ptypes::AbstractVector{Symbol}, stypes::AbstractVector{Symbol}) = @error "Must be implemented by subtype"
+function get_rflux_initstates(::RouteFlux{:river}; input::AbstractMatrix, pas::ComponentVector, stypes::AbstractVector{Symbol}, ptypes::AbstractVector{Symbol})
+    [pas[:params][ptype][:k] for ptype in ptypes] .* input[:, 1]
+end
+
+function (flux::RouteFlux{:river})(input::Matrix, pas::ComponentVector; kwargs...)
+    timeidx = get(kwargs, :timeidx, collect(1:size(input)[2]))
+    input_itp = LinearInterpolation(input[1, :], timeidx)
+    params = pas[:params]
+
+    function msk_prob!(du, u, p, t)
+        s_river = u[1]
+        q_in = input_itp(t)
+        k, x = p
+        q_out = (s_river - k * x * q_in) / (k * (1 - x))
+        du[1] = q_in - q_out
+    end
+
+    init_states = [params.k * input[1, 1]]
+    prob = ODEProblem(msk_prob!, init_states, (timeidx[1], timeidx[end]), params)
+    sol = solve(prob, Rosenbrock23(), saveat=timeidx)
+
+    s_river_vec = Array(sol)
+    q_out_vec = @.((s_river_vec - params.k * params.x * input) / (params.k * (1 - params.x)))
+    q_out_vec
+end
+
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux
@@ -642,6 +753,21 @@ function (flux::UnitHydroFlux{:unithydro2})(input::Matrix, pas::ComponentVector;
     #* sum the matrix
     sum_route = sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
     reshape(sum_route, 1, length(input_vec))
+end
+
+# todo: add the unithydro3 solver, 第三种解决方法可以用Integrals, Distributions这两个包实现卷积积分求解
+function (flux::UnitHydroFlux{:unithydro3})(input::Matrix, pas::ComponentVector; kwargs...)
+    input_vec = input[1, :]
+    itp_method = get(kwargs, :interp, LinearInterpolation)
+    itp = itp_method(input_vec, collect(1:length(input_vec)))
+    #* construct the unit hydrograph function based on the interpolation method and parameter
+    uh_func = flux.uhfunc(pas[:params][get_param_names(flux)[1]], itp)
+    routed_result = map(t -> begin
+            prob = IntegralProblem(uh_func, (0, tmax), t)
+            sol = solve(prob, QuadGKJL())
+            sol.u
+        end, 1:length(input_vec))
+    reshape(routed_result, 1, length(input_vec))
 end
 
 function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; kwargs...)

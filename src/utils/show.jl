@@ -197,6 +197,7 @@ function Base.show(io::IO, model::AbstractModel)
     else
         println(io, "HydroModel: ", model.meta.name)
         println(io, "  Type: ", model_type)
+        println(io, "  Components: ", join(map(c -> c.meta.name, model.components), ", "))
         println(io, "  Inputs: ", isempty(model.meta.inputs) ? "nothing" : join(model.meta.inputs, ", "))
         println(io, "  Outputs: ", isempty(model.meta.outputs) ? "nothing" : join(model.meta.outputs, ", "))
         println(io, "  Parameters: ", isempty(model.meta.params) ? "nothing" : join(model.meta.params, ", "))

@@ -30,6 +30,11 @@ get_nn_names(route::AbstractRoute) = route.meta.nns
 get_nn_names(unit::AbstractModel) = unit.meta.nns
 
 get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
+#* elements name utils
+get_var_names(ele::AbstractBucket) = ele.meta.inputs, ele.meta.outputs, ele.meta.states
+get_var_names(route::AbstractRoute) = route.meta.inputs, route.meta.outputs, route.meta.states
+get_var_names(unit::AbstractModel) = unit.meta.inputs, unit.meta.outputs, unit.meta.states
+
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
@@ -44,9 +49,7 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     end
     input_names, output_names, state_names
 end
-#* elements name utils
-get_var_names(ele::AbstractBucket) = ele.meta.inputs, ele.meta.outputs, ele.meta.states
-get_var_names(route::AbstractRoute) = route.meta.inputs, route.meta.outputs, route.meta.states
+
 
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()
@@ -64,5 +67,3 @@ function get_var_names(components::Vector{<:AbstractComponent})
     end
     input_names, output_names, state_names
 end
-
-get_var_names(unit::AbstractModel) = reduce(vcat, (unit.meta.inputs, unit.meta.outputs, unit.meta.states))

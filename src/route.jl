@@ -163,6 +163,8 @@ end
 input dims: node_num * ts_len
 """
 function grid_routing(input::AbstractVector, positions::AbstractVector, flwdir::AbstractMatrix)
+    d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
+    d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
     #* 转换为input的稀疏矩阵
     input_arr = Array(sparse(
         [pos[1] for pos in positions],
@@ -186,9 +188,13 @@ function (route::GridRoute)(
     kwargs...
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+
+    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
+    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
@@ -198,17 +204,18 @@ function (route::GridRoute)(
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
 
-    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes)
+    rflux_func = get_rflux_func(route.rfunc; pas, ptypes)
+    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes)
 
     function grid_route_ode!(du, u, p, t)
         # 提取单元产流
         q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
         # 计算单元出流,更新单元出流状态
-        q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], q_gen, p)
+        q_out, d_flux_states = rflux_func(u[:flux_states], u[:q_in], q_gen, p)
         # 计算出流的汇流结果
         new_q_in = grid_routing(q_out, route.positions, route.flwdir)
         # 更新状态
+        du[:flux_states] = d_flux_states
         du[:q_in] = new_q_in .- u[:q_in]
     end
     #* prepare init states
@@ -224,8 +231,7 @@ function (route::GridRoute)(
         flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
         q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
     end
-
-    q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
+    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params])))
     q_out_mat = reduce(hcat, q_out)
     # Convert q_out_mat and flux_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
@@ -302,9 +308,6 @@ struct VectorRoute <: AbstractVectorRoute
     end
 end
 
-"""
-step route
-"""
 function (route::VectorRoute)(
     input::AbstractArray,
     pas::ComponentVector;
@@ -312,9 +315,13 @@ function (route::VectorRoute)(
     kwargs...
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+
+    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
+    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
@@ -324,16 +331,17 @@ function (route::VectorRoute)(
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
 
-    cal_flux_q_out!, cal_flux_q_out = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes)
+    rflux_func = get_rflux_func(route.rfunc; pas, ptypes)
+    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes)
 
     function vec_route_ode!(du, u, p, t)
         q_in = u[:q_in]
         q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
-        q_out = cal_flux_q_out!(du, u[:flux_states], u[:q_in], q_gen, p)
+        q_out, d_flux_states = rflux_func(u[:flux_states], u[:q_in], q_gen, p)
         # update up_in
         q_in_updated = route.adjacency * q_out
         du[:q_in] = q_in_updated .- q_in
+        du[:flux_states] = d_flux_states
     end
 
     #* prepare init states
@@ -350,7 +358,7 @@ function (route::VectorRoute)(
         q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
     end
 
-    q_out = cal_flux_q_out.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params]))
+    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params])))
     q_out_mat = reduce(hcat, q_out)
     # Convert q_out_mat and flux_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)

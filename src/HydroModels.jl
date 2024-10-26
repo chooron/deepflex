@@ -60,7 +60,7 @@ abstract type AbstractComponent end
 ## todo this is used for multiple propose running
 abstract type AbstractRunner end
 abstract type AbstractSolver end
- 
+
 #* 负责某一平衡单元的计算
 abstract type AbstractFlux <: AbstractComponent end
 abstract type AbstractElement <: AbstractComponent end
@@ -119,16 +119,19 @@ include("utils/attr.jl")
 include("utils/ca.jl")
 include("utils/name.jl")
 include("utils/show.jl")
-include("utils/graph.jl")
-include("utils/smooth.jl")
 include("utils/build.jl")
-# some unit hydro function
-include("utils/unithydro.jl")
 include("utils/callback.jl")
+include("utils/sort.jl")
+
+include("optimize.jl")
+export param_grad_optim, param_box_optim, nn_param_optim
+
+include("solver.jl")
+export ODESolver, DiscreteSolver, ManualSolver
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, UnitHydroFlux
+export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, RiverRouteFlux, UnitHydroFlux
 
 include("bucket.jl")
 export HydroBucket # , add_inputflux!, add_outputflux!, 
@@ -142,31 +145,7 @@ export HydroModel #, update_unit!, add_elements!, remove_elements!
 include("estimator.jl")
 export HydroEstimator
 
-include("optimize.jl")
-export param_grad_optim, param_box_optim, nn_param_optim
 
-include("solver.jl")
-export ODESolver, DiscreteSolver, ManualSolver
-
-# some route function and special flux
-include("fluxes/cascade.jl")
-export CascadeRouteFlux
-include("fluxes/discharge.jl")
-export DischargeRouteFlux
-include("fluxes/muskingum.jl")
-export MuskingumRouteFlux
-include("fluxes/normalize.jl")
-export StdMeanNormFlux, MinMaxNormFlux
-include("fluxes/rename.jl")
-export RenameFlux
-
-# Implements Models
-include("implements/cemaneige.jl")
-include("implements/exphydro.jl")
-include("implements/gr4j.jl")
-include("implements/hymod.jl")
-include("implements/simhyd.jl")
-include("implements/m50.jl")
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute

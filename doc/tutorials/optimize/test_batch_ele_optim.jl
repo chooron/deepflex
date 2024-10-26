@@ -43,10 +43,9 @@ best_pas = HydroModels.param_batch_optim(
     const_pas=const_pas,
     input=repeat([input], 10),
     target=repeat([output], 10),
-    timeidx=repeat([timeidx], 10),
+    config=fill((solver=HydroModels.ODESolver(),timeidx=timeidx), 10),
     adtype=Optimization.AutoZygote(),
     maxiters=10,
     loss_func=HydroErrors.mse,
-    config=(solver=HydroModels.ODESolver(),),
     run_kwargs=(convert_to_ntp=true,)
 )

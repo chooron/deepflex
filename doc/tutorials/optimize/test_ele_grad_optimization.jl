@@ -15,15 +15,16 @@ include("../../../src/HydroModels.jl")
 @variables pet snowfall melt rainfall infiltration
 @parameters Tmin Tmax Df
 
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 # test exphydro model
 #* test state flux
 snow_funcs = [
     HydroModels.SimpleFlux([temp, lday] => [pet],
         exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     HydroModels.SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-        exprs=[HydroModels.step_func(Tmin - temp) * prcp, HydroModels.step_func(temp - Tmin) * prcp]),
+        exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
     HydroModels.SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-        exprs=[HydroModels.step_func(temp - Tmax) * HydroModels.step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+        exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [HydroModels.StateFlux([snowfall] => [melt], snowpack)]
 
@@ -66,6 +67,7 @@ best_pas, loss_df = HydroModels.param_grad_optim(
     adtype=Optimization.AutoForwardDiff(),
     maxiters=100,
     run_kwargs=run_kwargs,
-    loss_func=mse2
+    loss_func=mse2,
+    config=fill((solver=HydroModels.ManualSolver(),), 10)
 )
 # ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))

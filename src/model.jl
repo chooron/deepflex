@@ -80,9 +80,10 @@ end
 function (model::HydroModel)(
     input::Matrix,
     pas::ComponentVector;
-    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation, timeidx=collect(1:size(input, 2))),
+    config::Union{NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation, timeidx=collect(1:size(input, 2))),
     kwargs...
 )
+    # todo config可能需要做一个按照键值对匹配的输入类型,根据component的名称与其config对应
     #* 如果compkwargs是NamedTuple,则将其填充为Vector{NamedTuple}
     comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
     @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
@@ -141,7 +142,7 @@ function (model::HydroModel)(
     end
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        return [NamedTuple{Tuple(model.var_names)}(eachslice(fluxes[:, i, :], dims=1)) for i in 1:size(fluxes, 2)]
+        return [NamedTuple{Tuple(model.var_names)}(eachslice(fluxes[:, i, :], dims=1)) for i in axes(fluxes, 2)]
     else
         return fluxes
     end
