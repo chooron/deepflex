@@ -1,7 +1,7 @@
 #* callback function for 
 function get_callback_func(progress, recorder)
     default_callback_func!(state, l) = begin
-        push!(recorder, (iter=state.iter, loss=l, time=now()))
+        push!(recorder, (iter=state.iter, loss=l, time=now(), params=state.u))
         next!(progress)
         false
     end
@@ -21,7 +21,7 @@ function get_batch_callback_func(batch_size, recorder)
             next!(progress)
             println("")
             @info Symbol(:epoch_, state.iter ÷ batch_size, Symbol(", mean_loss: "), mean_loss, ", time: ", now())
-            push!(recorder, (iter=state.iter, loss=mean_loss, time=now()))
+            push!(recorder, (iter=state.iter, loss=mean_loss, time=now(), params=state.u))
             progress = Progress(batch_size, desc="Train Epoch $(state.iter ÷ batch_size + 1)...")
             cumsum_loss = 0.0
         end

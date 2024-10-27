@@ -86,14 +86,14 @@ function Base.show(io::IO, flux::AbstractUnitHydroFlux)
         print(io, "inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
         print(io, ", outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
         print(io, ", params: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
-        print(io, ", uhfunc: ", nameof(flux.uhfunc))
+        # print(io, ", uhfunc: ", nameof(flux.uhfunc))
         print(io, ")")
     else
         println(io, "UnitHydroFlux:")
         println(io, "  Inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
         println(io, "  Outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
         println(io, "  Parameters: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
-        println(io, "  UnitHydrograph: ", nameof(flux.uhfunc))
+        # println(io, "  UnitHydrograph: ", nameof(flux.uhfunc))
     end
 end
 

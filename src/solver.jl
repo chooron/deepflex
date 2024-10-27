@@ -4,8 +4,8 @@ A custom ODEProblem solver
 @kwdef struct ODESolver <: AbstractSolver
     alg = Tsit5()
     sensealg = InterpolatingAdjoint()
-    reltol = 1e-3
-    abstol = 1e-3
+    reltol = 1e-2
+    abstol = 1e-2
     saveat = 1.0
 end
 
@@ -50,7 +50,7 @@ end
 A custom ODEProblem solver
 """
 @kwdef struct DiscreteSolver <: AbstractSolver
-    alg = FunctionMap()
+    alg = FunctionMap{true}()
     sensealg = InterpolatingAdjoint()
 end
 
@@ -99,12 +99,11 @@ function (solver::ManualSolver)(
 )
     T = promote_type(eltype(pas), eltype(initstates))
     init_du = zeros(T, size(initstates))
-    itegration(st, pas, t) = begin
-        state, states_results = st
-        ode_func!(init_du, state, pas, t)
-        state = state .+ init_du
-        return state, (states_results..., state)
+    states_results = ()
+    for t in timeidx
+        ode_func!(init_du, initstates, pas, t)
+        initstates = initstates .+ init_du
+        (states_results..., initstates)
     end
-    final_states, states_results = reduce((acc, t) -> itegration(acc, pas, t), timeidx, init=(initstates, (initstates,)))
     reduce(hcat, states_results)
 end

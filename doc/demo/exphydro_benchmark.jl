@@ -1,9 +1,12 @@
 using DataInterpolations
 using OrdinaryDiffEq
 
-dayl_vec=df[ts, "dayl(day)"]
-temp_vec=df[ts, "tmean(C)"]
-prcp_vec=df[ts, "prcp(mm/day)"]
+df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
+prcp_vec = df[!, "prcp(mm/day)"]
+temp_vec = df[!, "tmean(C)"]
+dayl_vec = df[!, "dayl(day)"]
+qobs_vec = df[!, "flow(mm)"]
+ts = collect(1:length(prcp_vec))
 itp_Lday = LinearInterpolation(dayl_vec, ts)
 itp_P = LinearInterpolation(prcp_vec, ts)
 itp_T = LinearInterpolation(temp_vec, ts)
@@ -56,4 +59,4 @@ function basic_bucket_incl_states(p_, t_out)
 end
 
 pas = [0.0, 1303.004248, 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084]
-@btime q_sim_vec, sol = basic_bucket_incl_states(pas, ts);
+@btime q_sim_vec, sol = basic_bucket_incl_states(pas, ts); # 26.182 ms (1410550 allocations: 29.62 MiB)

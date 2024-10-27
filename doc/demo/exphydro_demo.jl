@@ -5,6 +5,7 @@ using ComponentArrays
 using OrdinaryDiffEq
 using ModelingToolkit
 using OptimizationBBO
+using Optimization
 using BenchmarkTools
 using DataInterpolations
 using Plots
@@ -36,7 +37,7 @@ SimpleFlux = HydroModels.SimpleFlux
 StateFlux = HydroModels.StateFlux
 HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
-step_func = HydroModels.step_func
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
 #! define the snow pack reservoir
 snow_funcs = [
@@ -48,7 +49,7 @@ snow_funcs = [
         exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the soil water reservoir
 soil_funcs = [
@@ -62,10 +63,10 @@ soil_funcs = [
         exprs=[baseflow + surfaceflow]),
 ]
 soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-soil_ele = HydroBucket(:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_ele = HydroBucket(name=:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the Exp-Hydro model
-exphydro_model = HydroModel(:exphydro, components=[snow_ele, soil_ele])
+exphydro_model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele])
 
 # load data
 df = DataFrame(CSV.File("data/exphydro/01013500.csv"));
@@ -80,9 +81,8 @@ pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00),
     params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09)))
 timeidx = collect(1:length(prcp_vec))
 solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
-result = exphydro_model(input, pas, timeidx=timeidx, solver=solver);
-
-@info 1 - HydroErr.nse(result.flow, qobs_vec)
+config = (solver=solver, timeidx=timeidx)
+result = exphydro_model(input, pas, config=config); #  29.317 ms (356101 allocations: 28.18 MiB)
 
 #! set the tunable parameters and constant parameters
 tunable_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09))
@@ -91,29 +91,39 @@ const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00))
 lower_bounds = [0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
 upper_bounds = [0.1, 2000.0, 50.0, 5.0, 3.0, 0.0]
 #! prepare flow
-output = (flow=qobs_vec,)
+output = (flow=qobs_vec,) 
 #! model calibration
-best_pas = HydroModels.param_box_optim(
+# best_pas = HydroModels.param_box_optim(
+#     exphydro_model,
+#     tunable_pas=tunable_pas,
+#     const_pas=const_pas,
+#     input=[input],
+#     target=[output],
+#     lb=lower_bounds,
+#     ub=upper_bounds,
+#     solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+#     maxiters=1000,
+#     loss_func=HydroErrors.mse,
+# )
+#! use the optimized parameters for model simulation
+best_pas = HydroModels.param_grad_optim(
     exphydro_model,
     tunable_pas=tunable_pas,
     const_pas=const_pas,
     input=[input],
     target=[output],
-    timeidx=[timeidx],
-    lb=lower_bounds,
-    ub=upper_bounds,
-    solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
-    maxiters=1000,
-    loss_func=HydroErr.nse,
-    solver=solver
+    config=[(solver=HydroModels.DiscreteSolver(),)],
+    maxiters=100,
+    loss_func=HydroErrors.mse,
+    adtype=Optimization.AutoForwardDiff(),
 )
-#! use the optimized parameters for model simulation
-total_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09), initstates=(snowpack=0.1, soilwater=1303.00))
-update_pas = HydroModels.update_ca(total_pas, ComponentVector(best_pas, getaxes(tunable_pas)))
-result_opt = exphydro_model(input, update_pas, timeidx=timeidx, solver=solver)
-result_opt_df = DataFrame(result_opt)
-result_opt_df.qobs = qobs_vec
-# CSV.write("temp.csv", result_opt_df)
-1 - HydroErr.nse(result_opt.flow, qobs_vec)
-1 - HydroErr.nse(result.flow, qobs_vec)
+
+# total_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09), initstates=(snowpack=0.1, soilwater=1303.00))
+# update_pas = HydroModels.update_ca(total_pas, ComponentVector(best_pas, getaxes(tunable_pas)))
+# result_opt = exphydro_model(input, update_pas, timeidx=timeidx, solver=solver)
+# result_opt_df = DataFrame(result_opt)
+# result_opt_df.qobs = qobs_vec
+# # CSV.write("temp.csv", result_opt_df)
+# 1 - HydroErr.nse(result_opt.flow, qobs_vec)
+# 1 - HydroErr.nse(result.flow, qobs_vec)
 

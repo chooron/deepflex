@@ -283,7 +283,7 @@ struct VectorRoute <: AbstractVectorRoute
         rfunc::AbstractRouteFlux,
         network::DiGraph,
         subareas::Union{AbstractVector,Number},
-        name::Union{Symbol,Nothing}=nothing
+        name::Union{Symbol,Nothing}=nothing,
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names, state_names = get_var_names(rfunc)

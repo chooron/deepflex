@@ -7,7 +7,6 @@ function get_objective()
         #* Optimization arguments: hydro component, input data, time index, ode solver,
         #*                         tunable parameters axes and default model params
         component, input, target, config, run_kwargs, default_model_pas, loss_func, warmup = p
-        # todo 添加clip方法,约束参数范围
         #* Use merge_ca to replace the tunable parameters inner the model parameters
         tmp_pas = update_ca(default_model_pas, x)
         loss = mean(map(eachindex(input, target, config)) do i
@@ -71,20 +70,31 @@ function param_box_optim(
     #* Get the argument for parameter optimization
     loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
     loss_recorder = NamedTuple[]
-    callback_func = get(opt_kwargs, :callback_func, get_callback_func(Progress(maxiters, desc="Training..."), loss_recorder))
     lb = get(opt_kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(opt_kwargs, :ub, ones(length(tunable_pas)) .* 100)
     maxiters = get(opt_kwargs, :maxiters, 10)
     warmup = get(opt_kwargs, :warmup, 100)
+    callback_func = get(opt_kwargs, :callback_func, get_callback_func(Progress(maxiters, desc="Training..."), loss_recorder))
     solve_alg = get(opt_kwargs, :solve_alg, BBO_adaptive_de_rand_1_bin_radiuslimited())
-
+    tunable_axes = getaxes(tunable_pas)
     #* Construct default model parameters based on tunbale parameters and constant parameters for subsequent merging
     default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
 
+    #* Constructing the objective function for optimization
+    function objective(x::AbstractVector{T}, p) where {T}
+        tmp_pas = update_ca(default_model_pas, ComponentVector(x, tunable_axes))
+        loss = mean(map(eachindex(input, target, config)) do i
+            inp, tar, cfg = input[i], target[i], config[i]
+            tmp_pred = component(inp, tmp_pas; config=cfg, run_kwargs...)
+            tmp_loss = mean([loss_func(tar[key][warmup:end], tmp_pred[key][warmup:end]) for key in keys(tar)])
+            tmp_loss
+        end)
+        loss
+    end
+
     #* Constructing and solving optimization problems
-    optf = Optimization.OptimizationFunction(objective_func)
-    prob_args = (component, input, target, config, run_kwargs, default_model_pas, loss_func, warmup)
-    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args, lb=lb, ub=ub)
+    optf = Optimization.OptimizationFunction(objective)
+    optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), (), lb=lb, ub=ub)
     sol = Optimization.solve(optprob, solve_alg, callback=callback_func, maxiters=maxiters)
     #* convert loss_recorder to DataFrame
     loss_df = DataFrame(loss_recorder)

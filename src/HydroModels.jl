@@ -32,6 +32,9 @@ using Graphs
 using DataInterpolations
 using DataInterpolations: AbstractInterpolation
 
+# integral
+using Integrals
+
 # solve ODEProblem
 using SciMLBase
 using OrdinaryDiffEq
@@ -103,12 +106,8 @@ struct HydroMeta
     nns::Vector{Symbol}
 
     function HydroMeta(;
-        name::Symbol,
-        inputs::Vector{Symbol}=Symbol[],
-        outputs::Vector{Symbol}=Symbol[],
-        params::Vector{Symbol}=Symbol[],
-        states::Vector{Symbol}=Symbol[],
-        nns::Vector{Symbol}=Symbol[],
+        name::Symbol, inputs::Vector{Symbol}=Symbol[], outputs::Vector{Symbol}=Symbol[],
+        params::Vector{Symbol}=Symbol[], states::Vector{Symbol}=Symbol[], nns::Vector{Symbol}=Symbol[],
     )
         return new(name, inputs, outputs, params, states, nns)
     end
@@ -124,28 +123,26 @@ include("utils/callback.jl")
 include("utils/sort.jl")
 
 include("optimize.jl")
-export param_grad_optim, param_box_optim, nn_param_optim
+export param_grad_optim, param_box_optim, nn_param_optim, param_batch_optim
 
 include("solver.jl")
 export ODESolver, DiscreteSolver, ManualSolver
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, RouteFlux, RiverRouteFlux, UnitHydroFlux
-
+export SimpleFlux, StateFlux, NeuralFlux, HydroFunction
+include("uhflux.jl")
+export UHFunction, UH_1_HALF, UH_2_FULL, UnitHydroFlux
+include("rflux.jl")
+export RouteFlux, RiverRouteFlux
 include("bucket.jl")
-export HydroBucket # , add_inputflux!, add_outputflux!, 
-
+export HydroBucket
 include("route.jl")
 export WeightSumRoute, GridRoute, VectorRoute
-
 include("model.jl")
-export HydroModel #, update_unit!, add_elements!, remove_elements!
-
+export HydroModel
 include("estimator.jl")
 export HydroEstimator
-
-
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute

@@ -16,7 +16,7 @@ include("../../src/HydroModels.jl")
 
 # load data
 df = DataFrame(CSV.File("data/m50/01013500.csv"));
-ts = collect(1:10000)
+ts = collect(1:1000)
 prcp_vec = df[ts, "Prcp"]
 temp_vec = df[ts, "Temp"]
 dayl_vec = df[ts, "Lday"]
@@ -46,24 +46,20 @@ stds = std.(inputs)
 @variables norm_snw norm_slw norm_temp norm_prcp
 
 SimpleFlux = HydroModels.SimpleFlux
-StdMeanNormFlux = HydroModels.StdMeanNormFlux
 NeuralFlux = HydroModels.NeuralFlux
 StateFlux = HydroModels.StateFlux
 HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
-step_func = HydroModels.step_func
+step_func = x -> ifelse(x > 0.0, 1.0, 0.0)
 
 #! define the snow pack reservoir
 snow_funcs = [
-    SimpleFlux([temp, lday] => [pet],
-        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
-    SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
-        exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
-    SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
-        exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+    SimpleFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
+    SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+    SimpleFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroBucket(:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
 
 #! define the ET NN and Q NN
 et_nn = Lux.Chain(
@@ -86,20 +82,22 @@ q_nn_flux = NeuralFlux([norm_slw, norm_prcp] => [log_flow], q_nn)
 #! define the soil water reservoir
 soil_funcs = [
     #* normalize
-    StdMeanNormFlux(
-        [snowpack, soilwater, prcp, temp] => [norm_snw, norm_slw, norm_prcp, norm_temp],
-        [[snowpack_mean, snowpack_std], [soilwater_mean, soilwater_std], [prcp_mean, prcp_std], [temp_mean, temp_std]]
-    ),
+    SimpleFlux([snowpack, soilwater, prcp, temp] => [norm_snw, norm_slw, norm_prcp, norm_temp],
+        [snowpack_mean, soilwater_mean, prcp_mean, temp_mean, snowpack_std, soilwater_std, prcp_std, temp_std],
+        exprs=[(var - mean) / std for (var, mean, std) in zip([snowpack, soilwater, prcp, temp],
+            [snowpack_mean, soilwater_mean, prcp_mean, temp_mean],
+            [snowpack_std, soilwater_std, prcp_std, temp_std]
+        )]),
     et_nn_flux,
     q_nn_flux,
 ]
 
 state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
 soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
-soil_ele = HydroBucket(:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
 #! define the Exp-Hydro model
-m50_model = HydroModel(:m50, components=[snow_ele, soil_ele]);
+m50_model = HydroModel(name=:m50, components=[snow_ele, soil_ele]);
 #! pretrain each NN
 et_nn_input = (norm_snw=snowpack_norm_vec, norm_slw=soilwater_norm_vec, norm_temp=temp_norm_vec)
 q_nn_input = (norm_slw=soilwater_norm_vec, norm_prcp=prcp_norm_vec)
@@ -149,7 +147,6 @@ best_pas = HydroModels.param_grad_optim(
     const_pas=const_pas,
     input=[input],
     target=[output],
-    timeidx=[ts],
     adtype=Optimization.AutoZygote(),
     maxiters=100
 )
