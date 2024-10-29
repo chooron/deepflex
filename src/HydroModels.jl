@@ -7,6 +7,7 @@ using ComponentArrays: indexmap, getval
 using Dates
 using DataFrames
 using IterTools: ncycle
+using LinearAlgebra
 using NamedTupleTools
 using ProgressMeter
 using Reexport
@@ -80,6 +81,8 @@ abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
+abstract type AbstractVectorRouteFlux <: AbstractRouteFlux end
+abstract type AbstractGridRouteFlux <: AbstractRouteFlux end
 abstract type AbstractUnitHydroFlux <: AbstractFlux end
 abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 

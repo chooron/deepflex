@@ -159,12 +159,13 @@ struct GridRoute <: AbstractGridRoute
     end
 end
 
+d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
+d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
+
 """
 input dims: node_num * ts_len
 """
 function grid_routing(input::AbstractVector, positions::AbstractVector, flwdir::AbstractMatrix)
-    d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
-    d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
     #* 转换为input的稀疏矩阵
     input_arr = Array(sparse(
         [pos[1] for pos in positions],
@@ -203,11 +204,13 @@ function (route::GridRoute)(
 
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
+    rflux_kwargs = (input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes, areacoefs=area_coefs)
 
-    rflux_func = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes)
+    rflux_func = get_rflux_func(route.rfunc; rflux_kwargs...)
+    flux_initstates = get_rflux_initstates(route.rfunc; rflux_kwargs...)
+    flux_parameters = get_rflux_parameters(route.rfunc; rflux_kwargs...)
 
-    function grid_route_ode!(du, u, p, t)
+    function route_ode!(du, u, p, t)
         # 提取单元产流
         q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
         # 计算单元出流,更新单元出流状态
@@ -221,7 +224,7 @@ function (route::GridRoute)(
     #* prepare init states
     init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
-    sol = solver(grid_route_ode!, pas[:params], init_states, timeidx, convert_to_array=false)
+    sol = solver(route_ode!, flux_parameters, init_states, timeidx, convert_to_array=false)
     if SciMLBase.successful_retcode(sol)
         # Extract flux_states and q_in for each time step
         flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
@@ -231,7 +234,7 @@ function (route::GridRoute)(
         flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
         q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
     end
-    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params])))
+    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(flux_parameters)))
     q_out_mat = reduce(hcat, q_out)
     # Convert q_out_mat and flux_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
@@ -266,6 +269,8 @@ Constructs a `VectorRoute` object with the given name, routing flux function, an
 
 The constructor extracts variable names, parameter names, and neural network names from the provided
 routing flux function to set up the internal information structure of the `VectorRoute` object.
+
+Note: 这个VectorRoute目前仅支持马斯京根算法类的汇流算法,必须使用离散计算方法
 """
 struct VectorRoute <: AbstractVectorRoute
     "Routing function"
@@ -315,13 +320,12 @@ function (route::VectorRoute)(
     kwargs...
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
-    stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     interp = get(config, :interp, LinearInterpolation)
-    solver = get(config, :solver, ODESolver())
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+    delta_t = get(config, :delta_t, 1.0)
+    solver = DiscreteSolver(alg=FunctionMap{true}())
 
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
@@ -329,39 +333,28 @@ function (route::VectorRoute)(
     itp_funcs = interp.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
 
     #* 计算出每个节点的面积转换系数
-    area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
+    area_coeffs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
 
-    rflux_func = get_rflux_func(route.rfunc; pas, ptypes)
-    flux_initstates = get_rflux_initstates(route.rfunc; input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes)
+    #* prepare the parameters for the routing function
+    rflux_func = get_rflux_func(route.rfunc; adjacency=route.adjacency)
+    #* 参数可能存在转换需求,其中包括A通常是固定值
+    rflux_parameters = get_rflux_parameters(route.rfunc; pas=pas, ptypes=ptypes, delta_t=delta_t, adjacency=route.adjacency)
 
-    function vec_route_ode!(du, u, p, t)
-        q_in = u[:q_in]
-        q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
-        q_out, d_flux_states = rflux_func(u[:flux_states], u[:q_in], q_gen, p)
-        # update up_in
-        q_in_updated = route.adjacency * q_out
-        du[:q_in] = q_in_updated .- q_in
-        du[:flux_states] = d_flux_states
+    function route_ode!(du, u, p, t)
+        q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coeffs
+        #* Ax = b, x is the q_out(t+1)
+        rflux_b = rflux_func(u, q_gen, p)
+        #* solve the linear equation (simple solve by matrix inversion)
+        du[:] = p.A \ (rflux_b .- p.A * u)
     end
 
-    #* prepare init states
-    init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
-    sol = solver(vec_route_ode!, pas[:params], init_states, timeidx, convert_to_array=false)
-    if SciMLBase.successful_retcode(sol)
-        # Extract flux_states and q_in for each time step
-        flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
-        q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
-    else
-        @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
-        flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
-        q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
-    end
+    sol_arr = solver(route_ode!, rflux_parameters, zeros(size(input_mat)[1]), timeidx, convert_to_array=true)
+    return reshape(sol_arr, 1, size(sol_arr)...)
+end
 
-    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(pas[:params])))
-    q_out_mat = reduce(hcat, q_out)
-    # Convert q_out_mat and flux_states_matrix to 1 x mat size
-    q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
-    flux_states_matrix_reshaped = reshape(flux_states_matrix, 1, size(flux_states_matrix)...)
-    return cat(flux_states_matrix_reshaped, q_out_reshaped, dims=1)
+"""
+# TODO 混合汇流:针对分布式水文模型的坡地汇流和河网汇流计算
+"""
+struct HybridRoute <: AbstractRoute
 end

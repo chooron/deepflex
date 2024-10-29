@@ -33,7 +33,7 @@ function route1(I_vec, timeidx, ps)
     prob = ODEProblem(muskingum_ode!, S0, (timeidx[1], timeidx[end]), ps)
 
     # 求解 ODE 问题
-    sol = solve(prob, Tsit5(), saveat=timeidx)
+    sol = solve(prob, Tsit5(), saveat=timeidx, dt=24)
     sol_vec = Vector(sol)
     I_vec_2 = [itp_func(t) for t in sol.t]
     Q_vec = @. (sol_vec - K * x * I_vec_2) / (K * (1 - x))
@@ -46,16 +46,15 @@ function route2(I_vec, dt)
     c1 = ((dt / k) + (2 * x)) / ((2 * (1 - x)) + (dt / k))
     c2 = ((2 * (1 - x)) - (dt / k)) / ((2 * (1 - x)) + (dt / k))
 
-    function msk_prob(u, p, t)
+    function msk_prob!(du,u, p, t)
         q_in, q_out = u[1], u[2]
         c0, c1, c2 = p
         new_q = (c0 * I_vec[Int(t)]) + (c1 * q_in) + (c2 * q_out)
-        # du[1] = I_vec[Int(t)] - q_in
-        # du[2] = new_q - q_out
-        [I_vec[Int(t)], new_q]
+        du[1] = I_vec[Int(t)] - q_in
+        du[2] = new_q - q_out
     end
 
-    prob = DiscreteProblem(msk_prob, [I_vec[1], I_vec[1]], (1, length(I_vec)), (c0, c1, c2))
+    prob = DiscreteProblem(msk_prob!, [I_vec[1], I_vec[1]], (1, length(I_vec)), (c0, c1, c2))
     sol = solve(prob, FunctionMap{true}())
     sol_arr = Array(sol)
     return sol_arr[2, :]
@@ -72,11 +71,11 @@ function route3(I_vec, dt)
     return q_out
 end
 
-@btime q_out1 = route1(I_vec, 1:length(I_vec), (K / 24, x / 24))
+@btime q_out1 = route1(I_vec, timeidx, (K, x))
 # q_out2 = route1(I_vec, timeidx, (K, x))
-@btime q_out1 = route1(I_vec, 1:length(I_vec), (K, x))
-q_out2 = route2(I_vec, 24)
-q_out3 = route3(I_vec, 24)
+# q_out1 = route1(I_vec, 1:length(I_vec), (K, x))
+@btime q_out2 = route2(I_vec, 24)
+@btime q_out3 = route3(I_vec, 24)
 
 plot(q_out1, color="red")
 plot!(q_out2, color="blue")

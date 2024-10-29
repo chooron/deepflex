@@ -173,7 +173,7 @@ function (flux::UnitHydroFlux{:SPARSE})(input::Matrix, pas::ComponentVector; kwa
     reshape(sum_route, 1, length(input_vec))
 end
 
-# todo: add the unithydro3 solver, 第三种解决方法可以用Integrals, Distributions这两个包实现卷积积分求解
+# todo: 卷积计算的结果与前两个计算结果不太一致
 function (flux::UnitHydroFlux{:INTEGRAL})(input::Matrix, pas::ComponentVector; kwargs...)
     input_vec = input[1, :]
     itp_method = get(kwargs, :interp, LinearInterpolation)
