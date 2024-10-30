@@ -1,6 +1,3 @@
-(route::AbstractRoute)(input::Vector, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) = error("This struct does not support Vector input in $(typeof(route)) subtype of the AbstractRoute")
-(route::AbstractRoute)(input::Matrix, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) = error("This struct does not support Matrix input in $(typeof(route)) subtype of the AbstractRoute")
-
 """
     WeightSumRoute <: AbstractRouteFlux
 
@@ -50,7 +47,7 @@ struct WeightSumRoute <: AbstractSumRoute
     # outid::Symbol
 
     function WeightSumRoute(;
-        rfunc::AbstractFlux=SimpleFlux([flow] => [flow_routed], exprs=[flow]),
+        rfunc::AbstractFlux,
         subareas::AbstractVector,
         name::Union{Symbol,Nothing}=nothing
     )
@@ -86,10 +83,32 @@ function (route::WeightSumRoute)(
     weight_params = [pas[:params][ptype][:route_weight] for ptype in ptypes]
     weight_result = sum(rfunc_output[1, :, :] .* weight_params .* area_coefs, dims=1)
     # expand dims
-    output_arr = reduce(vcat, repeat(weight_result, size(input_mat)[1]))
-    reshape(1, size(output_arr)...)
+    output_arr = repeat(weight_result, outer=(size(input)[1], 1))
+    reshape(output_arr, 1, size(output_arr)...)
 end
 
+d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
+d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
+
+"""
+input dims: node_num * ts_len
+"""
+function grid_routing(input::AbstractVector, positions::AbstractVector, flwdir::AbstractMatrix)
+    #* 转换为input的稀疏矩阵
+    input_arr = Array(sparse(
+        [pos[1] for pos in positions],
+        [pos[2] for pos in positions],
+        input,
+        size(flwdir)[1], size(flwdir)[2]
+    ))
+    #* 计算权重求和结果
+    input_routed = sum(collect([pad_zeros(input_arr .* (flwdir .== code), arg)
+                                for (code, arg) in zip(d8_codes, d8_nn_pads)]))
+    #* 裁剪输入矩阵边框
+    clip_arr = input_routed[2:size(input_arr)[1]+1, 2:size(input_arr)[2]+1]
+    #* 将输入矩阵转换为向量
+    collect([clip_arr[pos[1], pos[2]] for pos in positions])
+end
 
 """
     GridRoute(name::Symbol; rfunc::AbstractRouteFlux, flwdir::AbstractMatrix, positions::AbstractVector)
@@ -119,71 +138,83 @@ outputs, states, parameters, and neural networks (if applicable) derived from th
 This structure is particularly useful for modeling water flow across a landscape represented as a grid, 
 where each cell has a specific flow direction and contributes to downstream flow.
 """
-struct GridRoute <: AbstractGridRoute
+struct HydroRoute <: AbstractHydroRoute
     "Routing function"
-    rfunc::AbstractRouteFlux
-    "Flow direction matrix"
-    flwdir::AbstractMatrix
-    "Node position information"
-    positions::AbstractVector
+    rfunc::AbstractStateRouteFlux
+    "Outflow projection function"
+    projfunc::Function
+    "project function type"
+    projtype::Symbol
     "grid subarea information, km2"
     subareas::AbstractVector
     "Metadata: contains keys for input, output, param, state, and nn"
     meta::HydroMeta
+end
 
-    function GridRoute(;
-        rfunc::AbstractRouteFlux,
-        flwdir::AbstractMatrix,
-        positions::AbstractVector,
-        subareas::Union{AbstractVector,Number},
-        name::Union{Symbol,Nothing}=nothing,
+function GridRoute(;
+    rfunc::AbstractStateRouteFlux,
+    flwdir::AbstractMatrix,
+    positions::AbstractVector,
+    subareas::Union{AbstractVector,Number},
+    name::Union{Symbol,Nothing}=nothing,
+)
+    #* Extract all variable names of funcs and dfuncs
+    input_names, output_names, state_names = get_var_names(rfunc)
+    #* Extract all parameters names of funcs and dfuncs
+    param_names = get_param_names(rfunc)
+    #* Extract all neuralnetwork names of the funcs
+    nn_names = get_nn_names(rfunc)
+    #* Setup the name information of the hydrobucket
+    route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_grid_route) : name
+    meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
+    #* Convert subareas to a vector if it's a single value
+    subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
+    @assert length(positions) == length(subareas) "The length of positions must be the same as the length of subareas, but got positions: $(length(positions)) and subareas: $(length(subareas))"
+    #* build the outflow projection function
+    projfunc = (outflow) -> grid_routing(outflow, positions, flwdir)
+    return HydroRoute(
+        rfunc,
+        projfunc,
+        :gridroute,
+        subareas,
+        meta,
     )
-        #* Extract all variable names of funcs and dfuncs
-        input_names, output_names, state_names = get_var_names(rfunc)
-        #* Extract all parameters names of funcs and dfuncs
-        param_names = get_param_names(rfunc)
-        #* Extract all neuralnetwork names of the funcs
-        nn_names = get_nn_names(rfunc)
-        #* Setup the name information of the hydrobucket
-        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_grid_route) : name
-        meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
-        #* Convert subareas to a vector if it's a single value
-        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(positions))
-        return new(
-            rfunc,
-            flwdir,
-            positions,
-            subareas,
-            meta,
-        )
-    end
 end
 
-d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
-d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
-
-"""
-input dims: node_num * ts_len
-"""
-function grid_routing(input::AbstractVector, positions::AbstractVector, flwdir::AbstractMatrix)
-    #* 转换为input的稀疏矩阵
-    input_arr = Array(sparse(
-        [pos[1] for pos in positions],
-        [pos[2] for pos in positions],
-        input,
-        size(flwdir)[1], size(flwdir)[2]
-    ))
-    #* 计算权重求和结果
-    input_routed = sum(collect([pad_zeros(input_arr .* (flwdir .== code), arg)
-                                for (code, arg) in zip(d8_codes, d8_nn_pads)]))
-    #* 裁剪输入矩阵边框
-    clip_arr = input_routed[2:size(input_arr)[1]+1, 2:size(input_arr)[2]+1]
-    #* 将输入矩阵转换为向量
-    collect([clip_arr[pos[1], pos[2]] for pos in positions])
+function VectorRoute(;
+    rfunc::AbstractStateRouteFlux,
+    network::DiGraph,
+    subareas::Union{AbstractVector,Number},
+    name::Union{Symbol,Nothing}=nothing,
+)
+    #* Extract all variable names of funcs and dfuncs
+    input_names, output_names, state_names = get_var_names(rfunc)
+    #* Extract all parameters names of funcs and dfuncs
+    param_names = get_param_names(rfunc)
+    #* Extract all neuralnetwork names of the funcs
+    nn_names = get_nn_names(rfunc)
+    #* Setup the name information of the hydrobucket
+    route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_vector_route) : name
+    meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
+    #* Convert subareas to a vector if it's a single value
+    subareas = subareas isa AbstractVector ? subareas : fill(subareas, nv(network))
+    @assert length(subareas) == nv(network) "The length of subareas must be the same as the number of nodes, but got subareas: $(length(subareas)) and nodes: $(nv(network))"
+    #* generate adjacency matrix from network
+    adjacency = adjacency_matrix(network)'
+    #* build the outflow projection function
+    projfunc = (outflow) -> adjacency * outflow
+    return HydroRoute(
+        rfunc,
+        projfunc,
+        :vectorroute,
+        subareas,
+        meta,
+    )
 end
 
-function (route::GridRoute)(
-    input::AbstractArray,
+
+function (route::HydroRoute)(
+    input::Array,
     pas::ComponentVector;
     config::NamedTuple=NamedTuple(),
     kwargs...
@@ -194,8 +225,10 @@ function (route::GridRoute)(
     solver = get(config, :solver, ODESolver())
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
 
-    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
+    @assert length(route.subareas) == size(input, 2) "The length of subareas must be the same as the number of nodes, but got subareas: $(length(route.subareas)) and input: $(size(input, 2))"
+    @assert length(ptypes) == length(stypes) == size(input, 2) "The length of ptypes and stypes must be the same as the number of nodes, but got ptypes is $(length(ptypes)) and stypes is $(length(stypes))"
+    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got ptypes is $(length(ptypes))."
+    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got stypes is $(length(stypes))."
 
     #* var num * node num * ts len
     #* 计算出每个node结果的插值函数
@@ -206,6 +239,7 @@ function (route::GridRoute)(
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
     rflux_kwargs = (input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes, areacoefs=area_coefs)
 
+    #* 获取rflux的一系列信息
     rflux_func = get_rflux_func(route.rfunc; rflux_kwargs...)
     flux_initstates = get_rflux_initstates(route.rfunc; rflux_kwargs...)
     flux_parameters = get_rflux_parameters(route.rfunc; rflux_kwargs...)
@@ -214,33 +248,33 @@ function (route::GridRoute)(
         # 提取单元产流
         q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
         # 计算单元出流,更新单元出流状态
-        q_out, d_flux_states = rflux_func(u[:flux_states], u[:q_in], q_gen, p)
+        q_out, d_route_states = rflux_func(u[:route_states], u[:q_in], q_gen, p)
         # 计算出流的汇流结果
-        new_q_in = grid_routing(q_out, route.positions, route.flwdir)
+        new_q_in = route.projfunc(q_out)
         # 更新状态
-        du[:flux_states] = d_flux_states
+        du[:route_states] = d_route_states
         du[:q_in] = new_q_in .- u[:q_in]
     end
     #* prepare init states
-    init_states = ComponentVector(flux_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
+    init_states = ComponentVector(route_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
     sol = solver(route_ode!, flux_parameters, init_states, timeidx, convert_to_array=false)
     if SciMLBase.successful_retcode(sol)
-        # Extract flux_states and q_in for each time step
-        flux_states_matrix = reduce(hcat, [u.flux_states for u in sol.u])
+        # Extract route_states and q_in for each time step
+        route_states_matrix = reduce(hcat, [u.route_states for u in sol.u])
         q_in_matrix = reduce(hcat, [u.q_in for u in sol.u])
     else
         @warn "ODE solver failed, please check the parameters and initial states, or the solver settings"
-        flux_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
+        route_states_matrix = zeros(size(flux_initstates)..., length(timeidx))
         q_in_matrix = zeros(size(input_mat)[1], length(timeidx))
     end
-    q_out = first.(rflux_func.(eachslice(flux_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(flux_parameters)))
+    q_out = first.(rflux_func.(eachslice(route_states_matrix, dims=2), eachslice(q_in_matrix, dims=2), eachslice(input_mat, dims=2), Ref(flux_parameters)))
     q_out_mat = reduce(hcat, q_out)
-    # Convert q_out_mat and flux_states_matrix to 1 x mat size
+    # Convert q_out_mat and route_states_matrix to 1 x mat size
     q_out_reshaped = reshape(q_out_mat, 1, size(q_out_mat)...)
-    flux_states_matrix_reshaped = reshape(flux_states_matrix, 1, size(flux_states_matrix)...)
-    #  return flux_states and q_out
-    return cat(flux_states_matrix_reshaped, q_out_reshaped, dims=1)
+    route_states_matrix_reshaped = reshape(route_states_matrix, 1, size(route_states_matrix)...)
+    #  return route_states and q_out
+    return cat(route_states_matrix_reshaped, q_out_reshaped, dims=1)
 end
 
 """
@@ -270,13 +304,11 @@ Constructs a `VectorRoute` object with the given name, routing flux function, an
 The constructor extracts variable names, parameter names, and neural network names from the provided
 routing flux function to set up the internal information structure of the `VectorRoute` object.
 
-Note: 这个VectorRoute目前仅支持马斯京根算法类的汇流算法,必须使用离散计算方法
+Note: 来源于Rapid汇流模型
 """
-struct VectorRoute <: AbstractVectorRoute
+struct RapidRoute <: AbstractRapidRoute
     "Routing function"
     rfunc::AbstractRouteFlux
-    "Routing network"
-    network::DiGraph
     "Routing adjacency matrix"
     adjacency::AbstractMatrix
     "grid subarea information, km2"
@@ -284,8 +316,8 @@ struct VectorRoute <: AbstractVectorRoute
     "Metadata: contains keys for input, output, param, state, and nn"
     meta::HydroMeta
 
-    function VectorRoute(;
-        rfunc::AbstractRouteFlux,
+    function RapidRoute(;
+        rfunc::AbstractDynamicRouteFlux,
         network::DiGraph,
         subareas::Union{AbstractVector,Number},
         name::Union{Symbol,Nothing}=nothing,
@@ -302,10 +334,10 @@ struct VectorRoute <: AbstractVectorRoute
         #* generate adjacency matrix from network
         adjacency = adjacency_matrix(network)'
         #* Convert subareas to a vector if it's a single value
-        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(nv(network)))
+        subareas = subareas isa AbstractVector ? subareas : fill(subareas, nv(network))
+        @assert length(subareas) == nv(network) "The length of subareas must be the same as the number of nodes, but got subareas: $(length(subareas)) and nodes: $(nv(network))"
         return new(
             rfunc,
-            network,
             adjacency,
             subareas,
             meta,
@@ -313,8 +345,8 @@ struct VectorRoute <: AbstractVectorRoute
     end
 end
 
-function (route::VectorRoute)(
-    input::AbstractArray,
+function (route::RapidRoute)(
+    input::Array,
     pas::ComponentVector;
     config::NamedTuple=NamedTuple(),
     kwargs...
@@ -351,10 +383,4 @@ function (route::VectorRoute)(
     #* solve the ode
     sol_arr = solver(route_ode!, rflux_parameters, zeros(size(input_mat)[1]), timeidx, convert_to_array=true)
     return reshape(sol_arr, 1, size(sol_arr)...)
-end
-
-"""
-# TODO 混合汇流:针对分布式水文模型的坡地汇流和河网汇流计算
-"""
-struct HybridRoute <: AbstractRoute
 end

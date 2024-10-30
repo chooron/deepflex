@@ -27,44 +27,7 @@ and organizes the information about inputs, outputs, and parameters into the `me
 This structure is particularly useful for representing routing processes in hydrological models, 
 where water is transferred from one point to another in the system.
 """
-struct VectorRouteFlux{rtype} <: AbstractVectorRouteFlux
-    "A map of input names (Symbol) and its variables (Num)"
-    inputs::Vector{Num}
-    "A map of output names (Symbol) and its variables (Num)"
-    outputs::Vector{Num}
-    "A map of parameters names (Symbol) and its variables (Num)"
-    params::Vector{Num}
-    "bucket information: keys contains: input, output, param, state"
-    meta::HydroMeta
-
-    function VectorRouteFlux(
-        input::Num,
-        params::Vector{Num};
-        routetype::Symbol,
-        output::Union{Num,Nothing}=nothing,
-    )
-        input_name = Symbolics.tosymbol(input, escape=false)
-        param_names = isempty(params) ? Symbol[] : Symbolics.tosymbol.(params, escape=false)
-
-        if isnothing(output)
-            output_name = Symbol(input_name, :_routed)
-            output = first(@variables $output_name)
-        else
-            output_name = Symbolics.tosymbol(output, escape=false)
-        end
-        #* Setup the name information of the hydroroutement
-        meta = HydroMeta(inputs=[input_name], outputs=[output_name], params=param_names, name=Symbol(output_name, :_route_flux))
-
-        return new{routetype}(
-            [input],
-            [output],
-            params,
-            meta
-        )
-    end
-end
-
-struct GridRouteFlux{rtype} <: AbstractGridRouteFlux
+struct StateRouteFlux{rtype} <: AbstractStateRouteFlux
     "A map of input names (Symbol) and its variables (Num)"
     inputs::Vector{Num}
     "A map of output names (Symbol) and its variables (Num)"
@@ -76,7 +39,7 @@ struct GridRouteFlux{rtype} <: AbstractGridRouteFlux
     "bucket information: keys contains: input, output, param, state"
     meta::HydroMeta
 
-    function GridRouteFlux(
+    function StateRouteFlux(
         input::Num,
         params::Vector{Num},
         states::Vector{Num};
@@ -97,8 +60,10 @@ struct GridRouteFlux{rtype} <: AbstractGridRouteFlux
         meta = HydroMeta(inputs=[input_name], outputs=[output_name], params=param_names, states=state_names, name=Symbol(output_name, :_route_flux))
 
         return new{routetype}(
-            [input], [output],
-            params, states,
+            [input],
+            [output],
+            params,
+            states,
             meta
         )
     end
@@ -114,7 +79,56 @@ function DischargeRouteFlux(input::Num, output::Union{Num,Nothing}=nothing)
         output = first(@variables $output_name)
     end
 
-    return GridRouteFlux(input, [lag], [s_river]; routetype=:discharge, output=output)
+    return StateRouteFlux(input, [lag], [s_river]; routetype=:discharge, output=output)
+end
+
+function RiverRouteFlux(input::Num, output::Union{Num,Nothing}=nothing)
+    @parameters lag
+    @variables s_river
+
+    if isnothing(output)
+        input_name = Symbolics.tosymbol(input, escape=false)
+        output_name = Symbol(input_name, :_routed)
+        output = first(@variables $output_name)
+    end
+
+    return StateRouteFlux(input, [lag], [s_river]; routetype=:river, output=output)
+end
+
+struct DynamicRouteFlux{rtype} <: AbstractDynamicRouteFlux
+    "A map of input names (Symbol) and its variables (Num)"
+    inputs::Vector{Num}
+    "A map of output names (Symbol) and its variables (Num)"
+    outputs::Vector{Num}
+    "A map of parameters names (Symbol) and its variables (Num)"
+    params::Vector{Num}
+    "bucket information: keys contains: input, output, param, state"
+    meta::HydroMeta
+
+    function DynamicRouteFlux(
+        input::Num,
+        params::Vector{Num};
+        routetype::Symbol,
+        output::Union{Num,Nothing}=nothing,
+    )
+        input_name = Symbolics.tosymbol(input, escape=false)
+        param_names = isempty(params) ? Symbol[] : Symbolics.tosymbol.(params, escape=false)
+
+        if isnothing(output)
+            output_name = Symbol(input_name, :_routed)
+            output = first(@variables $output_name)
+        else
+            output_name = Symbolics.tosymbol(output, escape=false)
+        end
+        #* Setup the name information of the hydroroutement
+        meta = HydroMeta(inputs=[input_name], outputs=[output_name], params=param_names, name=Symbol(output_name, :_route_flux))
+
+        return new{routetype}(
+            [input], [output],
+            params,
+            meta
+        )
+    end
 end
 
 function MuskingumRouteFlux(input::Num, output::Union{Num,Nothing}=nothing)
@@ -126,7 +140,7 @@ function MuskingumRouteFlux(input::Num, output::Union{Num,Nothing}=nothing)
         output = first(@variables $output_name)
     end
 
-    return VectorRouteFlux(input, [k, x]; routetype=:muskingum, output=output)
+    return DynamicRouteFlux(input, [k, x]; routetype=:muskingum, output=output)
 end
 
 
@@ -161,10 +175,9 @@ This function must be implemented by subtypes of AbstractRouteFlux to provide th
 """
 get_rflux_func(::AbstractRouteFlux; kwargs...) = @error "Must be implemented by subtype"
 
-function get_rflux_func(::GridRouteFlux{:discharge}; kwargs...)
+function get_rflux_func(::StateRouteFlux{:discharge}; kwargs...)
 
     function rflux_func(s_river, q_in, q_gen, p)
-        # s_river, q_in = u[:flux_states], u[:q_in]
         q_rf = @. (s_river + q_in) / (1 + p.lag)
         d_state = q_in .- q_rf
         q_out = q_rf .+ q_gen
@@ -174,7 +187,20 @@ function get_rflux_func(::GridRouteFlux{:discharge}; kwargs...)
     return rflux_func
 end
 
-function get_rflux_func(::VectorRouteFlux{:muskingum}; adjacency::AbstractMatrix, kwargs...)
+function get_rflux_func(::StateRouteFlux{:river}; kwargs...)
+
+    function rflux_func(s_river, q_in, q_gen, p)
+        k_ps, x_ps = p.k, p.x
+        q_rf = @.((s_river - k_ps * x_ps * q_in) / (k_ps * (1 - x_ps)))
+        d_state = q_in .- q_rf
+        q_out = q_rf .+ q_gen
+        q_out, d_state
+    end
+
+    return rflux_func
+end
+
+function get_rflux_func(::DynamicRouteFlux{:muskingum}; adjacency::AbstractMatrix, kwargs...)
 
     function rflux_func(q_out_t1, q_gen, p)
         c0, c1, c2 = p.c0, p.c1, p.c2
@@ -208,9 +234,11 @@ A vector representing the initial states for the route flux model.
 - By taking input data, parameters, and type information as arguments, the function can create initial states that are appropriately tailored to the specific model configuration and data characteristics.
 
 """
-get_rflux_initstates(::AbstractGridRouteFlux; kwargs...) = @error "Must be implemented by subtype"
-function get_rflux_initstates(::GridRouteFlux{:discharge}; pas::ComponentVector, stypes::AbstractVector{Symbol}, kwargs...)
-    println([pas[:initstates][stype][:s_river] for stype in stypes])
+get_rflux_initstates(::AbstractStateRouteFlux; kwargs...) = @error "Must be implemented by subtype"
+function get_rflux_initstates(::StateRouteFlux{:discharge}; pas::ComponentVector, stypes::AbstractVector{Symbol}, kwargs...)
+    [pas[:initstates][stype][:s_river] for stype in stypes]
+end
+function get_rflux_initstates(::StateRouteFlux{:river}; pas::ComponentVector, stypes::AbstractVector{Symbol}, kwargs...)
     [pas[:initstates][stype][:s_river] for stype in stypes]
 end
 """
@@ -237,11 +265,16 @@ A vector representing the initial states for the route flux model.
 
 """
 get_rflux_parameters(::AbstractRouteFlux; kwargs...) = @error "Must be implemented by subtype"
-function get_rflux_parameters(::GridRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol}, kwargs...)
+function get_rflux_parameters(::StateRouteFlux{:discharge}; pas::ComponentVector, ptypes::AbstractVector{Symbol}, kwargs...)
     lag_ps = [pas[:params][ptype][:lag] for ptype in ptypes]
     return ComponentVector(lag=lag_ps)
 end
-function get_rflux_parameters(::VectorRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol}, delta_t::Number, adjacency::AbstractMatrix, kwargs...)
+function get_rflux_parameters(::StateRouteFlux{:river}; pas::ComponentVector, ptypes::AbstractVector{Symbol}, kwargs...)
+    k_ps = [pas[:params][ptype][:k] for ptype in ptypes]
+    x_ps = [pas[:params][ptype][:x] for ptype in ptypes]
+    return ComponentVector(k=k_ps, x=x_ps)
+end
+function get_rflux_parameters(::DynamicRouteFlux{:muskingum}; pas::ComponentVector, ptypes::AbstractVector{Symbol}, delta_t::Number, adjacency::AbstractMatrix, kwargs...)
     k_ps = [pas[:params][ptype][:k] for ptype in ptypes]
     x_ps = [pas[:params][ptype][:x] for ptype in ptypes]
     c0 = @. ((delta_t / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
@@ -277,7 +310,8 @@ This function does not actually return a value, as route flux models are abstrac
 (::AbstractRouteFlux)(input::Matrix, pas::ComponentVector; kwargs...) = @error "Must be implemented by subtype"
 (::AbstractRouteFlux)(input::Array, pas::ComponentVector; kwargs...) = @error "Must be implemented with the Route type"
 
-function (flux::GridRouteFlux{:discharge})(input::Matrix, pas::ComponentVector; kwargs...)
+# todo 直接调用还不完善
+function (flux::StateRouteFlux{:discharge})(input::Matrix, pas::ComponentVector; kwargs...)
     timeidx = get(kwargs, :timeidx, collect(1:size(input)[2]))
     delta_t = get(kwargs, :delta_t, 1.0)
     solver = get(kwargs, :solver, ODESolver(alg=Rosenbrock23()))
@@ -300,7 +334,30 @@ function (flux::GridRouteFlux{:discharge})(input::Matrix, pas::ComponentVector; 
     q_out_vec
 end
 
-function (flux::VectorRouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::StateRouteFlux{:river})(input::Matrix, pas::ComponentVector; kwargs...)
+    timeidx = get(kwargs, :timeidx, collect(1:size(input)[2]))
+    delta_t = get(kwargs, :delta_t, 1.0)
+    solver = get(kwargs, :solver, ODESolver(alg=Rosenbrock23()))
+    converted_timeidx = timeidx .* delta_t
+    input_itp = LinearInterpolation(input[1, :], converted_timeidx)
+    params = pas[:params]
+
+    function msk_func!(du, u, p, t)
+        s_river = u[1]
+        q_in = input_itp(t)
+        k, x = p[:params]
+        q_out = (s_river - k * x * q_in) / (k * (1 - x))
+        du[1] = q_in - q_out
+    end
+
+    init_states = [params.k * input[1, 1]]
+    sol_arr = solver(msk_func!, pas, init_states, converted_timeidx)
+    s_river_vec = sol_arr[1, :]
+    q_out_vec = @.((s_river_vec - params.k * params.x * input[1, :]) / (params.k * (1 - params.x)))
+    q_out_vec
+end
+
+function (flux::DynamicRouteFlux{:muskingum})(input::Matrix, pas::ComponentVector; kwargs...)
     timeidx = get(kwargs, :timeidx, collect(1:size(input)[2]))
     delta_t = get(kwargs, :delta_t, 1.0)
     solver = get(kwargs, :solver, DiscreteSolver(alg=FunctionMap{true}()))

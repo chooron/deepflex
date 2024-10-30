@@ -4,8 +4,7 @@ HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
 UnitHydroFlux = HydroModels.UnitHydroFlux
 NeuralFlux = HydroModels.NeuralFlux
-StdMeanNormFlux = HydroModels.StdMeanNormFlux
-step_func = HydroModels.step_func
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
 @testset "test grid route hydro model (multiple hydrology nodes based on exp-hydro)" begin
     @parameters Tmin Tmax Df Smax f Qmax
@@ -53,7 +52,7 @@ step_func = HydroModels.step_func
     @test Set(HydroModels.get_param_names(model)) == Set([:Tmin, :Tmax, :Df, :Smax, :f, :Qmax, :lag])
     @test Set(HydroModels.get_state_names(model)) == Set([:snowpack, :soilwater, :s_river])
     @test Set(HydroModels.get_output_names(model)) == Set([:pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :flow_routed])
-    @test Set(HydroModels.get_var_names(model)) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater, :s_river, :flow_routed])
+    @test Set(reduce(vcat, HydroModels.get_var_names(model))) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater, :s_river, :flow_routed])
 
     input_ntp_vec = repeat([input_ntp], 9)
     node_names = [Symbol(:node_, i) for i in 1:9]
@@ -63,7 +62,7 @@ step_func = HydroModels.step_func
 
     config = (timeidx=ts, ptypes=node_names)
     result_mat_vec = model(input_ntp_vec, node_pas, config=config)
-    @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
+    @test size(result_mat_vec) == (length(reduce(vcat, HydroModels.get_var_names(model))), length(input_ntp_vec), length(ts))
 end
 
 @testset "test vector route hydro model (spatial hydrology model based on vector route and exp-hydro)" begin
@@ -76,8 +75,8 @@ end
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
     input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 
-    initstates = ComponentVector(snowpack=0.0, soilwater=1303.00, s_river=0.0)
-    params = ComponentVector(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, lag=0.2)
+    initstates = ComponentVector(snowpack=0.0, soilwater=1303.00)
+    params = ComponentVector(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, lag=0.2, k=0.5, x=0.2)
     pas = ComponentVector(initstates=initstates, params=params)
 
     #! define the snow pack reservoir
@@ -100,19 +99,26 @@ end
     soil_ele = HydroBucket(name=:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
     #! define the routing method
-    flwdir = [1 4 8; 1 4 4; 1 1 2]
-    positions = [[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [2, 3], [3, 1], [3, 2], [3, 3]]
-    discharge_flux = HydroModels.DischargeRouteFlux(flow, flow_routed)
-    discharge_route = HydroModels.GridRoute(name=:exphydro_routed, rfunc=discharge_flux, flwdir=flwdir, positions=positions, subareas=10.0)
+    network = DiGraph(9)
+    add_edge!(network, 1, 2)
+    add_edge!(network, 2, 5)
+    add_edge!(network, 3, 5)
+    add_edge!(network, 4, 5)
+    add_edge!(network, 5, 8)
+    add_edge!(network, 6, 9)
+    add_edge!(network, 7, 8)
+    add_edge!(network, 8, 9)
+    discharge_flux = HydroModels.MuskingumRouteFlux(flow)
+    discharge_route = HydroModels.VectorRoute(name=:exphydro_routed, rfunc=discharge_flux, network=network, subareas=10.0)
 
     #! define the Exp-Hydro model
     model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele, discharge_route])
 
     @test Set(HydroModels.get_input_names(model)) == Set([:temp, :lday, :prcp])
-    @test Set(HydroModels.get_param_names(model)) == Set([:Tmin, :Tmax, :Df, :Smax, :f, :Qmax, :lag])
-    @test Set(HydroModels.get_state_names(model)) == Set([:snowpack, :soilwater, :s_river])
+    @test Set(HydroModels.get_param_names(model)) == Set([:Tmin, :Tmax, :Df, :Smax, :f, :Qmax, :k, :x])
+    @test Set(HydroModels.get_state_names(model)) == Set([:snowpack, :soilwater])
     @test Set(HydroModels.get_output_names(model)) == Set([:pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :flow_routed])
-    @test Set(HydroModels.get_var_names(model)) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater, :s_river, :flow_routed])
+    @test Set(reduce(vcat, HydroModels.get_var_names(model))) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater, :flow_routed])
 
     input_ntp_vec = repeat([input_ntp], 9)
     node_names = [Symbol(:node_, i) for i in 1:9]
@@ -122,5 +128,5 @@ end
 
     config = (timeidx=ts, ptypes=node_names)
     result_mat_vec = model(input_ntp_vec, node_pas, config=config, convert_to_ntp=false)
-    @test size(result_mat_vec) == (length(HydroModels.get_var_names(model)), length(input_ntp_vec), length(ts))
+    @test size(result_mat_vec) == (length(reduce(vcat, HydroModels.get_var_names(model))), length(input_ntp_vec), length(ts))
 end

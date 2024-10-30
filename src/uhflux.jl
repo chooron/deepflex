@@ -85,8 +85,8 @@ struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
 
     function UnitHydroFlux(
         input::Num,
-        param::Num,
-        uhtype::Symbol;
+        param::Num;
+        uhtype::Symbol=:UH_1_HALF,
         output::Union{Num,Nothing}=nothing,
         solvetype::Symbol=:DISCRETE,
     )
@@ -100,7 +100,6 @@ struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
         end
 
         uhfunc = UHFunction(uhtype)
-
         #* Setup the name information of the hydroroutement
         meta = HydroMeta(inputs=[input_name], outputs=[output_name], params=[param_name], name=Symbol(output_name, :_uh_flux))
 
@@ -193,17 +192,17 @@ function (flux::UnitHydroFlux{:INTEGRAL})(input::Matrix, pas::ComponentVector; k
     reshape(routed_result, 1, length(input_vec))
 end
 
-# function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; kwargs...)
-#     #* array dims: (variable dim, num of node, sequence length)
-#     #* Extract the initial state of the parameters and routement in the pas variable
-#     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
-#     pytype_params = [pas[:params][ptype] for ptype in ptypes]
+function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; kwargs...)
+    #* array dims: (variable dim, num of node, sequence length)
+    #* Extract the initial state of the parameters and routement in the pas variable
+    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    pytype_params = [pas[:params][ptype] for ptype in ptypes]
 
-#     sols = map(eachindex(ptypes)) do (idx)
-#         tmp_pas = ComponentVector(params=pytype_params[idx])
-#         node_sols = reduce(hcat, uh(input[:, idx, :], tmp_pas))
-#         node_sols
-#     end
-#     sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-#     return permutedims(sol_arr, (1, 3, 2))
-# end
+    sols = map(eachindex(ptypes)) do (idx)
+        tmp_pas = ComponentVector(params=pytype_params[idx])
+        node_sols = reduce(hcat, uh(input[:, idx, :], tmp_pas))
+        node_sols
+    end
+    sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
+    return permutedims(sol_arr, (1, 3, 2))
+end

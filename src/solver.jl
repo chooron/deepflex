@@ -73,6 +73,7 @@ function (solver::DiscreteSolver)(
     sol = solve(
         prob,
         solver.alg,
+        saveat=timeidx
     )
     if convert_to_array
         if SciMLBase.successful_retcode(sol)

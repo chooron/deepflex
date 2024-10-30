@@ -81,15 +81,15 @@ abstract type AbstractSimpleFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
 abstract type AbstractRouteFlux <: AbstractFlux end
-abstract type AbstractVectorRouteFlux <: AbstractRouteFlux end
-abstract type AbstractGridRouteFlux <: AbstractRouteFlux end
+abstract type AbstractStateRouteFlux <: AbstractRouteFlux end
+abstract type AbstractDynamicRouteFlux <: AbstractRouteFlux end
 abstract type AbstractUnitHydroFlux <: AbstractFlux end
 abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 
 #* route的两种变体
 abstract type AbstractSumRoute <: AbstractRoute end
-abstract type AbstractGridRoute <: AbstractRoute end
-abstract type AbstractVectorRoute <: AbstractRoute end
+abstract type AbstractHydroRoute <: AbstractRoute end
+abstract type AbstractRapidRoute <: AbstractRoute end
 
 """
 Metadata about the component, including:
@@ -141,7 +141,7 @@ export RouteFlux, RiverRouteFlux
 include("bucket.jl")
 export HydroBucket
 include("route.jl")
-export WeightSumRoute, GridRoute, VectorRoute
+export WeightSumRoute, GridRoute, VectorRoute, RapidRoute
 include("model.jl")
 export HydroModel
 include("estimator.jl")

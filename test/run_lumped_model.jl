@@ -5,7 +5,7 @@ HydroModel = HydroModels.HydroModel
 UnitHydroFlux = HydroModels.UnitHydroFlux
 NeuralFlux = HydroModels.NeuralFlux
 StdMeanNormFlux = HydroModels.StdMeanNormFlux
-step_func = HydroModels.step_func
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
 @testset "test lumped hydro model (exp-hydro with no neural network and no unit hydrograph)" begin
     @parameters Tmin Tmax Df Smax f Qmax

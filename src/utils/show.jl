@@ -119,7 +119,7 @@ function Base.show(io::IO, ele::AbstractBucket)
     end
 end
 
-function Base.show(io::IO, route::AbstractGridRoute)
+function Base.show(io::IO, route::AbstractHydroRoute)
     compact = get(io, :compact, false)
     if compact
         print(io, "GridRoute(")
@@ -129,8 +129,8 @@ function Base.show(io::IO, route::AbstractGridRoute)
         print(io, ", params: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
         print(io, ", states: ", isempty(route.meta.states) ? "nothing" : join(route.meta.states, ", "))
         print(io, ", routefunc: ", typeof(route.rfunc))
-        print(io, ", flwdir: ", size(route.flwdir))
-        print(io, ", nodes: ", length(route.positions))
+        print(io, ", projtype: ", route.projtype)
+        print(io, ", nodes: ", length(route.subareas))
         print(io, ")")
     else
         println(io, "GridRoute: ", route.meta.name)
@@ -138,33 +138,29 @@ function Base.show(io::IO, route::AbstractGridRoute)
         println(io, "  Outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
         println(io, "  Parameters: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
         println(io, "  States: ", isempty(route.meta.states) ? "nothing" : join(route.meta.states, ", "))
-        println(io, "  RouteFunc: RouteFlux(", typeof(route.rfunc).parameters[1], ")")
-        println(io, "  FlowDirection: ", " Matrix{", eltype(route.flwdir), "}", size(route.flwdir))
-        println(io, "  Nodes: ", length(route.positions))
+        println(io, "  RouteFunc: StateRouteFlux(", typeof(route.rfunc).parameters[1], ")")
+        println(io, "  ProjectionType: ", route.projtype)
+        println(io, "  Nodes: ", length(route.subareas))
     end
 end
 
-function Base.show(io::IO, route::AbstractVectorRoute)
+function Base.show(io::IO, route::AbstractRapidRoute)
     compact = get(io, :compact, false)
     if compact
-        print(io, "VectorRoute(")
+        print(io, "RapidRoute(")
         print(io, "name: ", route.meta.name)
         print(io, ", inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
         print(io, ", outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
         print(io, ", params: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
-        print(io, ", states: ", isempty(route.meta.states) ? "nothing" : join(route.meta.states, ", "))
         print(io, ", routefunc: ", typeof(route.rfunc))
-        println(io, ", rivernetwork: ", route.network)
         print(io, ", nodes: ", size(route.adjacency)[1])
         print(io, ")")
     else
-        println(io, "VectorRoute: ", route.meta.name)
+        println(io, "RapidRoute: ", route.meta.name)
         println(io, "  Inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
         println(io, "  Outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
         println(io, "  Parameters: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
-        println(io, "  States: ", isempty(route.meta.states) ? "nothing" : join(route.meta.states, ", "))
-        println(io, "  RouteFunc: RouteFlux(", typeof(route.rfunc).parameters[1], ")")
-        println(io, "  RiverNetwork: $(summary(route.network)){$(nv(route.network)), $(ne(route.network))}")
+        println(io, "  RouteFunc: DynamicRouteFlux(", typeof(route.rfunc).parameters[1], ")")
         println(io, "  Nodes: ", size(route.adjacency)[1])
     end
 end

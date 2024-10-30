@@ -141,6 +141,17 @@ Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
 Qout(i,t+1) = Func(Qin(i,t+1), Qin(i,t), Qout(i,t),Qgen(i,t), spatial_info)
 Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
 
+### RouteFlux分类
+RouteFlux可以分为两种类型:
+- 包括虚构状态,构建常微分方程的RouteFlux,命名为StateRouteFlux
+如: 
+基于状态方程:ds/dt = I-Q
+然后Q是由S计算得到,Q=f(S;ps)
+
+- 不包括虚构状态,构建的是流量的自相关关系的RouteFlux,命名为DynamicRouteFlux
+如Q(t+1) = f(Q(t);ps)
+
+
 ## 类型的一些信息展示功能
 
 类型信息展示可以分为两个大类:
