@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "ef254c8f78ce28bc5af5a90d1b696d632f843933"
+project_hash = "478afeda9fc3132b8d765182b2ca0cb6fad8b4c9"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "99a6f5d0ce1c7c6afdb759daa30226f71c54f6b0"
@@ -136,6 +136,12 @@ deps = ["UnsafeAtomics"]
 git-tree-sha1 = "c06a868224ecba914baa6942988e2f2aade419be"
 uuid = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
 version = "0.1.0"
+
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "01b8ccb13d68535d73d2b0c23e39bd23155fb712"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.1.0"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -1038,6 +1044,22 @@ git-tree-sha1 = "ce1566720fd6b19ff3411404d4b977acd4814f9f"
 uuid = "313cdc1a-70c2-5d6a-ae34-0150d3930a38"
 version = "1.1.1"
 
+[[deps.InfiniteArrays]]
+deps = ["ArrayLayouts", "FillArrays", "Infinities", "LazyArrays", "LinearAlgebra"]
+git-tree-sha1 = "478ad747fd8e0ac2506a19770e9597289e6027ad"
+uuid = "4858937d-0d70-526a-a4dd-2d5cb5dd786c"
+version = "0.14.3"
+weakdeps = ["DSP", "Statistics"]
+
+    [deps.InfiniteArrays.extensions]
+    InfiniteArraysDSPExt = "DSP"
+    InfiniteArraysStatisticsExt = "Statistics"
+
+[[deps.Infinities]]
+git-tree-sha1 = "6336676b91409ec0a2c82723de9bdf4cabd02d78"
+uuid = "e1ba4f0e-776d-440f-acd9-e1d2e9742647"
+version = "0.1.8"
+
 [[deps.Inflate]]
 git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
@@ -1095,6 +1117,16 @@ version = "2024.2.0+0"
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "88a101217d7cb38a7b481ccd50d21876e1d1b0e0"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.15.1"
+weakdeps = ["Unitful"]
+
+    [deps.Interpolations.extensions]
+    InterpolationsUnitfulExt = "Unitful"
 
 [[deps.IntervalSets]]
 git-tree-sha1 = "dba9ddf07f77f60450fe5d2e2beb9854d9a49bd0"
@@ -2072,6 +2104,12 @@ git-tree-sha1 = "cb5a2ab6763464ae0f19c86c56c63d4a2b0f5bda"
 uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
 version = "1.52.2+0"
 
+[[deps.ParameterSchedulers]]
+deps = ["InfiniteArrays", "Optimisers"]
+git-tree-sha1 = "99a2b9f799bae36f9571421883cdeeabfe25ad8c"
+uuid = "d7d3b36b-41b8-4d0d-a2bf-768c6151755e"
+version = "0.4.2"
+
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
@@ -2304,6 +2342,16 @@ deps = ["Random"]
 git-tree-sha1 = "c6ec94d2aaba1ab2ff983052cf6a606ca5985902"
 uuid = "e6cf234a-135c-5ec9-84dd-332b85af5143"
 version = "1.6.0"
+
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.5"
+weakdeps = ["FixedPointNumbers"]
+
+    [deps.Ratios.extensions]
+    RatiosFixedPointNumbersExt = "FixedPointNumbers"
 
 [[deps.RealDot]]
 deps = ["LinearAlgebra"]
@@ -2972,6 +3020,12 @@ version = "1.0.1"
     GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
     Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
     oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "c1a7aa6219628fcd757dede0ca95e245c5cd9511"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "1.0.0"
 
 [[deps.WorkerUtilities]]
 git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"

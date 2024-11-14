@@ -2,6 +2,12 @@ using OrdinaryDiffEq
 using DataInterpolations
 using Plots
 using BenchmarkTools
+using ParameterSchedulers
+using OptimizationOptimisers
+
+alg = ADAM(0.01)
+opt = Scheduler(alg, Exp(start = 1e-2, decay = 0.8))
+
 
 # 输入流量函数 I(t)
 I_vec = Float64[2, 3, 4, 3, 5, 6, 7, 8, 9, 10, 5, 3, 2]

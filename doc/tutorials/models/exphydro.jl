@@ -8,8 +8,10 @@ HydroModel = HydroModels.HydroModel
 
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 # define variables and parameters
+
 @variables temp lday pet prcp snowfall rainfall snowpack melt
 @parameters Tmin Tmax Df Smax Qmax f
+
 @variables soilwater pet evap baseflow surfaceflow flow rainfall
 
 # define model components
@@ -30,7 +32,6 @@ fluxes_2 = [
 dfluxes_2 = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
 bucket_2 = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
 
-# define model
 model = HydroModel(name=:exphydro, components=[bucket_1, bucket_2])
 
 export bucket_1, model

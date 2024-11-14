@@ -55,28 +55,38 @@ step_func = x -> ifelse(x > 0.0, 1.0, 0.0)
 #! define the snow pack reservoir
 snow_funcs = [
     SimpleFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
-    SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
-    SimpleFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
+    SimpleFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
+        exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
+    SimpleFlux([snowpack, temp] => [melt], [Tmax, Df],
+        exprs=[step_func(temp - Tmax) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+
+snow_ele = HydroBucket(
+    name=:exphydro_snow,
+    funcs=snow_funcs,
+    dfuncs=snow_dfuncs
+)
 
 #! define the ET NN and Q NN
-et_nn = Lux.Chain(
-    Lux.Dense(3 => 16, Lux.tanh),
-    Lux.Dense(16 => 16, Lux.leakyrelu),
-    Lux.Dense(16 => 1, Lux.leakyrelu),
-    name=:etnn
+ep_nn = Lux.Chain(
+    Lux.Dense(3 => 16, tanh),
+    Lux.Dense(16 => 16, leakyrelu),
+    Lux.Dense(16 => 16, leakyrelu),
+    Lux.Dense(16 => 1, leakyrelu),
+    name=:epnn
 )
 q_nn = Lux.Chain(
-    Lux.Dense(2 => 16, Lux.tanh),
-    Lux.Dense(16 => 16, Lux.leakyrelu),
-    Lux.Dense(16 => 1, Lux.leakyrelu),
+    Lux.Dense(2 => 16, tanh),
+    Lux.Dense(16 => 16, leakyrelu),
+    Lux.Dense(16 => 16, leakyrelu),
+    Lux.Dense(16 => 1, leakyrelu),
     name=:qnn
 )
 
 #! get init parameters for each NN
-et_nn_flux = NeuralFlux([norm_snw, norm_slw, norm_temp] => [log_evap_div_lday], et_nn)
+# et_nn_flux = NeuralFlux([norm_snw, norm_slw, norm_temp] => [log_evap_div_lday], et_nn)
+ep_nn_flux = NeuralFlux([norm_snw, norm_slw, norm_temp] => [evap], ep_nn)
 q_nn_flux = NeuralFlux([norm_slw, norm_prcp] => [log_flow], q_nn)
 
 #! define the soil water reservoir
@@ -88,6 +98,10 @@ soil_funcs = [
             [snowpack_mean, soilwater_mean, prcp_mean, temp_mean],
             [snowpack_std, soilwater_std, prcp_std, temp_std]
         )]),
+    StdNormalizeFlux(
+        [snowpack, soilwater, prcp, temp] =>
+        [norm_snw, norm_slw, norm_prcp, norm_temp]
+    ),
     et_nn_flux,
     q_nn_flux,
 ]
@@ -116,40 +130,40 @@ timeidx = collect(1:length(prcp_vec))
 solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
 result = m50_model(input, pas, timeidx=timeidx, solver=solver)
 
-# et_nn_p_trained = HydroModels.nn_param_optim(
-#     et_nn_flux,
-#     input=et_nn_input,
-#     target=(log_evap_div_lday=log.(df[ts, :evap] ./ df[ts, :lday]),),
-#     init_params=ComponentVector(etnn=et_nn_p),
-#     maxiters=100,
-# )
+# # et_nn_p_trained = HydroModels.nn_param_optim(
+# #     et_nn_flux,
+# #     input=et_nn_input,
+# #     target=(log_evap_div_lday=log.(df[ts, :evap] ./ df[ts, :lday]),),
+# #     init_params=ComponentVector(etnn=et_nn_p),
+# #     maxiters=100,
+# # )
 
-# q_nn_p_trained = HydroModels.nn_param_optim(
-#     q_nn_flux,
-#     input=q_nn_input,
-#     target=(log_flow=log.(df[ts, :flow]),),
-#     init_params=ComponentVector(qnn=q_nn_p),
-#     maxiters=100,
-# )
+# # q_nn_p_trained = HydroModels.nn_param_optim(
+# #     q_nn_flux,
+# #     input=q_nn_input,
+# #     target=(log_flow=log.(df[ts, :flow]),),
+# #     init_params=ComponentVector(qnn=q_nn_p),
+# #     maxiters=100,
+# # )
 
-#! set the tunable parameters and constant parameters
-#! 当仅优化部分参数如nn_params时就会出错
-tunable_pas = ComponentVector(nn=(etnn=collect(ComponentVector(et_nn_p)), qnn=collect(ComponentVector(q_nn_p))))
-const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00), params=reduce(merge, [params, var_means, var_stds]))
-default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
-# new_pas = merge_ca(default_model_pas, tunable_pas)
-#! prepare flow
-output = (log_flow=qobs_vec,)
-#! model calibration
-best_pas = HydroModels.param_grad_optim(
-    m50_model,
-    tunable_pas=tunable_pas,
-    const_pas=const_pas,
-    input=[input],
-    target=[output],
-    adtype=Optimization.AutoZygote(),
-    maxiters=100
-)
+# #! set the tunable parameters and constant parameters
+# #! 当仅优化部分参数如nn_params时就会出错
+# tunable_pas = ComponentVector(nn=(etnn=collect(ComponentVector(et_nn_p)), qnn=collect(ComponentVector(q_nn_p))))
+# const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00), params=reduce(merge, [params, var_means, var_stds]))
+# default_model_pas = ComponentArray(merge_recursive(NamedTuple(tunable_pas), NamedTuple(const_pas)))
+# # new_pas = merge_ca(default_model_pas, tunable_pas)
+# #! prepare flow
+# output = (log_flow=qobs_vec,)
+# #! model calibration
+# best_pas = HydroModels.param_grad_optim(
+#     m50_model,
+#     tunable_pas=tunable_pas,
+#     const_pas=const_pas,
+#     input=[input],
+#     target=[output],
+#     adtype=Optimization.AutoZygote(),
+#     maxiters=100
+# )
 
 #! use the optimized parameters for model simulation
 # result_opt = m50_model(input, HydroModels.update_ca(default_model_pas, best_pas), timeidx=timeidx, solver=solver)

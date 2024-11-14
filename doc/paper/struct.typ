@@ -27,34 +27,29 @@ In response to these needs, we present HydroModels.jl, a comprehensive and adapt
 
 = Architecture of HydroModels.jl
 
-HydroModels.jl is built upon a modular and flexible architecture, designed to accommodate a wide range of hydrological modeling approaches. The framework's core structure comprises four main classes: Flux, Bucket, Route, and Model. Each of these classes plays a crucial role in representing different aspects of the hydrological system, from individual processes to complete model structures.
+HydroModels.jl is built upon a modular and flexible architecture, designed to accommodate a wide range of hydrological modeling approaches. The framework's core structure comprises four main classes: Flux, Bucket, Route, and Model, each playing a vital role in constructing comprehensive hydrological systems.
 
 == Flux Class
 
-The Flux class serves as the fundamental building block of HydroModels.jl, representing basic hydrological processes. This class embodies the mathematical formulations that govern the movement and transformation of water within various components of the hydrological cycle. By design, the Flux class accommodates a diverse array of water fluxes, ranging from precipitation and evapotranspiration to infiltration and runoff. Its strength lies in its ability to not only encapsulate process-specific equations but also efficiently manage inputs, outputs, and parameters. Moreover, the Flux class demonstrates remarkable versatility in supporting both straightforward algebraic relationships and more complex differential equations. This flexibility enables it to capture a broad spectrum of hydrological processes, spanning from simple linear interactions to intricate dynamic systems, thereby providing a robust framework for comprehensive hydrological modeling.
+The Flux class serves as the fundamental building block of HydroModels.jl, representing basic hydrological processes. This class embodies the mathematical formulations that govern the movement and transformation of water within various components of the hydrological cycle. By design, the Flux class represents a diverse array of water fluxes, ranging from precipitation and evapotranspiration to infiltration and runoff. Flux代表的公式如下:
 
-To accommodate various modeling needs, the Flux class is extended into several specialized subclasses, see the following table:
+The Flux type standardizes the representation of hydrological flux calculations through a functional approach, where each flux computation encompasses inputs, outputs, and parameters. The calculation method is represented by a function F, which can take various forms depending on the specific requirements. F can be implemented as a conventional algebraic formula, a neural network, a convolutional operation, or even a flood dynamics system calculation. Based on different applications and computational methods, the Flux class can be categorized into several types:
 
-#table(
-  columns: (auto, auto, auto),
-  inset: 10pt,
-  align: horizon,
-  [*Flux Type*], [*Description*], [*Supported Dimensions*],
-  [SimpleFlux], [Implements basic algebraic relationships for straightforward process representations.], [Vector, Matrix, Array],
-  [StateFlux], [Designed for processes involving state variables, allowing for more complex dynamics.], [Vector, Matrix, Array],
-  [NeuralFlux], [Incorporates machine learning techniques, enabling the integration of data-driven approaches within the traditional modeling framework.], [Vector, Matrix, Array],
-  [RouteFlux], [Specialized for routing processes, handling water movement through the system.], [Vector, Matrix, Array],
-  [UnitHydroFlux], [Implements the unit hydrograph concept for rainfall-runoff modeling.], [Vector, Matrix, Array],
-  [TimeVaryingFlux], [Addresses time-dependent processes, allowing for time series inputs.], [Vector, Matrix, Array]
-)
+// 这段话是指FLux class的一个补充说明，但是我认为现在还不需要体现他的功能，比如优势什么的，主要还是体现他能够用于哪些场景
+//  Its strength lies in its ability to not only encapsulate process-specific equations but also efficiently manage inputs, outputs, and parameters. Moreover, the Flux class demonstrates remarkable versatility in supporting both straightforward algebraic relationships and more complex differential equations. This flexibility enables it to capture a broad spectrum of hydrological processes, spanning from simple linear interactions to intricate dynamic systems, thereby providing a robust framework for comprehensive hydrological modeling.
+
+The Flux class is extended into several specialized subclasses to accommodate various modeling needs. SimpleFlux represents the calculation method for most hydrological fluxes, such as actual evapotranspiration and runoff generation, which involve simple linear or nonlinear calculation formulas that can be computed through basic operators. StateFlux represents state hydrological flux calculations, such as soil moisture and snow depth in hydrological modules. These state hydrological fluxes represent a form of mass balance in the module and are fundamental to hydrological module construction. NeuralFlux is derived from SimpleFlux, using pre-built neural networks to predict hydrological fluxes, replacing original simple formulas to enhance model generalization ability and prediction performance. RouteFlux is another branch distinct from SimpleFlux, typically applied to further routing calculations of runoff model results, representing runoff evolution methods such as Muskingum, KAL wave, and discharge models. Based on differences in calculation methods, it can be further subdivided into three subclasses: dynamic system-based, differential calculation-based, and convolution calculation-based approaches.
+
+In these equations, I represents the runoff depth converted to discharge in the runoff generation model, Q denotes the flow evolution results calculated by the routing model, and θ represents parameters. The function f represents simple calculation formulas, while fuh represents the impulse response function. In equation 3, S represents the assumed river state variable, whose rate of change equals the difference between I and Q and can be used to calculate Q. In equation 4, T represents the time of influence of the impulse response function fuh.
+
 
 These diverse Flux subclasses, while tailored to specific hydrological processes, share a common interface and structure within the HydroModels.jl framework. This uniformity is a key strength of the design, ensuring consistency in metadata management, function calls, and overall usage across different flux types. Each subclass, regardless of its specialization, adheres to a standardized approach for handling inputs, outputs, and parameters. This consistency not only simplifies the implementation of new flux types but also enhances the framework's usability, allowing modelers to seamlessly integrate and interchange various flux components within their hydrological models. The unified structure facilitates a modular approach to model construction, where different flux types can be easily combined or substituted without necessitating significant changes to the overall model architecture.
 
 == Bucket Class
 
-The Bucket class is a fundamental component in HydroModels.jl, representing water storage modules within the hydrological system. It serves as a versatile abstraction for various water reservoirs, including soil moisture, groundwater, and surface water bodies, enabling the simulation of dynamic changes in water storage over time.
+The Bucket class represents water storage modules within the hydrological system. It is composed of multiple SimpleFlux components (including NeuralFlux) and StateFlux components, serving as a versatile abstraction for various water reservoirs. These reservoirs can represent soil moisture, groundwater, surface water bodies, and even complete runoff generation models. This structure enables comprehensive simulation of dynamic changes in water storage over time across different hydrological components.
 
-At its core, the Bucket class dynamically generates functions for solving ordinary differential equations (ODEs) and processing non-StateFlux components. These functions are constructed at runtime using anonymous functions, efficiently integrating multiple flux components. This approach allows for flexible and efficient representation of hydrological processes within the bucket system. The detailed implementation of this process will be discussed later in the paper.
+Following the integration of Flux components, the Bucket class dynamically generates two categories of functions: those responsible for solving ordinary differential equations (ODEs) and those handling non-StateFlux component computations. These functions are constructed at runtime through anonymous function generation, enabling a flexible and computationally efficient representation of hydrological processes within the bucket system. The detailed implementation methodology of this dynamic function generation process is thoroughly discussed in Section 3.
 
 The reason for using this approach is that this method is highly efficient and quick, avoiding matrix update calculations and other computational overheads. It allows for flexible and efficient representation of the relationships between different hydrological processes within the bucket, enabling seamless integration of various flux components and adaptability to diverse modeling scenarios.
 
@@ -62,35 +57,28 @@ The Bucket class seamlessly integrates multiple flux components, manages state v
 
 == Route Class
 
-The Route class plays a crucial role in HydroModels.jl by simulating water movement through landscapes and river networks. It serves as the key differentiator between lumped, multi-node, semi-distributed, and fully distributed hydrological models. While these models may share similar runoff generation processes, their routing calculations vary significantly, leading to distinct model types.
+The Route class is designed to simulate water movement through landscapes and river networks, serving as a crucial component that distinguishes between lumped, multi-node, semidistributed, and fully distributed hydrological models. While these models may share similar runoff generation processes, their routing calculations vary significantly, leading to distinct model architectures.
 
-The Route class is extended into three main subclasses, each catering to different spatial representations and routing approaches:
+RouteFlux serves as the foundation for constructing the Route class. To accommodate different RouteFlux calculations, we have implemented three Route subclasses:
 
-1. SumRoute: This subclass is designed for multi-node models, integrating results from multiple calculation units. It implements a simple weighted accumulation routing scheme, allowing for the aggregation of outputs from various model components.
+1. UHRoute: This Route class employs convolution-based calculations through RouteFlux, primarily used for unit hydrograph computations. It assumes that the flow convergence process from each computational unit to the outlet cross-section is independent. The Route transforms the runoff from each unit and applies convolution calculations using an impulse response function, then aggregates these to obtain the temporal evolution at the outlet.
 
-2. GridRoute: Tailored for fully distributed models, GridRoute specializes in routing processes for grid-based calculation units. It primarily operates on flow direction matrices of watersheds, enabling detailed spatial representation of water movement across a gridded landscape.
+2. StateRoute: This Route class utilizes an ordinary differential-based calculation approach through RouteFlux. Based on different spatial relationship inputs, it can be applied to both distributed and semi-distributed model construction. For flow direction data, it employs a direction matrix shifts method to represent distributed grid routing processes. For river network topology, it uses a network adjacency matrix to calculate cumulative inflow for each sub-basin, thereby representing semi-distributed river network routing. According to the routing calculation method and spatial information, StateRoute constructs a large-scale ODE system, solving for Route states to derive the flow process.
 
-3. VectorRoute: This subclass is particularly suited for semi-distributed models, focusing on routing processes in watershed network calculations. It employs directed graph computations to represent and simulate water flow through river networks and channel systems.
-
-The functionality of these Route subclasses, particularly GridRoute and VectorRoute, is enhanced by their unique ability to support different RouteFlux implementations. This feature sets HydroModels.jl apart from many other modeling frameworks. Both GridRoute and VectorRoute construct a unified system of ordinary differential equations that incorporates two types of states: those specific to the RouteFlux components and those pertaining to the Route itself. This approach allows for a more comprehensive and flexible representation of routing processes, enabling the integration of various hydrological phenomena such as time delays and flow attenuation. The detailed implementation of this unified ODE system is provided in the appendix.
-
-The Route class and its subclasses offer several advantages in hydrological modeling. They enable the construction of models with varying levels of spatial complexity, from simple lumped models to sophisticated distributed systems. This flexibility allows researchers and practitioners to choose the most appropriate spatial representation for their specific modeling needs, balancing computational efficiency with the desired level of detail in representing hydrological processes.
+3. RapidRoute: This Route class implements a dynamic system-based calculation approach through RouteFlux. Its computational logic is inspired by the Rapid routing framework. Through routing calculation methods, combined with grid and river network adjacency matrices, it constructs a system of linear equations and iteratively calculates the flow process.
 
 == Model Class
 
-The Model class represents the highest-level structure in HydroModels.jl, serving as an abstract base for various hydrological system representations. Its primary implementation, HydroModel, integrates multiple Flux, Bucket, and Route components to create comprehensive watershed models. HydroModel capitalizes on the uniform interfaces of these underlying components, enabling a streamlined and efficient simulation process.
+The Model class represents the highest-level abstraction in HydroModels.jl, encapsulating a complete hydrological model for simulating watershed runoff processes. It integrates the Bucket module for runoff generation and the Route module for flow routing, unifying their computational processes and enabling holistic parameter optimization across the entire model structure.
 
-HydroModel orchestrates the overall simulation by sequentially iterating through its constituent components. This approach leverages the standardized interfaces of Flux, Bucket, and Route classes, The consistency of these interfaces allows for flexible combination of modules within the framework while maintaining conceptual integrity. This design philosophy supports a wide range of model configurations, enabling researchers to construct and experiment with diverse hydrological representations tailored to specific research needs or watershed characteristics, all within a coherent and unified modeling environment. Further, the sequential computation simplifies model execution and facilitates easy integration of diverse hydrological processes and spatial representations.
+Building upon the consistent interfaces established across Flux, Bucket, Route, and Model components, the Model class facilitates flexible construction and computation under the premise of physical validity. The computational process follows a systematic approach where the model iterates through its constituent modules, updates input data, and aggregates results for subsequent calculations. To accommodate the immutable array requirements of Zygote.jl, the model construction phase includes storage of input-output flux information for each component, establishing index mappings for ordered data retrieval based on each module's computational requirements. This design ensures efficient data flow while maintaining compatibility with automatic differentiation frameworks.
 
-By managing the data flow between components, handling time stepping, and generating outputs, the Model class provides a unified framework for hydrological modeling. This design allows HydroModels.jl to accommodate a wide range of modeling approaches, from simple lumped models to complex, spatially-distributed systems. The architecture's emphasis on modularity and extensibility enables researchers and practitioners to easily implement new processes or modeling techniques within the existing structure, fostering innovation and adaptability in hydrological modeling.
-
-The Model class thus serves as a powerful tool for developing, testing, and applying diverse hydrological models. Its ability to seamlessly integrate various components while maintaining a consistent computational approach underscores the flexibility and robustness of HydroModels.jl as a comprehensive hydrological modeling framework.
 
 = Methodologies of HydroModels.jl
 
 == Construction Methods
 
-The construction methods are designed to transform user-defined components and parameters into cohesive, computationally efficient structures that represent complex hydrological systems.
+The construction methods aim to provide users with a flexible, logical, and hierarchical model building approach that aligns with deep learning construction principles. These methods automatically generate internal computational logic, reduce redundant code construction, and ultimately achieve the efficient building of hydrological models.
 
 === Symbolic Programming and Runtime Function Generation
 
@@ -101,6 +89,19 @@ At the core of HydroModels.jl's construction methods is symbolic programming, im
 In the context of hydrological modeling, symbolic programming allows for the representation of intermediate fluxes in the model's computational process. These symbolic variables, when combined with the framework's core classes, enable the representation of complex hydrological processes. Essentially, these variables act as intermediate fluxes in the model, while the classes define how these fluxes are calculated within the model structure.
 
 Following the symbolic representation, the framework generates metadata for each component. This metadata, stored in string format, records essential information about each class, including its inputs, outputs, parameters, and states. This feature allows users to access component information readily and facilitates efficient data computation. The metadata serves as a guide for the framework, enabling quick access to component characteristics and aiding in the orchestration of data flow within the model.
+
+After symbolically representing each flux's calculation method, the construction process builds an anonymous computation function for Flux and Bucket formulas, as illustrated in Figure X.
+
+As shown in the figure, the anonymous function construction method can be broken down into several key steps:
+
+First, the method matches outputs with their corresponding calculation expressions (exprs) to form the function body. Within this body, each output value is assigned its corresponding calculation expression. Once the expressions are complete, the outputs are assembled in sequence into an array that serves as the function's return value.
+
+Similarly, inputs and parameters are transformed into array-type arguments suitable for model input. After data input, the function sequentially assigns values to inputs and parameters for use in output calculations.
+
+After determining the input arguments, function body, and return values, the method generates meta-expressions representing the function through metaprogramming. Finally, it implements the model's anonymous function construction using runtime function generation techniques.
+
+This systematic construction approach ensures efficient computation while maintaining the mathematical rigor required for hydrological modeling. The resulting anonymous functions serve as the computational core of the framework, enabling flexible and performant model execution.
+
 
 The final step in the construction process involves the building of anonymous functions for specific components. This process varies depending on the type of component:
 
@@ -125,31 +126,15 @@ In model simulations, input arrays are categorized based on the number of calcul
 
 === Metadata-Driven Data Extraction and Result Storage
 
-HydroModels.jl employs a sophisticated metadata-driven approach for efficient data extraction and result storage during model execution. This method enhances computational efficiency and facilitates seamless data flow between model components. The key aspects of this approach are:
+HydroModels.jl employs a sophisticated metadata-driven approach for efficient data extraction and result storage during model execution. During model construction, the framework first generates and stores metadata that describes each component's inputs, outputs, and parameters. Based on this metadata and the computational sequence, the framework creates index mappings between modules and their input variables, where indices refer to the position of each variable in the model's metadata. These pre-built index mappings enable efficient data flow by replacing traditional key-value data storage and retrieval methods.
 
-1. Metadata Generation and Pre-computation Planning: During model construction, metadata for each component is generated and stored, including information about inputs, outputs, and intermediate fluxes. Based on this metadata, the framework pre-determines the sequence of calculations, optimizing the computational flow before simulations begin.
+During computation, the framework uses these index mappings to systematically extract the corresponding input data and parameters for each module. After each module's computation is complete, the results are concatenated along the variable dimension through matrix operations. This process repeats to execute calculations across all components. By avoiding mutable dictionaries and relying on immutable array operations, this approach maintains compatibility with automatic differentiation tools like Zygote.jl while preserving the model's differentiability. Additionally, this methodology improves computational efficiency and enables comprehensive storage of all intermediate states.
 
-2. Efficient Data Extraction and Result Storage: During execution, the framework uses the pre-stored metadata to extract precisely the required input data for each module and store results in a predetermined order. This approach minimizes unnecessary data processing and allows for efficient concatenation of results.
-
-3. Optimized Data Flow: By leveraging the metadata-driven approach, the framework ensures smooth data flow between components without redundant calculations or data reorganization, managing intermediate fluxes based on the pre-planned sequence.
-
-This metadata-driven method significantly enhances the framework's efficiency, particularly in complex models with multiple interconnected components, allowing for streamlined data management and improved overall model performance.
+This metadata-driven method significantly enhances the framework's performance, particularly for complex models with multiple interconnected components. The approach streamlines data management through efficient index-based operations rather than dictionary lookups, while maintaining the mathematical rigor required for gradient-based optimization methods.
 
 === Slicing and Broadcasting Techniques
 
-Since the generated computation functions support only single time point calculations, the framework implements array broadcasting and slicing techniques for both 2D and 3D array computations:
-
-1. For 2D matrices (single calculation unit):
-   - Time dimension slicing creates sub-arrays (an iterator).
-   - Parameters are broadcast to match the dimensions of the sliced iterator.
-   - Results are computed for each time step using the computation function.
-
-2. For 3D arrays (multiple calculation units):
-   - Slicing occurs along both time and calculation unit dimensions.
-   - Both input arrays and parameters are sliced for each calculation unit.
-   - Computation proceeds similarly to the 2D matrix case for each unit.
-
-The array broadcasting mechanism automatically matches input parameters with sliced arrays, enabling element-wise computation and producing output results of appropriate dimensions.
+For three-dimensional input arrays (N × M × T), the framework implements array slicing and broadcasting techniques to enable batch computation across multiple calculation units. Specifically, the input arrays are sliced along both the time and calculation unit dimensions. Through array broadcasting, the framework automatically matches the input parameters with the sliced arrays, enabling element-wise computation and producing output results of appropriate dimensions. This approach allows efficient parallel processing of multiple calculation units while maintaining the mathematical consistency of the model.
 
 === ODE Solving for Multiple Calculation Units
 

@@ -95,6 +95,7 @@
 - [x] 可以将flux, implements, 这些内容单独弄一个库, 名为HydroModelLibrary.jl
 - [ ] route这个涉及的计算大多是离散计算,因此不能执着于用连续方程的求解
 - [ ] SciMLOperators.jl待进一步研究,但是他还是不支持u的存储(限制于Zygote.jl)
+- [ ] routeflux可以采用一个route计算,每个routeflux能够反馈出不同的func,dfunc
 
 
 ## 关键功能和实现技术
