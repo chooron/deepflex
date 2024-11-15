@@ -58,26 +58,26 @@ function Base.show(io::IO, flux::AbstractNeuralFlux)
     end
 end
 
-function Base.show(io::IO, flux::AbstractRouteFlux)
-    compact = get(io, :compact, false)
-    rtype = typeof(flux).parameters[1]
-    if compact
-        print(io, "RouteFlux(")
-        print(io, "inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
-        print(io, ", outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
-        print(io, ", params: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
-        print(io, ", states: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
-        print(io, ", rtype: ", rtype)
-        print(io, ")")
-    else
-        println(io, "RouteFlux:")
-        println(io, "  Inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
-        println(io, "  Outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
-        println(io, "  Parameters: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
-        println(io, "  States: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
-        println(io, "  RouteType: ", rtype)
-    end
-end
+# function Base.show(io::IO, flux::AbstractRouteFlux)
+#     compact = get(io, :compact, false)
+#     rtype = typeof(flux).parameters[1]
+#     if compact
+#         print(io, "RouteFlux(")
+#         print(io, "inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+#         print(io, ", outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
+#         print(io, ", params: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
+#         print(io, ", states: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
+#         print(io, ", rtype: ", rtype)
+#         print(io, ")")
+#     else
+#         println(io, "RouteFlux:")
+#         println(io, "  Inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+#         println(io, "  Outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
+#         println(io, "  Parameters: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
+#         println(io, "  States: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
+#         println(io, "  RouteType: ", rtype)
+#     end
+# end
 
 function Base.show(io::IO, flux::AbstractUnitHydroFlux)
     compact = get(io, :compact, false)

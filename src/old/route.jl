@@ -234,28 +234,31 @@ function (route::HydroRoute)(
     #* 计算出每个node结果的插值函数
     input_mat = input[1, :, :]
     itp_funcs = interp.(eachslice(input_mat, dims=1), Ref(timeidx), extrapolate=true)
+
     #* 计算出每个节点的面积转换系数
     area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
-    #* prepare init states and parameters
-    rflux_state_nm = get_state_names(route.rfunc)[1]
-    flux_param_nms = get_param_names(route.rfunc)
-    init_states = ComponentVector(route_states=[pas[:initstates][stype][rflux_state_nm] for stype in stypes], q_in=zeros(size(input_mat)[1]))
-    flux_params = ComponentVector(NamedTuple{Tuple(flux_param_nms)}([[pas[:params][ptype][flux_param_nm] for ptype in ptypes] for flux_param_nm in flux_param_nms]))
+    rflux_kwargs = (input=input_mat, pas=pas, ptypes=ptypes, stypes=stypes, areacoefs=area_coefs)
+
+    #* 获取rflux的一系列信息
+    rflux_func = get_rflux_func(route.rfunc; rflux_kwargs...)
+    flux_initstates = get_rflux_initstates(route.rfunc; rflux_kwargs...)
+    flux_parameters = get_rflux_parameters(route.rfunc; rflux_kwargs...)
 
     function route_ode!(du, u, p, t)
         # 提取单元产流
         q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coefs
         # 计算单元出流,更新单元出流状态
-        q_out, d_route_states = route.rfunc.func.(u[:q_in], u[:route_states], q_gen, (p[nm] for nm in flux_param_nms)...)
+        q_out, d_route_states = rflux_func(u[:route_states], u[:q_in], q_gen, p)
         # 计算出流的汇流结果
         new_q_in = route.projfunc(q_out)
         # 更新状态
         du[:route_states] = d_route_states
         du[:q_in] = new_q_in .- u[:q_in]
     end
-
+    #* prepare init states
+    init_states = ComponentVector(route_states=flux_initstates, q_in=zeros(size(input_mat)[1]))
     #* solve the ode
-    sol = solver(route_ode!, flux_params, init_states, timeidx, convert_to_array=false)
+    sol = solver(route_ode!, flux_parameters, init_states, timeidx, convert_to_array=false)
     if SciMLBase.successful_retcode(sol)
         # Extract route_states and q_in for each time step
         route_states_matrix = reduce(hcat, [u.route_states for u in sol.u])

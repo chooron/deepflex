@@ -20,6 +20,30 @@ function build_flux_func(
     call_func
 end
 
+function build_rflux_func(
+    inputs::Vector{Num},
+    outputs::Vector{Num},
+    params::Vector{Num},
+    exprs::Vector{Num},
+)
+    assign_list = Assignment.(outputs, exprs)
+    outputs_arr = MakeArray(outputs, Vector)
+    func_input_args = [DestructuredArgs([input]) for input in inputs]
+    func_param_args = [DestructuredArgs([param]) for param in params]
+    func_args = [
+        #* argument 1: Function calculation parameters
+        func_input_args...,
+        #* argument 2: Function neuralnetwork parameters
+        func_param_args...,
+        #* argument 3: Function time variable
+        DestructuredArgs(t)
+    ]
+    call_func = @RuntimeGeneratedFunction(
+        toexpr(Func(func_args, [], Let(assign_list, outputs_arr, false)))
+    )
+    call_func
+end
+
 #* 构建bucket的函数
 function build_ele_func(
     funcs::Vector{<:AbstractFlux},
