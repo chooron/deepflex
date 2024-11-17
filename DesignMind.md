@@ -81,3 +81,34 @@ influxes, outfluxes, statefluxes
 state elmement 有时候会有需求，即添加input flux和output flux从而灵活改变state flux的计算结果，
 
 但是这种可能会引入一些难以命名的变量(m50)
+
+
+## 以后的一种构建方式
+
+```julia
+
+bucket = @hydrobucket begin
+  @varaibles a b c d e f
+  @parameters k1 k2
+
+  @fluxes begin
+    b ~ a + k1
+    c ~ b + k2
+    [e, f] ~ model([b, c])
+  end
+
+  @states begin
+    d ~ b - c
+  end
+end
+
+route = @hydroroute begin
+  @variables q
+  @parameters k
+  q ~ k * d
+end
+
+model = @hydromodel begin
+  bucket, route
+end
+```

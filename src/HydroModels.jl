@@ -26,6 +26,7 @@ using SymbolicUtils
 using SymbolicUtils.Code
 using ModelingToolkit: @variables, @parameters
 using ModelingToolkit: t_nounits as t
+using ModelingToolkit: isparameter
 # graph compute
 using Graphs
 
@@ -50,8 +51,6 @@ using NNlib
 using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
-# HydroErrors
-using HydroErrors
 
 # HydroEquations
 # using HydroEquations
@@ -59,6 +58,7 @@ using HydroErrors
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
 
+struct HydroEquation end
 ## Abstract Component Types
 abstract type AbstractComponent end
 ## todo this is used for multiple propose running
@@ -77,17 +77,13 @@ abstract type AbstractModel <: AbstractComponent end
 abstract type AbstractEstimator <: AbstractComponent end
 
 #* Flux的多种变体
-abstract type AbstractSimpleFlux <: AbstractFlux end
+abstract type AbstractHydroFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
-abstract type AbstractRouteFlux <: AbstractFlux end
-abstract type AbstractStateRouteFlux <: AbstractRouteFlux end
-abstract type AbstractDynamicRouteFlux <: AbstractRouteFlux end
 abstract type AbstractUnitHydroFlux <: AbstractFlux end
-abstract type AbstractTimeVaryingFlux <: AbstractFlux end
 
 #* route的两种变体
-abstract type AbstractSumRoute <: AbstractRoute end
+abstract type AbstractDirectRoute <: AbstractRoute end
 abstract type AbstractHydroRoute <: AbstractRoute end
 abstract type AbstractRapidRoute <: AbstractRoute end
 
@@ -108,19 +104,33 @@ struct HydroMeta
     states::Vector{Symbol}
     nns::Vector{Symbol}
 
-    function HydroMeta(;
-        name::Symbol, inputs::Vector{Symbol}=Symbol[], outputs::Vector{Symbol}=Symbol[],
-        params::Vector{Symbol}=Symbol[], states::Vector{Symbol}=Symbol[], nns::Vector{Symbol}=Symbol[],
+    function HydroMeta(
+        name::Symbol, input_names::Vector{Symbol}=Symbol[], output_names::Vector{Symbol}=Symbol[],
+        param_names::Vector{Symbol}=Symbol[], state_names::Vector{Symbol}=Symbol[], nn_names::Vector{Symbol}=Symbol[],
     )
-        return new(name, inputs, outputs, params, states, nns)
+        return new(name, input_names, output_names, param_names, state_names, nn_names)
+    end
+
+    function HydroMeta(;
+        name::Symbol, inputs::Vector{Num}=Num[], outputs::Vector{Num}=Num[],
+        params::Vector{Num}=Num[], states::Vector{Num}=Num[], nns::Vector{Num}=Num[],
+    )
+        input_names = isempty(inputs) ? Symbol[] : Symbolics.tosymbol.(inputs, escape=false)
+        output_names = isempty(outputs) ? Symbol[] : Symbolics.tosymbol.(outputs, escape=false)
+        param_names = isempty(params) ? Symbol[] : Symbolics.tosymbol.(params, escape=false)
+        state_names = isempty(states) ? Symbol[] : Symbolics.tosymbol.(states, escape=false)
+        nn_names = isempty(nns) ? Symbol[] : Symbolics.tosymbol.(nns, escape=false)
+        return new(name, input_names, output_names, param_names, state_names, nn_names)
     end
 end
 
 # utils
+include("utils/uh.jl")
+export UHFunction, UH_1_HALF, UH_2_FULL
 include("utils/attr.jl")
 include("utils/ca.jl")
 include("utils/name.jl")
-include("utils/show.jl")
+# include("utils/show.jl")
 include("utils/build.jl")
 include("utils/callback.jl")
 include("utils/sort.jl")
@@ -133,15 +143,11 @@ export ODESolver, DiscreteSolver, ManualSolver
 
 # framework build
 include("flux.jl")
-export SimpleFlux, StateFlux, NeuralFlux, HydroFunction
-include("uhflux.jl")
-export UHFunction, UH_1_HALF, UH_2_FULL, UnitHydroFlux
-include("rflux.jl")
-export RouteFlux, RiverRouteFlux
+export HydroFlux, StateFlux, NeuralFlux, HydroFunction, StateRouteFlux, UnitHydroFlux
 include("bucket.jl")
 export HydroBucket
 include("route.jl")
-export WeightSumRoute, GridRoute, VectorRoute, RapidRoute
+export DirectRoute, GridRoute, VectorRoute, HydroRoute # , RapidRoute
 include("model.jl")
 export HydroModel
 include("estimator.jl")
@@ -149,7 +155,7 @@ export HydroEstimator
 
 # export abstract structs
 export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute
-export AbstractFlux, AbstractSimpleFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractRouteFlux
+export AbstractFlux, AbstractHydroFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractRouteFlux
 
 # export model
 export ExpHydro, M50, GR4J, HyMOD, HBV_EDU

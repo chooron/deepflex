@@ -21,20 +21,20 @@ function build_flux_func(
 end
 
 function build_rflux_func(
-    inputs::Vector{Num},
+    input::Num,
+    states::Vector{Num},
     outputs::Vector{Num},
     params::Vector{Num},
     exprs::Vector{Num},
 )
     assign_list = Assignment.(outputs, exprs)
     outputs_arr = MakeArray(outputs, Vector)
-    func_input_args = [DestructuredArgs([input]) for input in inputs]
-    func_param_args = [DestructuredArgs([param]) for param in params]
     func_args = [
+        DestructuredArgs([input]),
         #* argument 1: Function calculation parameters
-        func_input_args...,
+        DestructuredArgs([states]),
         #* argument 2: Function neuralnetwork parameters
-        func_param_args...,
+        DestructuredArgs([params]),
         #* argument 3: Function time variable
         DestructuredArgs(t)
     ]

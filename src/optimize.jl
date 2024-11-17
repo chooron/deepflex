@@ -68,7 +68,7 @@ function param_box_optim(
     @assert length(input) == length(target) == length(config) "The length of input, target and config must be the same,
      while $(length(input)) input, $(length(target)) target, $(length(config)) config are given."
     #* Get the argument for parameter optimization
-    loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
+    loss_func = get(opt_kwargs, :loss_func, (obs, sim) -> sum((obs .- sim) .^ 2) / length(obs))
     loss_recorder = NamedTuple[]
     lb = get(opt_kwargs, :lb, zeros(length(tunable_pas)))
     ub = get(opt_kwargs, :ub, ones(length(tunable_pas)) .* 100)
@@ -147,7 +147,7 @@ function param_grad_optim(
      while $(length(input)) input, $(length(target)) target, $(length(config)) config are given."
 
     #* Get the argument for parameter optimization
-    loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
+    loss_func = get(opt_kwargs, :loss_func, (obs, sim) -> sum((obs .- sim) .^ 2) / length(obs))
     adtype = get(opt_kwargs, :adtype, Optimization.AutoZygote())
     maxiters = get(opt_kwargs, :maxiters, 10)
     warmup = get(opt_kwargs, :warmup, 100)
@@ -181,7 +181,7 @@ function param_batch_optim(
     opt_kwargs...,
 )
     #* Get the argument for parameter optimization
-    loss_func = get(opt_kwargs, :loss_func, HydroErrors.mse)
+    loss_func = get(opt_kwargs, :loss_func, (obs, sim) -> sum((obs .- sim) .^ 2) / length(obs))
     adtype = get(opt_kwargs, :adtype, Optimization.AutoZygote())
     maxiters = get(opt_kwargs, :maxiters, 100)
     warmup = get(opt_kwargs, :warmup, 100)
@@ -238,7 +238,7 @@ function nn_param_optim(
     solve_alg = get(kwargs, :solve_alg, Adam(0.01))
     adtype = get(kwargs, :adtype, Optimization.AutoZygote())
     maxiters = get(kwargs, :maxiters, 100)
-    loss_func = get(kwargs, :loss_func, HydroErrors.mse)
+    loss_func = get(kwargs, :loss_func, (obs, sim) -> sum((obs .- sim) .^ 2) / length(obs))
     callback_func = get(kwargs, :callback_func, default_callback_func)
 
     #* Integrate nn's input variables

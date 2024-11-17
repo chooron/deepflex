@@ -1,14 +1,14 @@
-function Base.show(io::IO, flux::AbstractSimpleFlux)
+function Base.show(io::IO, flux::AbstractHydroFlux)
     compact = get(io, :compact, false)
 
     if compact
-        print(io, "SimpleFlux(")
+        print(io, "HydroFlux(")
         print(io, "inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
         print(io, ", outputs: ", isempty(flux.meta.output) ? "nothing" : join(flux.meta.output, ", "))
         print(io, ", params: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))
         print(io, ")")
     else
-        println(io, "SimpleFlux:")
+        println(io, "HydroFlux:")
         println(io, "  Inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
         println(io, "  Outputs: ", isempty(flux.meta.output) ? "nothing" : join(flux.meta.output, ", "))
         println(io, "  Parameters: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))

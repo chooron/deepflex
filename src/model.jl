@@ -50,12 +50,7 @@ struct HydroModel <: AbstractModel
             var_names = reduce(vcat, [var_names, get_state_names(component), get_output_names(component)])
             push!(input_idx, tmp_input_idx)
         end
-        model_meta = HydroMeta(
-            name=name,
-            inputs=input_names, outputs=output_names,
-            states=state_names, params=param_names,
-            nns=nn_names
-        )
+        model_meta = HydroMeta(name, input_names, output_names, param_names, state_names, nn_names)
         new(
             model_meta,
             components,
@@ -78,8 +73,7 @@ end
 
 # 求解并计算
 function (model::HydroModel)(
-    input::Matrix,
-    pas::ComponentVector;
+    input::Matrix, pas::ComponentVector;
     config::Union{NamedTuple,Vector{<:NamedTuple}}=(solver=ODESolver(), ptypes=keys(pas[:params]), interp=LinearInterpolation, timeidx=collect(1:size(input, 2))),
     kwargs...
 )

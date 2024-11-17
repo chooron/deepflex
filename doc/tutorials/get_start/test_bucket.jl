@@ -25,10 +25,10 @@ ts = collect(1:10000)
 # single node input
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 solver = HydroModels.ODESolver()
-config = (solver=solver, )
+config = (solver=solver,)
 @btime results = ele(input, pas, config=config, convert_to_ntp=false)
 
-# # # multi node input
+# # multi node input
 # node_num = 10
 # node_names = [Symbol(:node, i) for i in 1:node_num]
 # node_params = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([params], length(node_names))))
@@ -38,8 +38,13 @@ config = (solver=solver, )
 # input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
 # node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(node_names)))
 # node_input = permutedims(node_input, (2, 3, 1))
-# # result = HydroModels.solve_multi_prob(ele, input=node_input, pas=node_pas, timeidx=ts)
 # run_kwgs = (ptypes=node_names, interpolator=LinearInterpolation, timeidx=ts)
 
-# result = ele(node_input, node_pas, kwargs=run_kwgs)
+# @btime result = ele(node_input, node_pas, kwargs=run_kwgs)
 # node_input = cat(node_input, result, dims=1)
+
+aa = ones(10000)
+aa_t = tuple(aa...)
+@btime aa[end] == 3
+@btime (aa_t..., 3);
+@btime vcat(aa, 3);

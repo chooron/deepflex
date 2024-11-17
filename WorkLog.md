@@ -92,11 +92,12 @@
 - [ ] 插值方法这类的时变函数,可以设计成一个TimeVaryingFlux, 这样就可以直接参与连续性方程的求解了,没有构建的必要，需要在生成function时注意t的输入
 - [X] 设置基于TimeVaryingFlux的插值Flux的可行性,由于对于不同模块,需要重新构建插值函数了,所以插值函数这块我认为是没必要构建的
 - [ ] 不同组的参数可能会分在不同组的ptypes下这个时候应该如何处理
-- [x] 可以将flux, implements, 这些内容单独弄一个库, 名为HydroModelLibrary.jl
+- [X] 可以将flux, implements, 这些内容单独弄一个库, 名为HydroModelLibrary.jl
 - [ ] route这个涉及的计算大多是离散计算,因此不能执着于用连续方程的求解
 - [ ] SciMLOperators.jl待进一步研究,但是他还是不支持u的存储(限制于Zygote.jl)
-- [ ] routeflux可以采用一个route计算,每个routeflux能够反馈出不同的func,dfunc
-
+- [X] routeflux可以采用一个route计算,每个routeflux能够反馈出不同的func,dfunc
+- [ ] 加入macro编程，让书写更加简单
+- [ ] 需要考虑rapid这种类型的route如何写
 
 ## 关键功能和实现技术
 
@@ -128,30 +129,31 @@ vector-based河网汇流计算中, 设定了q_in, q_out, q_gen, 以及riv_st四�
 
 关于汇流计算问题的定义,我认为河流汇流问题由于需要执行q_out在一定途径下转换为q_in的过程,而这个过程是不符合常微分方程的
 
-###  关于汇流计算的一些新的思考
-汇流计算可以分为两种,一种是离散型的计算,一种是连续型的计算:
-1. 离散型计算
-离散性计算,是以马斯京根算法为代表,这类代码是根据上一个时段数据来计算当前时段的流量
-Qout(i,t+1) = Func(Qin(i,t+1), Qin(i,t), Qout(i,t),Qgen(i,t), spatial_info)
-Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
-式中可以看出,Qin是由Qout转换而来,通常是根据空间的拓扑关系计算得到
-这种问题的计算方式是采用DiscreteProblem来求解
+### 关于汇流计算的一些新的思考
 
+汇流计算可以分为两种,一种是离散型的计算,一种是连续型的计算:
+
+1. 离散型计算
+   离散性计算,是以马斯京根算法为代表,这类代码是根据上一个时段数据来计算当前时段的流量
+   Qout(i,t+1) = Func(Qin(i,t+1), Qin(i,t), Qout(i,t),Qgen(i,t), spatial_info)
+   Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
+   式中可以看出,Qin是由Qout转换而来,通常是根据空间的拓扑关系计算得到
+   这种问题的计算方式是采用DiscreteProblem来求解
 2. 连续型计算
-连续型计算,是以单位线为代表,这类代码是根据当前时段数据来计算当前时段的流量
-Qout(i,t+1) = Func(Qin(i,t+1), Qin(i,t), Qout(i,t),Qgen(i,t), spatial_info)
-Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
+   连续型计算,是以单位线为代表,这类代码是根据当前时段数据来计算当前时段的流量
+   Qout(i,t+1) = Func(Qin(i,t+1), Qin(i,t), Qout(i,t),Qgen(i,t), spatial_info)
+   Qout(i,t+1) = Func(spatial(Qout(i,t+1)),spatial(Qout(i,t)),Qgen(i,t))
 
 ### RouteFlux分类
+
 RouteFlux可以分为两种类型:
+
 - 包括虚构状态,构建常微分方程的RouteFlux,命名为StateRouteFlux
-如: 
-基于状态方程:ds/dt = I-Q
-然后Q是由S计算得到,Q=f(S;ps)
-
+  如:
+  基于状态方程:ds/dt = I-Q
+  然后Q是由S计算得到,Q=f(S;ps)
 - 不包括虚构状态,构建的是流量的自相关关系的RouteFlux,命名为DynamicRouteFlux
-如Q(t+1) = f(Q(t);ps)
-
+  如Q(t+1) = f(Q(t);ps)
 
 ## 类型的一些信息展示功能
 

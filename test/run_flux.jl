@@ -1,7 +1,7 @@
-@testset "test simple flux (build by Symbolics.jl)" begin
+@testset "test hydro flux (build by Symbolics.jl)" begin
     @variables a b c
     @parameters p1 p2
-    simple_flux_1 = HydroModels.SimpleFlux([a, b] => [c], [p1, p2], exprs=[a * p1 + b * p2])
+    simple_flux_1 = HydroModels.HydroFlux([a, b] => [c], [p1, p2], exprs=[a * p1 + b * p2])
     @test HydroModels.get_input_names(simple_flux_1) == [:a, :b]
     @test HydroModels.get_param_names(simple_flux_1) == [:p1, :p2]
     @test HydroModels.get_output_names(simple_flux_1) == [:c,]
@@ -20,9 +20,9 @@ end
     @variables a b c d e
     @parameters p1 p2
 
-    # Create SimpleFlux objects for comparison
-    simple_flux_1 = HydroModels.SimpleFlux([a, b] => [c], [p1, p2], exprs=[a * p1 + b * p2])
-    simple_flux = HydroModels.SimpleFlux([a, b] => [d], [p1, p2], exprs=[a / p1 + b / p2])
+    # Create HydroFlux objects for comparison
+    simple_flux_1 = HydroModels.HydroFlux([a, b] => [c], [p1, p2], exprs=[a * p1 + b * p2])
+    simple_flux = HydroModels.HydroFlux([a, b] => [d], [p1, p2], exprs=[a / p1 + b / p2])
 
     # Test StateFlux with input and output, but no parameters
     state_flux_1 = HydroModels.StateFlux([a, b] => [c, d], e)

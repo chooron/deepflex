@@ -35,6 +35,20 @@ get_var_names(ele::AbstractBucket) = ele.meta.inputs, ele.meta.outputs, ele.meta
 get_var_names(route::AbstractRoute) = route.meta.inputs, route.meta.outputs, route.meta.states
 get_var_names(unit::AbstractModel) = unit.meta.inputs, unit.meta.outputs, unit.meta.states
 
+function get_var_names(funcs::Vector{<:AbstractFlux})
+    input_names = Vector{Symbol}()
+    output_names = Vector{Symbol}()
+    for func in funcs
+        #* 输入需要排除已有的输出变量，表明这个输入是中间计算得到的，此外state也不作为输入
+        tmp_input_names = setdiff(get_input_names(func), output_names)
+        #* 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
+        tmp_output_names = setdiff(get_output_names(func), input_names)
+        union!(input_names, tmp_input_names)
+        union!(output_names, tmp_output_names)
+    end
+    input_names, output_names
+end
+
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
