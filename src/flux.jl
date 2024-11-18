@@ -131,9 +131,10 @@ function (flux::AbstractHydroFlux)(input::Array, pas::ComponentVector; kwargs...
     params_vec = collect([collect([params_item[pname] for pname in get_param_names(flux)]) for params_item in params_collect])
 
     #* array dims: (var_names * node_names * ts_len)
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(params_vec[i]), timeidx)) for i in eachindex(ptypes)]
+    # flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(params_vec[i]), timeidx)) for i in eachindex(ptypes)]
+    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
-    permutedims(flux_output_arr, (3, 1, 2))
+    flux_output_arr
 end
 
 
@@ -214,7 +215,7 @@ struct NeuralFlux <: AbstractNeuralFlux
         nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, params_axes))
 
         #* neuralflux meta
-        meta = HydroMeta(name=Symbol(chain_name, :_nflux), inputs=inputs, outputs=outputs, params=params, nns=[chain_name])
+        meta = HydroMeta(name=Symbol(chain_name, :_nflux), inputs=inputs, outputs=outputs, nn_names=[chain_name])
         nninfos = (inputs=nn_input, outputs=nn_output, paramlen=length(init_params))
 
         new(
@@ -222,6 +223,21 @@ struct NeuralFlux <: AbstractNeuralFlux
             flux_expr, nn_func,
             meta, nninfos,
         )
+    end
+
+    function NeuralFlux(
+        inputs::Vector{Num},
+        outputs::Vector{Num},
+        params::Symbolics.Arr,
+        expr::Symbolics.Arr,
+        chain,
+    )
+        input_vec, output_vec = Symbol(chain.name, :_input), Symbol(chain.name, :_output)
+        nninfos = (inputs = first(@variables $(input_vec)[1:length(inputs)]), outputs = first(@variables $(output_vec)[1:length(outputs)]))
+        meta = HydroMeta(name=Symbol(chain.name, :_nflux), inputs=inputs, outputs=outputs, nn_names=[chain.name])
+        params_axes = getaxes(ComponentVector(Lux.initialparameters(StableRNG(42), chain)))
+        nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, params_axes))
+        new(inputs, outputs, params, expr, nn_func, meta, nninfos)
     end
 
     #* construct neural flux with input fluxes and output fluxes
@@ -315,14 +331,14 @@ struct StateFlux <: AbstractStateFlux
     meta::HydroMeta
 
     function StateFlux(
-        fluxes::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num
+        inputs::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num
     )
         #* Convert to a symbol based on the variable
         state_name = Symbolics.tosymbol(state, escape=false)
-        meta = HydroMeta(name=Symbol(state_name, :_stflux), inputs=fluxes, states=[state], params=params)
-        state_func = build_flux_func(fluxes, [state], params, [expr])
+        meta = HydroMeta(name=Symbol(state_name, :_stflux), inputs=inputs, states=[state], params=params)
+        state_func = build_flux_func(inputs, [state], params, [expr])
         return new(
-            fluxes,
+            inputs,
             state,
             params,
             expr,
@@ -420,31 +436,17 @@ struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
 
     function UnitHydroFlux(
         input::Num,
+        output::Num,
         param::Num;
-        uhtype::Symbol=:UH_1_HALF,
-        output::Union{Num,Nothing}=nothing,
+        uhfunc::UHFunction=:UH_1_HALF,
         solvetype::Symbol=:DISCRETE,
     )
-        input_name = Symbolics.tosymbol(input, escape=false)
-        param_name = Symbolics.tosymbol(param, escape=false)
-        if isnothing(output)
-            output_name = Symbol(input_name, :_routed)
-            output = first(@variables $output_name)
-        else
-            output_name = Symbolics.tosymbol(output, escape=false)
-        end
-
-        uhfunc = UHFunction(uhtype)
+        output_name = Symbolics.tosymbol(output, escape=false)
+        @assert solvetype in [:DISCRETE, :SPARSE, :INTEGRAL] "solvetype must be one of [:DISCRETE, :SPARSE, :INTEGRAL]"
         #* Setup the name information of the hydroroutement
-        meta = HydroMeta(inputs=[input_name], outputs=[output_name], params=[param_name], name=Symbol(output_name, :_uh_flux))
+        meta = HydroMeta(inputs=[input], outputs=[output], params=[param], name=Symbol(output_name, :_uh_flux))
 
-        return new{solvetype}(
-            [input],
-            [output],
-            [param],
-            uhfunc,
-            meta
-        )
+        return new{solvetype}([input], [output], [param], uhfunc, meta)
     end
 end
 

@@ -143,8 +143,8 @@ function param_grad_optim(
     run_kwargs::NamedTuple=(convert_to_ntp=true,),
     opt_kwargs...,
 )
-    @assert length(input) == length(target) == length(config) "The length of input, target and config must be the same,
-     while $(length(input)) input, $(length(target)) target, $(length(config)) config are given."
+    @assert(length(input) == length(target) == length(config),
+        "The length of input, target and config must be the same, while $(length(input)) input, $(length(target)) target, $(length(config)) config are given.")
 
     #* Get the argument for parameter optimization
     loss_func = get(opt_kwargs, :loss_func, (obs, sim) -> sum((obs .- sim) .^ 2) / length(obs))

@@ -22,6 +22,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # Symbolic building
 using Symbolics
+using Symbolics: tosymbol
 using SymbolicUtils
 using SymbolicUtils.Code
 using ModelingToolkit: @variables, @parameters
@@ -38,7 +39,7 @@ using DataInterpolations: AbstractInterpolation
 using Integrals
 
 # solve ODEProblem
-using SciMLBase
+# using SciMLBase
 using OrdinaryDiffEq
 using SciMLSensitivity
 
@@ -51,9 +52,6 @@ using NNlib
 using Optimization
 using OptimizationBBO
 using OptimizationOptimisers
-
-# HydroEquations
-# using HydroEquations
 
 ## package version
 const version = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
@@ -113,13 +111,12 @@ struct HydroMeta
 
     function HydroMeta(;
         name::Symbol, inputs::Vector{Num}=Num[], outputs::Vector{Num}=Num[],
-        params::Vector{Num}=Num[], states::Vector{Num}=Num[], nns::Vector{Num}=Num[],
+        params::Vector{Num}=Num[], states::Vector{Num}=Num[], nn_names::Vector{Symbol}=Symbol[],
     )
-        input_names = isempty(inputs) ? Symbol[] : Symbolics.tosymbol.(inputs, escape=false)
-        output_names = isempty(outputs) ? Symbol[] : Symbolics.tosymbol.(outputs, escape=false)
-        param_names = isempty(params) ? Symbol[] : Symbolics.tosymbol.(params, escape=false)
-        state_names = isempty(states) ? Symbol[] : Symbolics.tosymbol.(states, escape=false)
-        nn_names = isempty(nns) ? Symbol[] : Symbolics.tosymbol.(nns, escape=false)
+        input_names = isempty(inputs) ? Symbol[] : tosymbol.(inputs, escape=false)
+        output_names = isempty(outputs) ? Symbol[] : tosymbol.(outputs, escape=false)
+        param_names = isempty(params) ? Symbol[] : tosymbol.(params, escape=false)
+        state_names = isempty(states) ? Symbol[] : tosymbol.(states, escape=false)
         return new(name, input_names, output_names, param_names, state_names, nn_names)
     end
 end

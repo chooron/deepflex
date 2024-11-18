@@ -34,8 +34,6 @@ weighted differently in the cumulative output.
 """
 struct DirectRoute <: AbstractDirectRoute
     rfunc::AbstractFlux
-    "grid subarea information, km2"
-    subareas::AbstractVector
     "Metadata: contains keys for input, output, param, state, and nn"
     meta::HydroMeta
     # "output identifier" 
@@ -47,7 +45,6 @@ struct DirectRoute <: AbstractDirectRoute
 
     function DirectRoute(;
         rfunc::AbstractFlux,
-        subareas::AbstractVector,
         name::Union{Symbol,Nothing}=nothing
     )
         #* Extract all variable names of funcs and dfuncs
@@ -62,7 +59,6 @@ struct DirectRoute <: AbstractDirectRoute
         meta = HydroMeta(name=route_name, inputs=input_names, outputs=output_names, states=state_names, params=param_names, nns=nn_names)
         return new(
             rfunc,
-            subareas,
             meta,
         )
     end
@@ -76,11 +72,10 @@ function (route::DirectRoute)(
 )
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     #* 计算出每个节点的面积转换系数
-    area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
-
+    # area_coefs = @. 24 * 3600 / (route.subareas * 1e6) * 1e3
     rfunc_output = route.rfunc(input, pas, ptypes=ptypes)
     weight_params = [pas[:params][ptype][:route_weight] for ptype in ptypes]
-    weight_result = sum(rfunc_output[1, :, :] .* weight_params .* area_coefs, dims=1)
+    weight_result = sum(rfunc_output[1, :, :] .* weight_params, dims=1)
     # expand dims
     output_arr = repeat(weight_result, outer=(size(input)[1], 1))
     reshape(output_arr, 1, size(output_arr)...)
@@ -119,8 +114,6 @@ struct HydroRoute <: AbstractHydroRoute
     rfunc::AbstractHydroFlux
     "Outflow projection function"
     projfunc::Function
-    "grid subarea information, km2"
-    subareas::AbstractVector
     "node index"
     nodeids::Vector{Symbol}
     "Metadata: contains keys for input, output, param, state, and nn"
@@ -130,14 +123,13 @@ struct HydroRoute <: AbstractHydroRoute
         rfunc::AbstractHydroFlux,
         rstate::Num,
         projfunc::Function,
-        subareas::Union{AbstractVector,Number},
         nodeids::Vector{Symbol},
         name::Union{Symbol,Nothing}=nothing,
     )
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names = get_var_names(rfunc)
         state_name = Symbolics.tosymbol(rstate)
-        input_names = setdiff(input_names, output_names)
+        input_names = setdiff(input_names, [state_name])
         #* Extract all parameters names of funcs and dfuncs
         param_names = get_param_names(rfunc)
         #* Extract all neuralnetwork names of the funcs
@@ -145,13 +137,10 @@ struct HydroRoute <: AbstractHydroRoute
         #* Setup the name information of the hydrobucket
         route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_grid_route) : name
         meta = HydroMeta(route_name, input_names, output_names, param_names, [state_name], nn_names)
-        #* fill the subareas vector if it's a single value
-        subareas = subareas isa AbstractVector ? subareas : fill(subareas, length(nodeids))
 
         return new(
             rfunc,
             projfunc,
-            subareas,
             nodeids,
             meta,
         )
@@ -163,7 +152,6 @@ function GridRoute(;
     rstate::Num,
     flwdir::AbstractMatrix,
     positions::AbstractVector,
-    subareas::Union{AbstractVector,Number},
     nodeids::Vector{Symbol},
     name::Union{Symbol,Nothing}=nothing,
 )
@@ -186,14 +174,13 @@ function GridRoute(;
     @assert length(positions) == length(nodeids) "The length of positions must be the same as the length of nodeids, but got positions: $(length(positions)) and nodeids: $(length(nodeids))"
     #* build the outflow projection function
     projfunc = (outflow) -> grid_routing(outflow, positions, flwdir)
-    return HydroRoute(; rfunc, rstate, projfunc, subareas, nodeids, name)
+    return HydroRoute(; rfunc, rstate, projfunc, nodeids, name)
 end
 
 function VectorRoute(;
     rfunc::AbstractHydroFlux,
     rstate::Num,
     network::DiGraph,
-    subareas::Union{AbstractVector,Number},
     nodeids::Vector{Symbol},
     name::Union{Symbol,Nothing}=nothing,
 )
@@ -202,7 +189,7 @@ function VectorRoute(;
     adjacency = adjacency_matrix(network)'
     #* build the outflow projection function
     projfunc = (outflow) -> adjacency * outflow
-    return HydroRoute(; rfunc, rstate, projfunc, subareas, nodeids, name)
+    return HydroRoute(; rfunc, rstate, projfunc, nodeids, name)
 end
 
 function (route::HydroRoute)(
@@ -220,8 +207,7 @@ function (route::HydroRoute)(
     #* get the time index
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
 
-    #* check the length of subareas, ptypes, stypes
-    @assert length(route.subareas) == size(input, 2) "The length of subareas must be the same as the number of nodes, but got subareas: $(length(route.subareas)) and input: $(size(input, 2))"
+    #* check the length of ptypes, stypes
     @assert length(ptypes) == length(stypes) == size(input, 2) "The length of ptypes and stypes must be the same as the number of nodes, but got ptypes is $(length(ptypes)) and stypes is $(length(stypes))"
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got ptypes is $(length(ptypes))."
     @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got stypes is $(length(stypes))."
@@ -239,7 +225,7 @@ function (route::HydroRoute)(
     end
 
     #* solve the problem
-    sol_arr = solve_prob(route, input, pas, param_func, timeidx=timeidx, stypes=stypes, solver=solver, interp=interp)
+    sol_arr = solve_prob(route, input, pas, paramfunc=param_func, timeidx=timeidx, stypes=stypes, solver=solver, interp=interp)
     sol_arr_permuted = permutedims(sol_arr, (2, 1, 3))
     cont_arr = cat(input, sol_arr_permuted, dims=1)
     output_vec = [route.rfunc.func.(eachslice(cont_arr[:, :, i], dims=2), param_func(pas), timeidx[i]) for i in 1:size(input)[3]]
@@ -251,8 +237,8 @@ end
 function solve_prob(
     route::HydroRoute,
     input::Array,
-    pas::ComponentVector,
-    paramfunc::Function;
+    pas::ComponentVector;
+    paramfunc::Function,
     timeidx::Vector{<:Number}=collect(1:size(input, 3)),
     stypes::Vector{Symbol}=collect(keys(pas[:initstates])),
     solver::AbstractSolver=ODESolver(),

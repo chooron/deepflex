@@ -282,7 +282,7 @@ function solve_prob(
     input::Matrix,
     pas::ComponentVector;
     paramsfunc::Function,
-    nnparamfunc::Function,
+    nnparamfunc::Function=(_) -> nothing,
     timeidx::Vector{<:Number}=collect(1:size(input, 2)),
     solver::AbstractSolver=ODESolver(),
     interp::Type{<:AbstractInterpolation}=LinearInterpolation,
@@ -311,7 +311,7 @@ function solve_prob(
     input::Array,
     pas::ComponentVector;
     paramsfunc::Function,
-    nnparamfunc::Function,
+    nnparamfunc::Function=(_) -> nothing,
     timeidx::Vector{<:Number}=collect(1:size(input, 3)),
     stypes::Vector{Symbol}=collect(keys(pas[:initstates])),
     solver::AbstractSolver=ODESolver(),
