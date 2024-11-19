@@ -1,42 +1,52 @@
-using CSV
-using DataFrames
-using Lux
-using Test
 using ModelingToolkit
-using Symbolics
-using LuxCore
-using ComponentArrays
-using DataInterpolations
 using OrdinaryDiffEq
-using Statistics
-using Graphs
-# using HydroModels
-include("../src/HydroModels.jl")
+using DiffEqCallbacks
+using Plots
 
+# Define the system with discrete updates
+function discrete_condition(u, t, integrator)
+    # Trigger condition for discrete updates
+    return true
+end
 
-@variables q1 q1_routed s_river
-@parameters lag
-flwdir = [1 4 8; 1 4 4; 1 1 2]
-positions = [[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [2, 3], [3, 1], [3, 2], [3, 3]]
+function discrete_affect!(integrator)
+    # Get current values
+    Q = integrator.u[1]
+    I = integrator.p[4]*Q + integrator.p[5]  # A*Q + R
+    
+    # Calculate next Q using discrete equation
+    C0, C1, C2, A, R = integrator.p
+    Q_next = C0*(A*Q + R) + C1*I + C2*Q
+    
+    # Update state
+    integrator.u[1] = Q_next
+end
 
-ndtypes = [:ntype1, :ntype2, :ntype3]
-rflux = HydroModels.HydroFlux([q1, s_river] => [q1_routed], [lag], exprs=[s_river / (1 + lag) + q1])
-println(HydroModels.get_input_names(rflux))
-println(HydroModels.get_output_names(rflux))
-println(HydroModels.get_param_names(rflux))
-println(HydroModels.get_state_names(rflux))
-params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(lag=0.2,) for _ in eachindex(ndtypes)]))
-initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.1,) for _ in eachindex(ndtypes)]))
-pas = ComponentVector(; params, initstates)
-nodeids = [:nid1, :nid2, :nid3, :nid4, :nid5, :nid6, :nid7, :nid8, :nid9]
-route = HydroModels.GridRoute(rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions, subareas=10.0, nodeids=nodeids)
-println(HydroModels.get_input_names(route))
-println(HydroModels.get_output_names(route))
-println(HydroModels.get_param_names(route))
-println(HydroModels.get_state_names(route))
+# Create the discrete callback
+cb = DiscreteCallback(discrete_condition, discrete_affect!, save_positions=(false,true))
 
-input_arr = ones(1, 9, 20)
-timeidx = collect(1:20)
-node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types, stypes=node_types, timeidx=timeidx)
-output_arr = route(input_arr, pas, config=config)
+# Define the continuous system (simplified for discrete updates)
+function continuous_system!(du, u, p, t)
+    du[1] = 0.0  # No continuous evolution between discrete steps
+end
+
+# Parameters and initial conditions
+p = (0.2, 0.3, 0.4, 1.0, 2.0)  # C0, C1, C2, A, R
+u0 = [1.0]  # Initial Q
+tspan = (0.0, 10.0)
+
+# Create and solve the problem with discrete callbacks
+prob = ODEProblem(continuous_system!, u0, tspan, p)
+sol = solve(prob, Tsit5(), callback=cb, tstops=0:1:10)
+
+# Calculate I values for plotting
+I_values = [p[4]*q[1] + p[5] for q in sol.u]
+t_values = sol.t
+
+# Plot results
+plot(t_values, [first.(sol.u) I_values], 
+     label=["Q(t)" "I(t)"],
+     title="Discrete System Solution",
+     xlabel="Time",
+     ylabel="Value",
+     marker=:circle)

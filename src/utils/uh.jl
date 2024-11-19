@@ -12,7 +12,7 @@ function (uh::UHFunction{:UH_1_HALF})(t, lag)
     end
 end
 
-get_uh_tmax(::UHFunction{:UH_1_HALF}, lag) = lag
+get_uh_tmax(::UHFunction{:UH_1_HALF}, lag) = ceil(lag)
 
 function (uh::UHFunction{:UH_2_FULL})(t, lag)
     if t - lag * 2 > 0
@@ -24,4 +24,4 @@ function (uh::UHFunction{:UH_2_FULL})(t, lag)
     end
 end
 
-get_uh_tmax(::UHFunction{:UH_2_FULL}, lag) = 2 * lag
+get_uh_tmax(::UHFunction{:UH_2_FULL}, lag) = 2 * ceil(lag)

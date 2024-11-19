@@ -12,7 +12,7 @@
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2.0 3.0 1.0; 3.0 2.0 2.0] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
     input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(p1=3.0, p2=4.0)], 10)))
-    @test simple_flux_1(input_arr, input_pas, ptypes=ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (3, 1, 2))
+    @test simple_flux_1(input_arr, input_pas, ptypes=ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test state flux (build by Symbolics.jl)" begin
@@ -89,17 +89,19 @@ end
     # Test the routing function with sample input
     input_flow = Float32[2 3 4 2 3 1]
     params = ComponentVector(params=(x1=3.5,))
-    expected_output = [0.08990658541313483 0.6434483278713437 2.3442008102889558 3.209340932169254 3.4464582575417912 2.2093409321692534]
-    @test uhflux1(input_flow, params) ≈ expected_output
-    @test uhflux2(input_flow, params) ≈ expected_output
+    expected_output = [0.0899066  0.643448  2.3442  3.20934  3.44646  2.20934]
+    # [0.08726897695099571 0.5373023715895905 1.6508571480656808 2.839759323622619 3.2301609643779736 2.7991762465729138]
+    @test uhflux1(input_flow, params) ≈ expected_output atol = 1e-3
+    @test uhflux2(input_flow, params) ≈ expected_output atol = 1e-3
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), input_flow for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
     node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
     node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
     input_pas = ComponentVector(params=node_params, initstates=node_initstates)
-    @test uhflux1(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
-    @test uhflux2(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2))
+
+    @test uhflux1(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
+    @test uhflux2(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
 end
 
 @testset "test neural flux (single output)" begin

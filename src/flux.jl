@@ -233,7 +233,7 @@ struct NeuralFlux <: AbstractNeuralFlux
         chain,
     )
         input_vec, output_vec = Symbol(chain.name, :_input), Symbol(chain.name, :_output)
-        nninfos = (inputs = first(@variables $(input_vec)[1:length(inputs)]), outputs = first(@variables $(output_vec)[1:length(outputs)]))
+        nninfos = (inputs=first(@variables $(input_vec)[1:length(inputs)]), outputs=first(@variables $(output_vec)[1:length(outputs)]))
         meta = HydroMeta(name=Symbol(chain.name, :_nflux), inputs=inputs, outputs=outputs, nn_names=[chain.name])
         params_axes = getaxes(ComponentVector(Lux.initialparameters(StableRNG(42), chain)))
         nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, params_axes))
@@ -488,24 +488,35 @@ function (flux::UnitHydroFlux{:DISCRETE})(input::Matrix, pas::ComponentVector; k
     end
     #* prepare the initial states
     lag = pas[:params][get_param_names(flux)[1]]
-    uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))
-    initstates = input_vec[1] .* uh_weight ./ sum(uh_weight)
-    #* solve the problem
-    sol = solver(lag_prob!, ComponentVector(weight=uh_weight ./ sum(uh_weight)), initstates, timeidx)
-    reshape(sol[1, :], 1, length(input_vec))
+    uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
+    if length(uh_weight) == 0
+        @warn "The unit hydrograph weight is empty, please check the unit hydrograph function"
+        return input
+    else
+        initstates = input_vec[1] .* uh_weight ./ sum(uh_weight)
+        #* solve the problem
+        sol = solver(lag_prob!, ComponentVector(weight=uh_weight ./ sum(uh_weight)), initstates, timeidx)
+        reshape(sol[1, :], 1, length(input_vec))
+    end
 end
 
 function (flux::UnitHydroFlux{:SPARSE})(input::Matrix, pas::ComponentVector; kwargs...)
     input_vec = input[1, :]
     lag = pas[:params][get_param_names(flux)[1]]
-    uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))
-    #* the weight of the unit hydrograph is normalized by the sum of the weights
-    uh_result = [-(i - 1) => uh_wi .* input_vec ./ sum(uh_weight) for (i, uh_wi) in enumerate(uh_weight)]
-    #* construct the sparse matrix
-    uh_sparse_matrix = spdiagm(uh_result...)
-    #* sum the matrix
-    sum_route = sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
-    reshape(sum_route, 1, length(input_vec))
+    uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
+
+    if length(uh_weight) == 0
+        @warn "The unit hydrograph weight is empty, please check the unit hydrograph function"
+        return input
+    else
+        #* the weight of the unit hydrograph is normalized by the sum of the weights
+        uh_result = [-(i - 1) => uh_wi .* input_vec ./ sum(uh_weight) for (i, uh_wi) in enumerate(uh_weight)]
+        #* construct the sparse matrix
+        uh_sparse_matrix = spdiagm(uh_result...)
+        #* sum the matrix
+        sum_route = sum(uh_sparse_matrix, dims=2)[1:end-length(uh_weight)+1]
+        reshape(sum_route, 1, length(input_vec))
+    end
 end
 
 # todo: 卷积计算的结果与前两个计算结果不太一致

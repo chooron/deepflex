@@ -128,7 +128,7 @@ struct HydroRoute <: AbstractHydroRoute
     function HydroRoute(;
         rfunc::AbstractHydroFlux,
         rstate::Num,
-        projfunc::AbstractHydroFlux,
+        projfunc::Function,
         nodeids::Vector{Symbol},
         name::Union{Symbol,Nothing}=nothing,
     )
@@ -179,9 +179,8 @@ function GridRoute(;
     end
     @assert length(positions) == length(nodeids) "The length of positions must be the same as the length of nodeids, but got positions: $(length(positions)) and nodeids: $(length(nodeids))"
     #* build the outflow projection function
-    projfunc(outflow) = grid_routing(outflow, positions, flwdir)
-    afunc = HydroFlux(rfunc.outputs => [rinput], exprs=[projfunc(rfunc.outputs[1])])
-    return HydroRoute(; rfunc, rstate, afunc, nodeids, name)
+    projfunc = (outflow) -> grid_routing(outflow, positions, flwdir)
+    return HydroRoute(; rfunc, rstate, projfunc, nodeids, name)
 end
 
 """
@@ -258,6 +257,43 @@ function (route::HydroRoute)(
     out_arr = reduce(hcat, reduce.(vcat, output_vec))
     #  return route_states and q_out
     return cat(sol_arr_permuted, reshape(out_arr, 1, size(out_arr)...), dims=1)
+end
+
+function solve_prob(
+    route::HydroRoute,
+    input::Array,
+    pas::ComponentVector;
+    paramfunc::Function,
+    timeidx::Vector{<:Number}=collect(1:size(input, 3)),
+    stypes::Vector{Symbol}=collect(keys(pas[:initstates])),
+    solver::AbstractSolver=ODESolver(),
+    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
+)
+    #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
+    #* so an interpolation function can be constructed to apply to each time point.
+    itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
+
+    #* 准备初始状态
+    init_states_vec = collect([collect(pas[:initstates][stype][get_state_names(route)]) for stype in stypes])
+    #* prepare the initial states matrix (dims: state_num * node_num)
+    init_states_mat = reduce(hcat, init_states_vec)'
+
+    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
+    function route_ode!(du, u, p, t)
+        # 提取单元产流
+        q_gen = [itp_func(t) for itp_func in itp_funcs]
+        # 计算单元出流,更新单元出流状态
+        q_out_vec = route.rfunc.func.(eachslice(hcat(q_gen, u), dims=1), paramfunc(p), Ref(t))
+        q_out = reduce(vcat, q_out_vec)
+        q_in = route.projfunc(q_out)
+        # 更新状态
+        du[:] = q_in .+ q_gen .- q_out
+    end
+
+    #* Solve the problem using the solver wrapper
+    sol = solver(route_ode!, pas, init_states_mat, timeidx, convert_to_array=true)
+    # return route_states and q_out
+    sol
 end
 
 function solve_prob(
