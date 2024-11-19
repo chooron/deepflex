@@ -179,9 +179,8 @@ function GridRoute(;
     end
     @assert length(positions) == length(nodeids) "The length of positions must be the same as the length of nodeids, but got positions: $(length(positions)) and nodeids: $(length(nodeids))"
     #* build the outflow projection function
-    projfunc(outflow) = grid_routing(outflow, positions, flwdir)
-    afunc = HydroFlux(rfunc.outputs => [rinput], exprs=[projfunc(rfunc.outputs[1])])
-    return HydroRoute(; rfunc, rstate, afunc, nodeids, name)
+    projfunc = (outflow) -> grid_routing(outflow, positions, flwdir)
+    return HydroRoute(; rfunc, rstate, projfunc, nodeids, name)
 end
 
 """
@@ -286,7 +285,7 @@ function solve_prob(
         # 计算单元出流,更新单元出流状态
         q_out_vec = route.rfunc.func.(eachslice(hcat(q_gen, u), dims=1), paramfunc(p), Ref(t))
         q_out = reduce(vcat, q_out_vec)
-        q_in = route.afunc.func(q_out)
+        q_in = route.projfunc(q_out)
         # 更新状态
         du[:] = q_in .+ q_gen .- q_out
     end
@@ -334,10 +333,17 @@ struct RapidRoute <: AbstractRapidRoute
     meta::HydroMeta
 
     function RapidRoute(;
-        func::AbstractFlux, # 计算qout的函数
-        rfuncs::Vector{AbstractFlux}, # route的函数
+        func::AbstractHydroFlux, # 计算qout的函数
+        argpairs::Vector{Tuple{Num,Num}}, # 输入输出对  [i1=>q1, i2=>q2]
         name::Union{Symbol,Nothing}=nothing,
     )
+        flux_expr = func.expr
+        #* 替换expr的方程式
+        for pair in argpairs
+            expr = substitute(expr, pair)
+        end
+        # solve expr for qout
+        d_output = solve_for(expr, func.outputs[1]) - func.outputs[1]
         #* Extract all variable names of funcs and dfuncs
         input_names, output_names = get_var_names(vcat(func, rfuncs...))
         #* Extract all parameters names of funcs and dfuncs
@@ -388,9 +394,9 @@ function (route::RapidRoute)(
     A = (p) -> Matrix(I, size(route.adjacency)...) .- diagm(p.c0) * route.adjacency
 
     function route_ode!(du, u, p, t)
-        q_gen = [itp_func(t) for itp_func in itp_funcs] .* area_coeffs
         #* Ax = b, x is the q_out(t+1)
-        rflux_b = p.c0 * q_gen + p.c1 * (route.adjacency * q_out_t1 + q_gen) + p.c2 * q_out_t1
+        q_in_t1 = route.adjacency * q_out_t1
+        rflux_b = p.c0 * q_gen + p.c1 * (q_in_t1 + q_gen) + p.c2 * q_out_t1
         #* solve the linear equation (simple solve by matrix inversion)
         du[:] = A(p) \ (rflux_b .- A(p) * u)
     end
