@@ -1,3 +1,40 @@
+
+"""
+Metadata about the component, including:
+- name: Symbol representing the component's name
+- inputs: Vector of input variable names
+- outputs: Vector of output variable names
+- params: Vector of parameter names
+- states: Vector of state variable names
+- nns: Vector of neural network names
+"""
+struct HydroMeta
+    name::Symbol
+    inputs::Vector{Symbol}
+    outputs::Vector{Symbol}
+    params::Vector{Symbol}
+    states::Vector{Symbol}
+    nns::Vector{Symbol}
+
+    function HydroMeta(
+        name::Symbol, input_names::Vector{Symbol}=Symbol[], output_names::Vector{Symbol}=Symbol[],
+        param_names::Vector{Symbol}=Symbol[], state_names::Vector{Symbol}=Symbol[], nn_names::Vector{Symbol}=Symbol[],
+    )
+        return new(name, input_names, output_names, param_names, state_names, nn_names)
+    end
+
+    function HydroMeta(;
+        name::Symbol, inputs::Vector{Num}=Num[], outputs::Vector{Num}=Num[],
+        params::Vector{Num}=Num[], states::Vector{Num}=Num[], nn_names::Vector{Symbol}=Symbol[],
+    )
+        input_names = isempty(inputs) ? Symbol[] : tosymbol.(inputs, escape=false)
+        output_names = isempty(outputs) ? Symbol[] : tosymbol.(outputs, escape=false)
+        param_names = isempty(params) ? Symbol[] : tosymbol.(params, escape=false)
+        state_names = isempty(states) ? Symbol[] : tosymbol.(states, escape=false)
+        return new(name, input_names, output_names, param_names, state_names, nn_names)
+    end
+end
+
 get_input_names(func::AbstractFlux) = func.meta.inputs
 get_input_names(ele::AbstractBucket) = ele.meta.inputs
 get_input_names(route::AbstractRoute) = route.meta.inputs
@@ -63,7 +100,6 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     end
     input_names, output_names, state_names
 end
-
 
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()

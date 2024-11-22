@@ -101,10 +101,10 @@ pas = ComponentVector((initstates=(snowpack=0.0, soilwater=1303.00),
 timeidx = collect(1:length(prcp_vec))
 solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3, saveat=timeidx)
 config = (solver=solver, timeidx=timeidx)
-result = exphydro_model(input, pas, config=config, convert_to_ntp=true); #  29.317 ms (356101 allocations: 28.18 MiB)
+@btime result = exphydro_model(input, pas, config=config, convert_to_ntp=false); #  29.317 ms (356101 allocations: 28.18 MiB)
 
-plot(result.flow)
-plot!(qobs_vec)
+# plot(result.flow)
+# plot!(qobs_vec)
 # #! set the tunable parameters and constant parameters
 # tunable_pas = ComponentVector(params=(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09))
 # const_pas = ComponentVector(initstates=(snowpack=0.1, soilwater=1303.00))

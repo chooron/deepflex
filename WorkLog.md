@@ -98,6 +98,8 @@
 - [X] routeflux可以采用一个route计算,每个routeflux能够反馈出不同的func,dfunc
 - [ ] 加入macro编程，让书写更加简单
 - [ ] 需要考虑rapid这种类型的route如何写
+- [ ] GPU 支持
+- [ ] batch优化器功能的扩展
 
 ## 关键功能和实现技术
 

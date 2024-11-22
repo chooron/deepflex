@@ -1,11 +1,11 @@
 """
 A custom ODEProblem solver
 """
-@kwdef struct ODESolver <: AbstractSolver
+@kwdef struct ODESolver <: AbstractHydroSolver
     alg = Tsit5()
     sensealg = InterpolatingAdjoint()
-    reltol = 1e-2
-    abstol = 1e-2
+    reltol = 1e-3
+    abstol = 1e-3
     saveat = 1.0
 end
 
@@ -17,7 +17,6 @@ function (solver::ODESolver)(
     convert_to_array::Bool=true
 )
     #* build problem
-    # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
     prob = ODEProblem(
         ode_func!,
         initstates,
@@ -49,7 +48,7 @@ end
 """
 A custom ODEProblem solver
 """
-@kwdef struct DiscreteSolver <: AbstractSolver
+@kwdef struct DiscreteSolver <: AbstractHydroSolver
     alg = FunctionMap{true}()
     sensealg = InterpolatingAdjoint()
 end
@@ -62,7 +61,6 @@ function (solver::DiscreteSolver)(
     convert_to_array::Bool=true
 )
     #* build problem
-    # 虽然pas本身就包含了initstates但是initstates的构建方式因输入会有所不同
     prob = DiscreteProblem(
         ode_func!,
         initstates,
@@ -88,7 +86,7 @@ function (solver::DiscreteSolver)(
     end
 end
 
-@kwdef struct ManualSolver <: AbstractSolver
+@kwdef struct ManualSolver <: AbstractHydroSolver
     #* 计算效率过差不予考虑
 end
 
@@ -100,11 +98,11 @@ function (solver::ManualSolver)(
 )
     T = promote_type(eltype(pas), eltype(initstates))
     init_du = zeros(T, size(initstates))
-    states_results = ()
+    states_results = eltype(initstates)[]
     for t in timeidx
         ode_func!(init_du, initstates, pas, t)
         initstates = initstates .+ init_du
-        (states_results..., initstates)
+        vcat(states_results, [initstates])
     end
     reduce(hcat, states_results)
 end

@@ -33,26 +33,26 @@ calculation function, which can be used to compute flux values given input and p
 This structure is particularly useful for representing straightforward hydrological processes 
 where the relationship between inputs and outputs can be expressed as simple mathematical formulas.
 """
-struct HydroFlux <: AbstractHydroFlux
+struct HydroFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractHydroFlux
     "Vector of input variables"
-    inputs::Vector{Num}
+    inputs::Vector{T}
     "Vector of output variables"
-    outputs::Vector{Num}
+    outputs::Vector{T}
     "Vector of parameter variables"
-    params::Vector{Num}
+    params::Vector{T}
     "Vector of expressions describing the formulas for output variables"
-    exprs::Vector{Num}
+    exprs::Vector{T}
     "Compiled function that calculates the flux"
-    func::Function
+    func::F
     "Metadata about the flux, including input, output, and parameter names"
-    meta::HydroMeta
+    meta::M
 
     function HydroFlux(
-        inputs::Vector{Num},
-        outputs::Vector{Num},
-        params::Vector{Num};
-        exprs::Vector{Num}=Num[],
-    )
+        inputs::Vector{T},
+        outputs::Vector{T},
+        params::Vector{T};
+        exprs::Vector{T}=T[],
+    ) where {T<:Num}
         #* name the flux
         output_names = Symbolics.tosymbol.(outputs, escape=false)
         flux_name = Symbol(Symbol(reduce((x, y) -> Symbol(x, y), output_names)), :_sflux)
@@ -68,14 +68,7 @@ struct HydroFlux <: AbstractHydroFlux
         #* build flux function
         flux_func = build_flux_func(inputs, outputs, params, exprs)
 
-        return new(
-            inputs,
-            outputs,
-            params,
-            exprs,
-            flux_func,
-            meta
-        )
+        return new{T,typeof(flux_func),typeof(meta)}(inputs, outputs, params, exprs, flux_func, meta)
     end
 
     #* construct hydro flux with input fluxes and output fluxes
@@ -101,39 +94,45 @@ Apply the simple flux model to input data of various dimensions.
 - For matrix input: A matrix where each column is the result of applying the flux function to the corresponding input column.
 - For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
 """
-function (flux::AbstractHydroFlux)(input::Vector, pas::ComponentVector; kwargs...)
+function (flux::AbstractHydroFlux)(input::AbstractVector, pas::ComponentVector; kwargs...)
     timeidx = get(kwargs, :timeidx, 1)
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
     flux.func(input, params_vec, timeidx)
 end
 
-function (flux::AbstractHydroFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::AbstractHydroFlux)(input::AbstractArray{N,2}, pas::ComponentVector; kwargs...) where {N}
     timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
     # assert the input params must include all the parameters in the flux
     @assert length(timeidx) == size(input, 2) "Time index length does not match the number of time steps"
     @assert all(nm in keys(pas[:params]) for nm in get_param_names(flux)) "Input parameters do not match the flux parameters, the flux parameters should be: $(get_param_names(flux))"
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
-    reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
+    output_arr = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
+    to_ntp = get(kwargs, :convert_to_ntp, false)
+    return to_ntp ? NamedTuple{Tuple(get_output_names(flux))}(eachslice(output_arr, dims=1)) : output_arr
 end
 
-function (flux::AbstractHydroFlux)(input::Array, pas::ComponentVector; kwargs...)
+function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {N}
     #* get kwargs
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
-    timeidx = get(kwargs, :timeidx, collect(1:size(input, 3)))
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
     @assert length(timeidx) == size(input, 3) "Time index length does not match the number of time steps"
 
     #* extract params and nn params
-    params_collect = [pas[:params][ptype] for ptype in ptypes]
-    #* check params input is correct
-    for (ptype, params_item) in zip(ptypes, params_collect)
-        @assert all(param_name in keys(params_item) for param_name in get_param_names(flux)) "Missing required parameters. Expected all of $(get_param_names(flux)), but got $(keys(params_item)) at param type: $ptype."
+    node_params = [pas[:params][ptype] for ptype in ptypes]
+    # 批量检查参数
+    required_params = Set(get_param_names(flux))
+    for (ptype, node_param) in zip(ptypes, node_params)
+        missing_params = setdiff(required_params, keys(node_param))
+        @assert isempty(missing_params) "Missing parameters for $ptype: $missing_params"
     end
-    params_vec = collect([collect([params_item[pname] for pname in get_param_names(flux)]) for params_item in params_collect])
+    params_vec = collect([collect([params_item[pname] for pname in get_param_names(flux)]) for params_item in node_params])
 
     #* array dims: (var_names * node_names * ts_len)
-    # flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, i, :], dims=2), Ref(params_vec[i]), timeidx)) for i in eachindex(ptypes)]
     flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
     flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    # flux_output_arr = mapslices(input, dims=[1,2]) do slice
+    #     reduce(hcat, flux.func.(eachcol(slice), params_vec, timeidx))
+    # end
     flux_output_arr
 end
 
@@ -166,27 +165,27 @@ allowing for seamless incorporation of machine learning models into traditional 
 This structure is particularly useful for representing complex, non-linear relationships in hydrological systems 
 where traditional equations may be insufficient or unknown.
 """
-struct NeuralFlux <: AbstractNeuralFlux
+struct NeuralFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractNeuralFlux
     "Vector of input variables"
-    inputs::Vector{Num}
+    inputs::Vector{T}
     "Vector of output variables"
-    outputs::Vector{Num}
+    outputs::Vector{T}
     "Array of neural network parameters"
-    nnparam::Symbolics.Arr
+    nnparam::Symbolics.Arr{T,1}
     "Array of expressions describing the formulas for output variables"
-    expr::Symbolics.Arr{Num,1}
+    expr::Symbolics.Arr{T,1}
     "Compiled function that calculates the flux using the neural network"
-    func::Function
+    func::F
     "Metadata about the flux, including input, output, and neural network parameter names"
-    meta::HydroMeta
+    meta::M
     "Information about the neural network's input and output structure"
     nninfos::NamedTuple
 
     function NeuralFlux(
-        inputs::Vector{Num},
-        outputs::Vector{Num},
-        chain, # ::LuxCore.AbstractExplicitContainerLayer
-    )
+        inputs::Vector{T},
+        outputs::Vector{T},
+        chain::LuxCore.AbstractExplicitContainerLayer
+    ) where {T<:Num}
         #* assert the chain has a name
         @assert chain.name isa Symbol "Neural network chain should have a name with Symbol type"
         #* Get the neural network name (neural flux param name) and object
@@ -217,8 +216,7 @@ struct NeuralFlux <: AbstractNeuralFlux
         #* neuralflux meta
         meta = HydroMeta(name=Symbol(chain_name, :_nflux), inputs=inputs, outputs=outputs, nn_names=[chain_name])
         nninfos = (inputs=nn_input, outputs=nn_output, paramlen=length(init_params))
-
-        new(
+        new{T,typeof(nn_func),typeof(meta)}(
             inputs, outputs, chain_params,
             flux_expr, nn_func,
             meta, nninfos,
@@ -226,18 +224,18 @@ struct NeuralFlux <: AbstractNeuralFlux
     end
 
     function NeuralFlux(
-        inputs::Vector{Num},
-        outputs::Vector{Num},
-        params::Symbolics.Arr,
-        expr::Symbolics.Arr,
+        inputs::Vector{T},
+        outputs::Vector{T},
+        params::Symbolics.Arr{T,1},
+        expr::Symbolics.Arr{T,1},
         chain,
-    )
+    ) where {T<:Number}
         input_vec, output_vec = Symbol(chain.name, :_input), Symbol(chain.name, :_output)
         nninfos = (inputs=first(@variables $(input_vec)[1:length(inputs)]), outputs=first(@variables $(output_vec)[1:length(outputs)]))
         meta = HydroMeta(name=Symbol(chain.name, :_nflux), inputs=inputs, outputs=outputs, nn_names=[chain.name])
         params_axes = getaxes(ComponentVector(Lux.initialparameters(StableRNG(42), chain)))
         nn_func = (x, p) -> LuxCore.stateless_apply(chain, x, ComponentVector(p, params_axes))
-        new(inputs, outputs, params, expr, nn_func, meta, nninfos)
+        new{T,typeof(nn_func),typeof(meta)}(inputs, outputs, params, expr, nn_func, meta, nninfos)
     end
 
     #* construct neural flux with input fluxes and output fluxes
@@ -266,17 +264,19 @@ Apply the flux model (simple or neural) to input data of various dimensions.
 # Note
 For neural flux models, the parameters are accessed from `pas[:nn]` instead of `pas[:params]`.
 """
-function (flux::AbstractNeuralFlux)(input::Vector, pas::ComponentVector; kwargs...)
+function (flux::AbstractNeuralFlux)(input::AbstractVector, pas::ComponentVector; kwargs...)
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
     flux.func(input, nn_params_vec)
 end
 
-function (flux::AbstractNeuralFlux)(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::AbstractNeuralFlux)(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
-    flux.func(input', nn_params_vec)
+    output_arr = flux.func(input, nn_params_vec)
+    to_ntp = get(kwargs, :convert_to_ntp, false)
+    return to_ntp ? NamedTuple{Tuple(get_output_names(flux))}(eachslice(output_arr, dims=1)) : output_arr
 end
 
-function (flux::AbstractNeuralFlux)(input::Array, pas::ComponentVector; kwargs...)
+function (flux::AbstractNeuralFlux)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
     nn_params = pas[:nn][get_nn_names(flux)[1]]
     #* array dims: (ts_len * node_names * var_names)
     flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]
@@ -316,28 +316,28 @@ for simple state transitions.
 This structure is particularly useful in building complex hydrological models where state 
 variables evolve over time based on various input and output fluxes.
 """
-struct StateFlux <: AbstractStateFlux
+struct StateFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractStateFlux
     "A map of input names (Symbol) and its variables (Num)"
-    inputs::Vector{Num}
+    inputs::Vector{T}
     "A map of state names (Symbol) and its variables (Num)"
-    state::Num
+    state::T
     "A map of parameters names (Symbol) and its variables (Num)"
-    params::Vector{Num}
+    params::Vector{T}
     "flux expressions to descripe the formula of the state variable"
-    expr::Num
+    expr::T
     "flux expressions to descripe the formula of the output variable"
-    func::Function
+    func::F
     "bucket information: keys contains: input, output, param, state"
-    meta::HydroMeta
+    meta::M
 
     function StateFlux(
-        inputs::Vector{Num}, state::Num, params::Vector{Num}=Num[]; expr::Num
-    )
+        inputs::Vector{T}, state::T, params::Vector{T}=T[]; expr::T
+    ) where {T<:Num}
         #* Convert to a symbol based on the variable
         state_name = Symbolics.tosymbol(state, escape=false)
         meta = HydroMeta(name=Symbol(state_name, :_stflux), inputs=inputs, states=[state], params=params)
         state_func = build_flux_func(inputs, [state], params, [expr])
-        return new(
+        return new{T,typeof(state_func),typeof(meta)}(
             inputs,
             state,
             params,
@@ -373,9 +373,9 @@ This function does not actually return a value, as state flux models cannot be r
 - State flux models cannot be run directly and will throw an error if attempted.
 - To use state flux models, they should be incorporated into a HydroFlux or other composite flux model.
 """
-(::AbstractStateFlux)(::Vector, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using HydroFlux to run"
-(::AbstractStateFlux)(::Matrix, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using HydroFlux to run"
-(::AbstractStateFlux)(::Array, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using HydroFlux to run"
+(::AbstractStateFlux)(::AbstractVector, ::ComponentVector; kwargs...) = @error "State Flux cannot run directly, please using HydroFlux to run"
+(::AbstractStateFlux)(::AbstractArray{T,2}, ::ComponentVector; kwargs...) where {T} = @error "State Flux cannot run directly, please using HydroFlux to run"
+(::AbstractStateFlux)(::AbstractArray{T,3}, ::ComponentVector; kwargs...) where {T} = @error "State Flux cannot run directly, please using HydroFlux to run"
 
 """
     UnitHydroFlux{solvetype} <: AbstractRouteFlux
@@ -422,31 +422,31 @@ This structure is designed to be flexible and can be integrated into larger hydr
 to represent various routing processes in different parts of a water system.
 
 """
-struct UnitHydroFlux{solvetype} <: AbstractUnitHydroFlux
+struct UnitHydroFlux{T<:Num,UF<:UHFunction,M<:HydroMeta,ST} <: AbstractUnitHydroFlux
     "A vector of input variables (Num)"
-    inputs::Vector{Num}
+    inputs::Vector{T}
     "A vector of output variables (Num)"
-    outputs::Vector{Num}
+    outputs::Vector{T}
     "A vector of parameter variables (Num)"
-    params::Vector{Num}
+    params::Vector{T}
     "The unit hydrograph function"
-    uhfunc::UHFunction
+    uhfunc::UF
     "A named tuple containing information about inputs, outputs, parameters, and states"
-    meta::HydroMeta
+    meta::M
 
     function UnitHydroFlux(
-        input::Num,
-        output::Num,
-        param::Num;
-        uhfunc::UHFunction=:UH_1_HALF,
+        input::T,
+        output::T,
+        param::T;
+        uhfunc::UF,
         solvetype::Symbol=:DISCRETE,
-    )
+    ) where {T<:Num,UF<:UHFunction}
         output_name = Symbolics.tosymbol(output, escape=false)
         @assert solvetype in [:DISCRETE, :SPARSE, :INTEGRAL] "solvetype must be one of [:DISCRETE, :SPARSE, :INTEGRAL]"
         #* Setup the name information of the hydroroutement
         meta = HydroMeta(inputs=[input], outputs=[output], params=[param], name=Symbol(output_name, :_uh_flux))
 
-        return new{solvetype}([input], [output], [param], uhfunc, meta)
+        return new{T,UF,typeof(meta),solvetype}([input], [output], [param], uhfunc, meta)
     end
 end
 
@@ -475,9 +475,9 @@ Apply the unit hydrograph flux model to input data of various dimensions.
 - Vector input is not supported and will throw an error.
 """
 
-(::UnitHydroFlux)(::Vector, ::ComponentVector; kwargs...) = @error "UnitHydroFlux is not support for single timepoint"
+(::UnitHydroFlux)(::AbstractVector, ::ComponentVector; kwargs...) = @error "UnitHydroFlux is not support for single timepoint"
 
-function (flux::UnitHydroFlux{:DISCRETE})(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::UnitHydroFlux{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     solver = get(kwargs, :solver, DiscreteSolver())
     timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
     input_vec = input[1, :]
@@ -500,7 +500,7 @@ function (flux::UnitHydroFlux{:DISCRETE})(input::Matrix, pas::ComponentVector; k
     end
 end
 
-function (flux::UnitHydroFlux{:SPARSE})(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::UnitHydroFlux{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     input_vec = input[1, :]
     lag = pas[:params][get_param_names(flux)[1]]
     uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
@@ -520,7 +520,7 @@ function (flux::UnitHydroFlux{:SPARSE})(input::Matrix, pas::ComponentVector; kwa
 end
 
 # todo: 卷积计算的结果与前两个计算结果不太一致
-function (flux::UnitHydroFlux{:INTEGRAL})(input::Matrix, pas::ComponentVector; kwargs...)
+function (flux::UnitHydroFlux{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     input_vec = input[1, :]
     itp_method = get(kwargs, :interp, LinearInterpolation)
     itp = itp_method(input_vec, collect(1:length(input_vec)), extrapolate=true)
@@ -539,7 +539,7 @@ function (flux::UnitHydroFlux{:INTEGRAL})(input::Matrix, pas::ComponentVector; k
     reshape(routed_result, 1, length(input_vec))
 end
 
-function (uh::AbstractUnitHydroFlux)(input::Array, pas::ComponentVector; kwargs...)
+function (uh::UnitHydroFlux)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
     ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))

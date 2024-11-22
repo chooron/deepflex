@@ -100,9 +100,7 @@ function build_ele_func(
     ]
 
     #* Construct Flux Function: Func(args, kwargs, body), where body represents the matching formula between each variable and expression
-    merged_flux_func = @RuntimeGeneratedFunction(
-        toexpr(Func(func_args, [], Let(assign_list, flux_output_array, false)))
-    )
+    merged_flux_func = @RuntimeGeneratedFunction(toexpr(Func(func_args, [], Let(assign_list, flux_output_array, false))))
 
     if length(dfuncs) > 0
         #* convert diff state output to array
