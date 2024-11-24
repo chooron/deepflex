@@ -233,6 +233,7 @@ function (route::HydroRoute{F,PF,M})(
     #* get the parameter types and state types
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     stypes = get(config, :stypes, route.hrunames)
+    # hrunames = get(config, :stypes, route.hrunames)
     #* get the interpolation type and solver type
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())

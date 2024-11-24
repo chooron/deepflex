@@ -250,6 +250,8 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
+    @assert length(ptypes) == size(input, 2) "Number of parameter types mismatch. Expected $(size(input, 2)) parameter types, got $(length(ptypes))."
+    @assert length(stypes) == size(input, 2) "Number of state types mismatch. Expected $(size(input, 2)) state types, got $(length(stypes))."
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
     @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
 
@@ -288,6 +290,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     #* check input and parameter
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
+    @assert length(ptypes) == size(input, 2) "Number of parameter types mismatch. Expected $(size(input, 2)) parameter types, got $(length(ptypes))."
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
 
     #* extract params and nn params

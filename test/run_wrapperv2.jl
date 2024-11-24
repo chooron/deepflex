@@ -1,9 +1,18 @@
+using CSV
+using DataFrames
+using ComponentArrays
+using BenchmarkTools
+using NamedTupleTools
+using DataInterpolations
+
+
+include("../src/HydroModels.jl")
+
 HydroFlux = HydroModels.HydroFlux
 StateFlux = HydroModels.StateFlux
 NeuralFlux = HydroModels.NeuralFlux
 HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
-RecordComponentState = HydroModels.RecordComponentState
 EstimateComponentParams = HydroModels.EstimateComponentParams
 
 @parameters Tmin Tmax Df Smax f Qmax
@@ -41,32 +50,22 @@ soil_ele = HydroBucket(funcs=soil_funcs, dfuncs=soil_dfuncs)
 #! define the Exp-Hydro model
 model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele])
 
-@testset "RecordComponentState wrapper" begin
-    wrapper = RecordComponentState(model, initstates)
-    for i in 1:10
-        println(wrapper.states)
-        output1 = wrapper(input, pas)
-    end
-end
+@parameters S0 Q0 ks kq
 
-@testset "EstimateComponentParams wrapper" begin
-    @parameters S0 Q0 ks kq
+est_func1 = HydroFlux([S0] => [Smax, Df], [ks], exprs=[step_func(S0) * S0 * ks, ks * 2.674])
+est_func2 = HydroFlux([Q0] => [Qmax], [kq], exprs=[step_func(Q0) * Q0 * kq])
+est_func1.func
+wrapper1 = EstimateComponentParams(model, [est_func1, est_func2])
+# @test Set(get_param_names(wrapper1.component)) == Set([:Tmin, :Tmax, :Df, :f, :S0, :Q0, :ks, :kq])
+new_params = ComponentVector(f=0.0167, Df=2.674, Tmax=0.17, Tmin=-2.09, Smax=1709.46, Qmax=18.47)
+new_pas = ComponentVector(params=new_params, initstates=initstates)
+# output = wrapper1(input, new_pas)
 
-    est_func1 = HydroFlux([S0] => [Smax, Df], [ks], exprs=[step_func(S0) * S0 * ks, ks * 2.674])
-    est_func2 = HydroFlux([Q0] => [Qmax], [kq], exprs=[step_func(Q0) * Q0 * kq])
-    est_func1.func
-    wrapper1 = EstimateComponentParams(model, [est_func1, est_func2])
-    # @test Set(get_param_names(wrapper1.component)) == Set([:Tmin, :Tmax, :Df, :f, :S0, :Q0, :ks, :kq])
-    new_params = ComponentVector(f=0.0167, Df=0.0, Tmax=0.17, Tmin=-2.09, S0=1709.46, Q0=18.47, ks=1.0, kq=1.0, Smax=0.0, Qmax=0.0)
-    new_pas = ComponentVector(params=new_params, initstates=initstates)
-    output = wrapper1(input, new_pas)
-    
-    pkeys = [:ptype1, :ptype2, :ptype3]
-    ptypes = [:ptype1, :ptype2, :ptype3, :ptype1, :ptype2, :ptype3, :ptype1, :ptype2, :ptype3, :ptype1]
-    stypes = [Symbol("hru_$i") for i in 1:10]
-    wrapper2 = EstimateComponentParams(model, [est_func1, est_func2], pkeys)
-    multi_input = fill(input_ntp, 10)
-    multi_pas = ComponentVector(params=NamedTuple{Tuple(pkeys)}(fill(new_params, 3)), initstates=NamedTuple{Tuple(stypes)}(fill(initstates, 10)))
-    cfg = (ptypes=ptypes, stypes=stypes)
-    output = wrapper2(multi_input, multi_pas, config=cfg)
-end
+pkeys = [:ptype1, :ptype2, :ptype3]
+ptypes = [:ptype1, :ptype2, :ptype3, :ptype1, :ptype2, :ptype3, :ptype1, :ptype2, :ptype3, :ptype1]
+stypes = [Symbol("hru_$i") for i in 1:10]
+wrapper2 = EstimateComponentParams(model, [est_func1, est_func2], pkeys)
+multi_input = fill(input_ntp, 10)
+multi_pas = ComponentVector(params=NamedTuple{Tuple(pkeys)}(fill(new_params, 3)), initstates=NamedTuple{Tuple(stypes)}(fill(initstates, 10)))
+
+wrapper = ComputeComponentOutlet(model, )

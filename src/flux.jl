@@ -129,7 +129,12 @@ function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVect
 
     #* array dims: (var_names * node_names * ts_len)
     flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
-    flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    if length(flux_output_vec) == 1
+        tmp_output_arr = flux_output_vec[1]
+        flux_output_arr = reshape(tmp_output_arr, size(tmp_output_arr)..., 1)
+    else
+        flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    end
     # flux_output_arr = mapslices(input, dims=[1,2]) do slice
     #     reduce(hcat, flux.func.(eachcol(slice), params_vec, timeidx))
     # end
