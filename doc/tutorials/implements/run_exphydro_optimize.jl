@@ -15,6 +15,8 @@ using SciMLSensitivity
 # using HydroModels
 include("../../../src/HydroModels.jl")
 include("../models/exphydro.jl")
+# model_grad_opt = HydroModels.GradOptimizer(component=exphydro_model, solve_alg=Adam(1e-2), adtype=Optimization.AutoForwardDiff(), maxiters=100)
+
 
 # load data
 file_path = "data/exphydro/01013500.csv"
@@ -24,14 +26,21 @@ ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 q_vec = df[ts, "flow(mm)"]
 
-model_grad_opt = HydroModels.GradOptimizer(component=model, solve_alg=Adam(1e-2), adtype=Optimization.AutoForwardDiff(), maxiters=100)
-model_hydro_opt = HydroModels.HydroOptimizer(component=model, maxiters=100)
-tunable_params = ComponentVector(f=0.01674478, Smax=1709.461015, Qmax=18.46996175, Df=2.674548848, Tmax=0.175739196, Tmin=-2.092959084)
-tunable_pas = ComponentVector(params=tunable_params)
+model_hydro_opt = HydroModels.HydroOptimizer(
+    component=exphydro_model,
+    maxiters=100,
+    warmup=100,
+    alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+    loss_func=(obs, sim) -> sum((obs .- sim) .^ 2) / length(obs)
+)
+tunable_pas = ComponentVector(params=ComponentVector(
+    f=0.01674478, Smax=1709.461015, Qmax=18.46996175,
+    Df=2.674548848, Tmax=0.175739196, Tmin=-2.092959084
+))
 const_pas = ComponentVector(initstates=ComponentVector(snowpack=0.0, soilwater=1300.0))
 config = (solver=HydroModels.ODESolver(), interp=LinearInterpolation)
 
-exphydro_hydro_opt_params, loss_dfv2 = model_hydro_opt(
+exphydro_hydro_opt_params, loss_df = model_hydro_opt(
     [input], [(flow=q_vec,)],
     tunable_pas=tunable_pas,
     const_pas=const_pas,

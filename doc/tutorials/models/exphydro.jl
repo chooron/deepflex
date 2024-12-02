@@ -32,6 +32,6 @@ fluxes_2 = [
 dfluxes_2 = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
 bucket_2 = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
 
-model = HydroModel(name=:exphydro, components=[bucket_1, bucket_2]) 
+exphydro_model = HydroModel(name=:exphydro, components=[bucket_1, bucket_2]) 
 
-export bucket_1, model
+export bucket_1, exphydro_model

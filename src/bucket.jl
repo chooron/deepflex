@@ -112,7 +112,6 @@ function _get_parameter_extractors(ele::HydroBucket, pas::ComponentVector, ptype
         @assert all(param_name in keys(pas[:params][ptype]) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params][ptype])) at param type: $ptype."
     end
 
-
     #* Check if all required neural network names are present in pas[:nn] (if any)
     if !isempty(get_nn_names(ele))
         @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(ele)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."

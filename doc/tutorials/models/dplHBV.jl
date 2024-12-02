@@ -28,6 +28,7 @@ soil_funcs = [
 soil_dfuncs = [StateFlux([rainfall, infil] => [recharge, excess, evap], soilwater)]
 soil_bucket = HydroBucket(name=:hbv_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 
+#* up and low zone bucket
 zone_funcs = [
     HydroFlux([suz] => [perc], [PPERC], exprs=[suz * PPERC]),
     HydroFlux([suz] => [q0], [UZL, k0], exprs=[max(0.0, suz - UZL) * k0]),
