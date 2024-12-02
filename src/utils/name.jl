@@ -39,18 +39,21 @@ get_input_names(func::AbstractFlux) = func.meta.inputs
 get_input_names(ele::AbstractBucket) = ele.meta.inputs
 get_input_names(route::AbstractRoute) = route.meta.inputs
 get_input_names(unit::AbstractModel) = unit.meta.inputs
+get_input_names(comp::AbstractComponent) = comp.meta.inputs
 
 get_output_names(func::AbstractFlux) = func.meta.outputs
 get_output_names(::AbstractStateFlux) = Symbol[]
 get_output_names(ele::AbstractBucket) = ele.meta.outputs
 get_output_names(route::AbstractRoute) = route.meta.outputs
 get_output_names(unit::AbstractModel) = unit.meta.outputs
+get_output_names(comp::AbstractComponent) = comp.meta.outputs
 
 get_state_names(flux::AbstractFlux) = flux.meta.states
 get_state_names(fluxes::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(fluxes))
 get_state_names(ele::AbstractBucket) = ele.meta.states
 get_state_names(route::AbstractRoute) = route.meta.states
 get_state_names(unit::AbstractModel) = unit.meta.states
+get_state_names(comp::AbstractComponent) = comp.meta.states
 
 get_param_names(func::AbstractFlux) = func.meta.params
 get_param_names(::AbstractNeuralFlux) = Symbol[]
@@ -58,6 +61,7 @@ get_param_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_param_names.(
 get_param_names(ele::AbstractBucket) = ele.meta.params
 get_param_names(route::AbstractRoute) = route.meta.params
 get_param_names(unit::AbstractModel) = unit.meta.params
+get_param_names(comp::AbstractComponent) = comp.meta.params
 
 get_nn_names(::AbstractFlux) = Symbol[]
 get_nn_names(func::AbstractNeuralFlux) = func.meta.nns
@@ -65,6 +69,7 @@ get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs)
 get_nn_names(ele::AbstractBucket) = ele.meta.nns
 get_nn_names(route::AbstractRoute) = route.meta.nns
 get_nn_names(unit::AbstractModel) = unit.meta.nns
+get_nn_names(comp::AbstractComponent) = comp.meta.nns
 
 get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
 #* elements name utils

@@ -126,6 +126,14 @@ function _get_parameter_extractors(ele::HydroBucket, pas::ComponentVector, ptype
     return param_func, nn_param_func
 end
 
+function _get_du_func(ele::HydroBucket, ode_input_func::Function, param_func::Function, nn_param_func::Function)
+    (u, p, t) -> ele.ode_func(ode_input_func(t), u, param_func(p), nn_param_func(p), t)
+end
+
+function _get_dum_func(ele::HydroBucket, ode_input_func::Function, param_func::Function, nn_param_func::Function)
+    (u, p, t) -> reduce(hcat, ele.ode_func.(ode_input_func(t), eachslice(u, dims=2), param_func(p), nn_param_func(p), t))
+end
+
 """
     (ele::HydroBucket)(input::Matrix, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
     (ele::HydroBucket)(input::Array, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
@@ -181,11 +189,17 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
 
+    #* get initial states matrix
+    initstates_mat = collect(pas[:initstates][get_state_names(ele)])
     #* extract params and nn params
+    #* build differential equation function
     param_func, nn_param_func = _get_parameter_extractors(ele, pas)
+    itpfunc_list = map((var) -> interp(var, timeidx, extrapolate=true), eachrow(input))
+    ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
+    du_func = _get_du_func(ele, ode_input_func, param_func, nn_param_func)
 
-    #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-    solved_states = solve_prob(ele, input, pas; paramsfunc=param_func, nnparamfunc=nn_param_func, timeidx=timeidx, solver=solver, interp=interp)
+    #* solve the problem by call the solver
+    solved_states = solver(du_func, pas, initstates_mat, timeidx)
     #* Store the solved bucket state in fluxes
     fluxes = cat(input, solved_states, dims=1)
 
@@ -193,13 +207,13 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     params_vec, nn_params_vec = param_func(pas), nn_param_func(pas)
     flux_output = ele.flux_func.(eachslice(fluxes, dims=2), Ref(params_vec), Ref(nn_params_vec), timeidx)
     #* convert vector{vector} to matrix
-    flux_output_matrix = reduce(hcat, flux_output)
+    flux_output_mat = reduce(hcat, flux_output)
     #* merge output and state, if solved_states is not nothing, then cat it at the first dim
-    output_matrix = cat(solved_states, flux_output_matrix, dims=1)
+    output_mat = cat(solved_states, flux_output_mat, dims=1)
     if convert_to_ntp
-        return NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(output_matrix, dims=1))
+        return NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(output_mat, dims=1))
     else
-        return output_matrix
+        return output_mat
     end
 end
 
@@ -255,11 +269,20 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
     @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
 
+    #* prepare initial states
+    init_states_vec = collect([collect(pas[:initstates][stype][get_state_names(ele)]) for stype in stypes])
+    init_states_mat = reduce(hcat, init_states_vec)
     #* extract params and nn params
     param_func, nn_param_func = _get_parameter_extractors(ele, pas, ptypes)
+    #* prepare input function
+    itpfunc_vecs = [interp.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
+    ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
+    #* build differential equation function
+    du_func = _get_dum_func(ele, ode_input_func, param_func, nn_param_func)
 
     #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-    solved_states = solve_prob(ele, input, pas, timeidx=timeidx, solver=solver, interp=interp, paramsfunc=param_func, nnparamfunc=nn_param_func)
+    solved_states = solver(du_func, pas, init_states_mat, timeidx; convert_to_array=true)
+
     #* Store the solved bucket state in fluxes
     fluxes = cat(input, solved_states, dims=1)
 
@@ -292,7 +315,10 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
     @assert length(ptypes) == size(input, 2) "Number of parameter types mismatch. Expected $(size(input, 2)) parameter types, got $(length(ptypes))."
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-
+    #* check initstates input is correct
+    for stype in stypes
+        @assert all(state_name in keys(pas[:initstates][stype]) for state_name in get_state_names(ele)) "Missing required initial states. Expected all of $(get_state_names(ele)), but got $(keys(init_states_item)) at state type: $stype."
+    end
     #* extract params and nn params
     param_func, nn_param_func = _get_parameter_extractors(ele, pas, ptypes)
     #* array dims: (num of node, sequence length, variable dim)
@@ -307,10 +333,9 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     end
 end
 
-
 function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
     @assert all(input_name in keys(input) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input))."
-    input_matrix = Matrix(reduce(hcat, [input[k] for k in keys(input)])')
+    input_matrix = Matrix(reduce(hcat, [input[k] for k in get_input_names(ele)])')
     ele(input_matrix, pas; config=config, kwargs...)
 end
 
@@ -322,98 +347,3 @@ function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector; c
     input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
     ele(input_arr, pas; config=config, kwargs...)
 end
-
-
-"""
-Solve the ordinary differential equations for a HydroBucket model.
-
-This function handles two types of input arguments:
-
-1. Single node input:
-   - `input`: Matrix with dimensions (var_names × ts_len)
-   - `pas`: ComponentVector with structure:
-     ComponentVector(params=(p1=, p2=, ...), initstates=(...), nn=(...))
-
-2. Multiple node input:
-   - `input`: Array with dimensions (var_names × node_names × ts_len)
-   - `pas`: ComponentVector with structure:
-     ComponentVector(params=(node_1=(p1=, p2=, ...), node_2=(p1=, p2=, ...), ...), initstates=(...), nn=(...))
-
-# Arguments
-- `ele::HydroBucket`: The HydroBucket model instance
-- `input`: Input data (Matrix for single node, dims: var_names × ts_len, Array for multiple nodes, dims: var_names × node_names × ts_len)
-- `pas::ComponentVector`: Parameters and initial states
-- `paramsfunc::Function`: Function to extract parameters from pas for each node
-- `nnparamfunc::Function`: Function to extract neural network parameters from pas (default: returns nothing)
-- `timeidx::Vector{<:Number}`: Time index vector (default: 1:size(input,2) or 1:size(input,3))
-- `solver::AbstractHydroSolver`: ODE solver to use (default: ODESolver())
-- `interp::Type{<:AbstractInterpolation}`: Interpolation type for input data (default: LinearInterpolation)
-- `stypes::Vector{Symbol}`: State types for multiple node input (default: keys of pas[:initstates])
-
-# Returns
-- `sol`: Solution of the ordinary differential equations, dims: state_names × ts_len (or state_names × node_names × ts_len for multiple nodes)
-"""
-function solve_prob(
-    ele::HydroBucket{F,D,FF,OF,M},
-    input::AbstractArray{T,2},
-    pas::ComponentVector;
-    paramsfunc::Function,
-    nnparamfunc::Function=(_) -> nothing,
-    timeidx::Vector{<:Number}=collect(1:size(input, 2)),
-    solver::AbstractHydroSolver=ODESolver(),
-    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
-) where {F,D,FF,OF<:Function,M,T}
-    #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
-    #* so an interpolation function can be constructed to apply to each time point.
-    itpfunc_list = map((var) -> interp(var, timeidx, extrapolate=true), eachrow(input))
-    #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
-    ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
-
-    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
-    function single_ele_ode_func!(du, u, p, t)
-        ode_input = ode_input_func(t)
-        du[:] = ele.ode_func(ode_input, u, paramsfunc(p), nnparamfunc(p), t)
-    end
-
-    #* Solve the problem using the solver wrapper
-    sol = solver(single_ele_ode_func!, pas, collect(pas[:initstates][get_state_names(ele)]), timeidx)
-    sol
-end
-
-function solve_prob(
-    ele::HydroBucket{F,D,FF,OF,M},
-    input::AbstractArray{T,3},
-    pas::ComponentVector;
-    paramsfunc::Function,
-    nnparamfunc::Function=(_) -> nothing,
-    timeidx::Vector{<:Number}=collect(1:size(input, 3)),
-    stypes::Vector{Symbol}=collect(keys(pas[:initstates])),
-    solver::AbstractHydroSolver=ODESolver(),
-    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
-) where {F,D,FF,OF<:Function,M,T}
-    #* Interpolate input data and solve ODEs in parallel for multiple identical units
-    #* Input dims: num_nodes × num_vars × timesteps
-    itpfunc_vecs = [interp.(eachslice(input[:, i, :], dims=1), Ref(timeidx), extrapolate=true) for i in 1:size(input)[2]]
-    ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
-
-    #* prepare initial states
-    init_states_vec = collect([collect(pas[:initstates][stype][get_state_names(ele)]) for stype in stypes])
-    init_states_matrix = reduce(hcat, init_states_vec)
-    #* check initstates input is correct
-    for stype in stypes
-        @assert all(state_name in keys(pas[:initstates][stype]) for state_name in get_state_names(ele)) "Missing required initial states. Expected all of $(get_state_names(ele)), but got $(keys(init_states_item)) at state type: $stype."
-    end
-
-    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
-    function multi_ele_ode_func!(du, u, p, t)
-        ode_input = ode_input_func(t)
-        tmp_output_vec = ele.ode_func.(ode_input, eachslice(u, dims=2), paramsfunc(p), nnparamfunc(p), t)
-        tmp_output = reduce(hcat, tmp_output_vec)
-        du[:] = tmp_output
-    end
-
-    #* Solve the problem using the solver wrapper
-    sol = solver(multi_ele_ode_func!, pas, init_states_matrix, timeidx)
-    sol
-end
-

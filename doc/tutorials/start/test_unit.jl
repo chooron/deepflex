@@ -22,16 +22,17 @@ ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 
 # run model with single node input
-solver = HydroModels.ODESolver()
-result = model(input, pas, config=(solver=solver, timeidx=ts), convert_to_ntp=true)
+# solver = HydroModels.ODESolver(reltol=1e-3, abstol=1e-3)
+solver = HydroModels.ManualSolver()
+@btime result = model(input, pas, config=(solver=solver, timeidx=ts), convert_to_ntp=true)
 plot(result.flow)
 plot!(df[ts, "flow(mm)"])
 
-# run model with multi node input
-node_num = 10
-inputs = repeat([input], node_num)
-ptypes = [Symbol(:node, i) for i in 1:node_num]
-params_multi = ComponentVector(NamedTuple{Tuple(ptypes)}(repeat([params], node_num)))
-init_states_multi = ComponentVector(NamedTuple{Tuple(ptypes)}(repeat([init_states], node_num)))
-pas_multi = ComponentVector(params=params_multi, initstates=init_states_multi)
-results = model(inputs, pas_multi, config=(solver=solver, timeidx=ts), convert_to_ntp=true)
+# # run model with multi node input
+# node_num = 10
+# inputs = repeat([input], node_num)
+# ptypes = [Symbol(:node, i) for i in 1:node_num]
+# params_multi = ComponentVector(NamedTuple{Tuple(ptypes)}(repeat([params], node_num)))
+# init_states_multi = ComponentVector(NamedTuple{Tuple(ptypes)}(repeat([init_states], node_num)))
+# pas_multi = ComponentVector(params=params_multi, initstates=init_states_multi)
+# results = model(inputs, pas_multi, config=(solver=solver, timeidx=ts), convert_to_ntp=true)

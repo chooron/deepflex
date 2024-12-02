@@ -25,22 +25,25 @@ ts = collect(1:10000)
 
 # single node input
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-solver = HydroModels.ODESolver(reltol=1e-3, abstol=1e-3)
+solver = HydroModels.ManualSolver{true}()
 config = (solver=solver,)
+input_arr = Matrix(reduce(hcat, collect(input[ele.meta.inputs]))')
 # bucket_1.ode_func([1, 1, 1], [0], [1, 1, 1], [], [1])
-@btime results = ele(input, pas, config=config, convert_to_ntp=false)
+@btime results = ele(input_arr, pas, config=config, convert_to_ntp=true)
+#  results1 = ele(input, pas, config=config, convert_to_ntp=true)
 
-# # multi node input
-# node_num = 10
-# node_names = [Symbol(:node, i) for i in 1:node_num]
-# node_params = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([params], length(node_names))))
-# node_initstates = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([init_states], length(node_names))))
-# node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
-# input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
-# node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(node_names)))
-# node_input = permutedims(node_input, (2, 3, 1))
-# run_kwgs = (ptypes=node_names, interpolator=LinearInterpolation, timeidx=ts)
+# multi node input
+node_num = 10
+node_names = [Symbol(:node, i) for i in 1:node_num]
+node_params = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([params], length(node_names))))
+node_initstates = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([init_states], length(node_names))))
+node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
-# @btime result = ele(node_input, node_pas, kwargs=run_kwgs)
+input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
+node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(node_names)))
+node_input = permutedims(node_input, (2, 3, 1))
+run_kwgs = (ptypes=node_names, interpolator=LinearInterpolation, timeidx=ts)
+
+result = ele(node_input, node_pas, kwargs=run_kwgs)
 # node_input = cat(node_input, result, dims=1)

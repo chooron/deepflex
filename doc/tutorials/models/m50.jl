@@ -1,5 +1,11 @@
 using ModelingToolkit
 
+HydroFlux = HydroModels.HydroFlux
+StateFlux = HydroModels.StateFlux
+NeuralFlux = HydroModels.NeuralFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
+
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 #! parameters in the Exp-Hydro model
 @parameters Tmin Tmax Df Smax f Qmax
@@ -62,3 +68,5 @@ soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, lo
 soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 #! define the Exp-Hydro model
 m50_model = HydroModel(name=:m50, components=[snow_ele, soil_ele]);
+
+export m50_model, eq_nn_flux, q_nn_flux

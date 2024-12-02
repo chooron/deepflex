@@ -2,6 +2,7 @@ module HydroModels
 
 ## External packages
 # common packages
+using Accessors
 using ComponentArrays
 using ComponentArrays: indexmap, getval
 using Dates
@@ -45,6 +46,8 @@ using Lux
 using LuxCore
 using NNlib
 
+using ChainRulesCore
+
 # parameters Optimization
 using Optimization
 using OptimizationBBO
@@ -76,6 +79,7 @@ abstract type AbstractHydroRoute <: AbstractRoute end
 abstract type AbstractRapidRoute <: AbstractRoute end
 
 abstract type AbstractHydroWrapper <: AbstractComponent end
+abstract type AbstractNeuralWrapper <: AbstractComponent end
 # utils
 include("utils/uh.jl")
 export UHFunction, UH_1_HALF, UH_2_FULL

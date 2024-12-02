@@ -26,7 +26,7 @@ When called, it:
 
 The state values can be accessed through the `states` field at any time.
 """
-mutable struct RecordComponentState{C<:AbstractComponent,T<:Number,M<:HydroMeta} <: AbstractHydroWrapper
+struct RecordComponentState{C<:AbstractComponent,T<:Number,M<:HydroMeta} <: AbstractHydroWrapper
     component::C
     states::ComponentVector{T}
     meta::M
@@ -72,7 +72,7 @@ function (wrapper::RecordComponentState{C,T,M})(input::Any, pas::ComponentVector
             ))
         end
     end
-    wrapper.states = states_ca
+    @reset wrapper.states = states_ca
     return output
 end
 
@@ -255,5 +255,41 @@ function (wrapper::WeightSumComponentOutlet)(input::Union{AbstractArray{T,3},Abs
             sum([output[idx, i, :] .* weight_vec[i] for i in eachindex(weight_vec)])
         end
         return reduce(hcat, var_vec)
+    end
+end
+
+struct NeuralWrapper{N,F,M} <: AbstractNeuralWrapper
+    model::N
+    func::F
+    meta::M
+
+    function NeuralWrapper(fluxes::Pair, model::N; name::Union{Nothing,Symbol}=nothing, rng::R=StableRNG(42)) where {N,R}
+        #* assert the chain has a name
+        # @assert model.name isa Symbol "Neural network chain should have a name with Symbol type"
+        #* extract the parameter and state
+        ps, st = Lux.setup(rng, model)
+        ps_axes = getaxes(ComponentVector(ps))
+        nn_func(x, p) = LuxCore.apply(model, x, ComponentVector(p, ps_axes), st)[1]
+        wrapper_name = name === nothing ? Symbol(model.name, :_wrapper) : name
+        meta = HydroMeta(name=wrapper_name, inputs=fluxes.first, outputs=fluxes.second) # , nn_names=[model.name]
+        new{N,typeof(nn_func),typeof(meta)}(model, nn_func, meta)
+    end
+end
+
+function (wrapper::NeuralWrapper)(input::Array{T,2}, pas::ComponentVector; kwargs...) where {T}
+    nn_ps = pas[:nn][wrapper.meta.name]
+    output = wrapper.func(input, nn_ps)
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
+    return convert_to_ntp ? NamedTuple{Tuple(get_output_names(wrapper))}(eachslice(output, dims=1)) : output
+end
+
+function (wrapper::NeuralWrapper)(input::Array{T,3}, pas::ComponentVector; kwargs...) where {T}
+    nn_ps = pas[:nn][wrapper.meta.name]
+    output = wrapper.func.(eachslice(input, dims=2), Ref(nn_ps))
+    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
+    if convert_to_ntp
+        return [NamedTuple{Tuple(get_output_names(wrapper))}(eachslice(output[:, i, :], dims=1)) for i in axes(output, 2)]
+    else
+        return output
     end
 end

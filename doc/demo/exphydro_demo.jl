@@ -41,18 +41,18 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 # HydroFlux([temp, lday] => [pet],
 # exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
 #! define the snow pack reservoir
+HydroFlux([temp, lday] => [pet],
+    exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)])
 
 snow_funcs = [
-    HydroFlux([temp, lday] => [pet],
-        exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin],
         exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
     HydroFlux([snowpack, temp] => [melt], [Tmax, Df],
         exprs=[step_func(temp - Tmax) * min(snowpack, Df * (temp - Tmax))]),
 ]
 snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-
 snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+
 snow_ele.flux_func
 #! define the soil water reservoir
 soil_funcs = [
