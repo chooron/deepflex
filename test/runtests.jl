@@ -23,3 +23,5 @@ using Test
     include("run_lumped_model.jl")
     include("run_spatial_model.jl")
 end
+
+Aqua.test_all(HydroModels)

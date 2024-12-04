@@ -37,6 +37,9 @@ using Graphs
 using DataInterpolations
 using DataInterpolations: AbstractInterpolation
 
+# integral
+using Integrals
+
 # solve ODEProblem
 using SciMLBase
 using OrdinaryDiffEq
@@ -76,6 +79,11 @@ abstract type AbstractRoute <: AbstractElement end
 abstract type AbstractHydroRoute <: AbstractRoute end
 abstract type AbstractRapidRoute <: AbstractRoute end
 abstract type AbstractModel <: AbstractComponent end
+
+export AbstractComponent, AbstractHydroSolver, AbstractHydroOptimizer, AbstractHydroWrapper, AbstractNeuralWrapper
+export AbstractFlux, AbstractHydroFlux, AbstractNeuralFlux, AbstractStateFlux
+export AbstractElement, AbstractBucket, AbstractHydrograph, AbstractRoute, AbstractHydroRoute, AbstractRapidRoute, AbstractModel
+
 # utils
 include("utils/attr.jl")
 include("utils/ca.jl")
@@ -93,20 +101,15 @@ export ODESolver, DiscreteSolver, ManualSolver
 
 # framework build
 include("flux.jl")
-export HydroFlux, StateFlux, NeuralFlux, UnitHydroFlux
+export HydroFlux, StateFlux, NeuralFlux
 include("bucket.jl")
 export HydroBucket
 include("route.jl")
-export DirectRoute, GridRoute, VectorRoute, HydroRoute # , RapidRoute
+export GridRoute, VectorRoute, HydroRoute, RapidRoute
 include("uh.jl")
-export UHFunction, UH_1_HALF, UH_2_FULL
+export UHFunction, UnitHydrograph
 include("model.jl")
 export HydroModel
 include("wrapper.jl")
 export RecordComponentState, EstimateComponentParams, WeightSumComponentOutlet, ComputeComponentOutlet
-
-# export abstract structs
-export AbstractComponent, AbstractSolver, AbstractElement, AbstractUnit, AbstractHydroBucket, AbstractRoute, HydroEquation
-export AbstractFlux, AbstractHydroFlux, AbstractNeuralFlux, AbstractStateFlux, AbstractRouteFlux
-
 end # module HydroModels

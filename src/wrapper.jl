@@ -239,7 +239,7 @@ struct WeightSumComponentOutlet{C<:AbstractComponent,M<:HydroMeta,T<:Number} <: 
     end
 end
 
-function (wrapper::WeightSumComponentOutlet)(input::Union{AbstractArray{T,3},AbstractVector{<:NamedTuple}}, pas::ComponentVector; kwargs...) where {T}
+function (wrapper::WeightSumComponentOutlet)(input::Union{AbstractArray{<:Number,3},AbstractVector{<:NamedTuple}}, pas::ComponentVector; kwargs...)
     convert_to_ntp = get(kwargs, :convert_to_ntp, true)
     output = wrapper.component(input, pas; kwargs...)
     var_names = Symbolics.tosymbol.(wrapper.vars)

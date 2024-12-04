@@ -102,12 +102,7 @@ tmp_params = ComponentVector(
 )
 m50_outputv2 = m50_model(input, tmp_params, config=config, convert_to_ntp=true)
 
-result = (exphydro=exphydro_output.flow, m50=exp.(m50_output.log_flow), sim=flow_vec)
-# plot((m50_output.flow))
-# plot!((m50_outputv2.flow))
-
-# plot!((q_flux_output)[1, :])
-# # plot!(exphydro_output.flow)
-# plot!(flow_vec)
-
-# plot(m50_loss_df.loss)
+result = (exphydro=exphydro_output.flow, m50=m50_output.flow, qnn=exp.((q_flux_output)[1, :]), sim=flow_vec)
+save("doc/tutorials/implements/save/m50_result.jld2",
+    "exphydro", exphydro_output.flow, "m50", m50_output.flow,
+    "qnn", exp.((q_flux_output)[1, :]), "obs", flow_vec)

@@ -36,4 +36,4 @@ plot!(ma_loss,
     color=:red,
     linewidth=2,
     alpha=0.8)
-# savefig(p, "doc/tutorials/implements/plot/figures/m50_training_0.001.png")
+savefig(p, "tutorials/implements/plot/figures/m50_training.png")
