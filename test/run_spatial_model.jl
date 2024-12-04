@@ -12,7 +12,7 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
     #! load data
     ts = collect(1:100)
-    df = DataFrame(CSV.File("data/exphydro/01013500.csv"))
+    df = DataFrame(CSV.File("../data/exphydro/01013500.csv"))
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
     input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 
@@ -74,7 +74,7 @@ end
 
     #! load data
     ts = collect(1:100)
-    df = DataFrame(CSV.File("data/exphydro/01013500.csv"))
+    df = DataFrame(CSV.File("../data/exphydro/01013500.csv"))
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
     input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 

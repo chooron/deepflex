@@ -13,16 +13,16 @@ using Plots
 using JLD2
 using OptimizationOptimisers
 using SciMLSensitivity
-# using HydroModels
-include("../../../src/HydroModels.jl")
+using HydroModels
+# include("../../../src/HydroModels.jl")
 include("../models/m50.jl")
 
 # load data
-data = CSV.read("data/exphydro/01013500.csv", DataFrame)
+data = CSV.read("../data/exphydro/01013500.csv", DataFrame)
 ts = collect(1:10000)
 input = (lday=data[ts, "dayl(day)"], temp=data[ts, "tmean(C)"], prcp=data[ts, "prcp(mm/day)"])
 flow_vec = data[ts, "flow(mm)"]
-load_exphydro = load("doc/tutorials/implements/save/exphydro_opt.jld2")
+load_exphydro = load("tutorials/implements/save/exphydro_opt.jld2")
 exphydro_output = load_exphydro["output"]
 exphydro_opt_params = load_exphydro["opt_params"]
 # predefine the parameters
@@ -48,6 +48,7 @@ ep_opt_params, epnn_loss_df = ep_grad_opt(
     const_pas=ComponentVector(),
     return_loss_df=true
 )
+ep_flux_output = ep_nn_flux(ep_input_matrix, ep_opt_params)
 #* train the q nn
 q_grad_opt = HydroModels.GradOptimizer(component=q_nn_flux, solve_alg=Adam(1e-2), adtype=AutoZygote(), maxiters=1000)
 q_opt_params, qnn_loss_df = q_grad_opt(
@@ -62,8 +63,8 @@ q_flux_output = q_nn_flux(q_input_matrix, q_opt_params)
 
 #* define parameters
 norm_pas = ComponentVector(
-    snowpack_mean=mean(exphydro_output.snowpack), soilwater_mean=mean(exphydro_output.snowpack), prcp_mean=mean(input.prcp), temp_mean=mean(input.temp),
-    snowpack_std=std(exphydro_output.snowpack), soilwater_std=std(exphydro_output.snowpack), prcp_std=std(input.prcp), temp_std=std(input.temp)
+    snowpack_mean=mean(exphydro_output.snowpack), soilwater_mean=mean(exphydro_output.soilwater), prcp_mean=mean(input.prcp), temp_mean=mean(input.temp),
+    snowpack_std=std(exphydro_output.snowpack), soilwater_std=std(exphydro_output.soilwater), prcp_std=std(input.prcp), temp_std=std(input.temp)
 )
 m50_const_pas = ComponentVector(
     initstates=ComponentVector(snowpack=0.0, soilwater=1300.0),
@@ -90,13 +91,23 @@ m50_opt_params, m50_loss_df = m50_opt(
 )
 save("doc/tutorials/implements/save/m50_opt.jld2", "loss_df", m50_loss_df, "opt_params",
     m50_opt_params, "epnn_params", ep_opt_params, "qnn_params", q_opt_params)
-
+plot(m50_loss_df.loss)
 m50_opt_params = load("doc/tutorials/implements/save/m50_opt.jld2")["opt_params"]
 m50_output = m50_model(input, m50_opt_params, config=config, convert_to_ntp=true)
+
+tmp_params = ComponentVector(
+    initstates=ComponentVector(snowpack=0.0, soilwater=1300.0),
+    params=ComponentVector(Tmin=Tmin, Tmax=Tmax, Df=Df; norm_pas...),
+    nn=ComponentVector(epnn=ep_opt_params, qnn=q_opt_params)
+)
+m50_outputv2 = m50_model(input, tmp_params, config=config, convert_to_ntp=true)
+
 result = (exphydro=exphydro_output.flow, m50=exp.(m50_output.log_flow), sim=flow_vec)
-# plot(m50_output.flow)
-# plot(exp.(q_flux_output)[1,:])
-# plot!(exphydro_output.flow)
+# plot((m50_output.flow))
+# plot!((m50_outputv2.flow))
+
+# plot!((q_flux_output)[1, :])
+# # plot!(exphydro_output.flow)
 # plot!(flow_vec)
 
 # plot(m50_loss_df.loss)

@@ -11,7 +11,7 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
     #! load data
     ts = collect(1:100)
-    df = DataFrame(CSV.File("data/exphydro/01013500.csv"))
+    df = DataFrame(CSV.File("../data/exphydro/01013500.csv"))
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
     input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 
@@ -73,7 +73,7 @@ end
 
     #! load data
     # load data
-    df = DataFrame(CSV.File("data/gr4j/sample.csv"))
+    df = DataFrame(CSV.File("../data/gr4j/sample.csv"))
     for col in names(df)[3:end]
         df[ismissing.(df[:, col]), col] .= 0.0
     end
@@ -165,7 +165,7 @@ end
     @variables norm_snw norm_slw norm_temp norm_prcp
 
     #! load data
-    df = DataFrame(CSV.File("data/m50/01013500.csv"))
+    df = DataFrame(CSV.File("../data/m50/01013500.csv"))
     ts = collect(1:10000)
     prcp_vec = df[ts, "Prcp"]
     temp_vec = df[ts, "Temp"]

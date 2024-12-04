@@ -47,8 +47,6 @@ using Lux
 using LuxCore
 using NNlib
 
-using ChainRulesCore
-
 # parameters Optimization
 using Optimization
 using OptimizationBBO
