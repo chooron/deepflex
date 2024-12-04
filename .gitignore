@@ -4,5 +4,6 @@ doc/build
 project
 .gitignore
 .cursorrules
+index.md
 WorkLog.md
 DesignMind.md
