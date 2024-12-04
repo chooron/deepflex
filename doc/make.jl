@@ -7,16 +7,14 @@ makedocs(
     authors = "xin jing",
     format = Documenter.HTML(
         # 启用 pretty URLs，移除 .html 后缀
-        prettyurls = get(ENV, "CI", nothing) == "true",
+        prettyurls = false,  # 修改这里，禁用 prettyurls
         # 设置文档的规范 URL
         canonical = "https://chooron.github.io/HydroModels.jl",
         # 设置资源文件
         assets = ["assets/icons.ico"],
         # 配置侧边栏
         collapselevel = 2,
-        sidebar_sitename = true,
-        # # 添加 favicon
-        # favicon = "assets/icons.ico"
+        sidebar_sitename = true
     ),
     # 配置模块
     modules = [HydroModels],
@@ -37,5 +35,6 @@ makedocs(
 deploydocs(
     repo = "github.com/chooron/HydroModels.jl",
     devbranch = "main",
-    push_preview = true
+    push_preview = true,
+    target = "build"  # 确保这里指定了正确的构建目录
 )
