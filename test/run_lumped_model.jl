@@ -2,7 +2,6 @@ HydroFlux = HydroModels.HydroFlux
 StateFlux = HydroModels.StateFlux
 HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
-UnitHydroFlux = HydroModels.UnitHydroFlux
 NeuralFlux = HydroModels.NeuralFlux
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
@@ -101,8 +100,8 @@ end
     prod_dfuncs = [StateFlux(soilwater => new_soilwater)]
 
 
-    uh_flux_1 = HydroModels.UnitHydroFlux(slowflow, slowflow_routed, x4, uhfunc=HydroModels.UHFunction(:UH_1_HALF), solvetype=:SPARSE)
-    uh_flux_2 = HydroModels.UnitHydroFlux(fastflow, fastflow_routed, x4, uhfunc=HydroModels.UHFunction(:UH_2_FULL), solvetype=:SPARSE)
+    uh_1 = HydroModels.UnitHydrograph(slowflow, slowflow_routed, x4, uhfunc=HydroModels.UHFunction(:UH_1_HALF), solvetype=:SPARSE)
+    uh_2 = HydroModels.UnitHydrograph(fastflow, fastflow_routed, x4, uhfunc=HydroModels.UHFunction(:UH_2_FULL), solvetype=:SPARSE)
 
     prod_ele = HydroBucket(funcs=prod_funcs, dfuncs=prod_dfuncs)
     #* define the routing store
@@ -115,7 +114,7 @@ end
     rst_dfuncs = [StateFlux(routingstore => new_routingstore)]
     rst_ele = HydroBucket(funcs=rst_funcs, dfuncs=rst_dfuncs)
     #* define the gr4j model
-    model = HydroModel(name=:gr4j, components=[prod_ele, uh_flux_1, uh_flux_2, rst_ele])
+    model = HydroModel(name=:gr4j, components=[prod_ele, uh_1, uh_2, rst_ele])
 
     @test Set(HydroModels.get_input_names(model)) == Set([:prcp, :ep])
     @test Set(HydroModels.get_param_names(model)) == Set([:x1, :x2, :x3, :x4])

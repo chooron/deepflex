@@ -18,7 +18,7 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 #! hydrological flux in the Exp-Hydro model
 @variables prcp temp lday pet rainfall snowfall
 @variables snowpack soilwater lday pet
-@variables melt log_evap_div_lday log_flow
+@variables melt log_evap_div_lday log_flow flow
 @variables norm_snw norm_slw norm_temp norm_prcp
 
 #! define the snow pack reservoir
@@ -60,13 +60,13 @@ soil_funcs = [
             [snowpack_std, soilwater_std, prcp_std, temp_std]
         )]),
     ep_nn_flux,
-    q_nn_flux,
+    q_nn_flux
 ]
-
-state_expr = rainfall + melt - step_func(soilwater) * lday * log_evap_div_lday - step_func(soilwater) * exp(log_flow)
+state_expr = rainfall + melt - step_func(soilwater) * lday * exp(log_evap_div_lday) - step_func(soilwater) * exp(log_flow)
 soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
 soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+convert_flux = HydroFlux([log_flow] => [flow], exprs=[exp(log_flow)])
 #! define the Exp-Hydro model
-m50_model = HydroModel(name=:m50, components=[snow_ele, soil_ele]);
+m50_model = HydroModel(name=:m50, components=[snow_ele, soil_ele, convert_flux]);
 
 export m50_model, eq_nn_flux, q_nn_flux

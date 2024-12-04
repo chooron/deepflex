@@ -63,14 +63,27 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
         manual_result = [sol[i, :] for i in 1:num_u]
         ele_params_idx = [getaxes(pas[:params])[1][nm].idx for nm in HydroModels.get_param_names(snow_ele)]
         paramfunc = (p) -> [p[:params][idx] for idx in ele_params_idx]
-        pkg_result = HydroModels.solve_prob(snow_ele, input, pas, paramsfunc=paramfunc, timeidx=ts, solver=HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3))
-        @test manual_result[1] == pkg_result[1, :]
+
+        param_func, nn_param_func = HydroModels._get_parameter_extractors(snow_ele, pas)
+        itpfunc_list = map((var) -> LinearInterpolation(var, ts, extrapolate=true), eachrow(input))
+        ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
+        du_func = HydroModels._get_du_func(snow_ele, ode_input_func, param_func, nn_param_func)
+        solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
+        initstates_mat = collect(pas[:initstates][HydroModels.get_state_names(snow_ele)])
+        #* solve the problem by call the solver
+        solved_states = solver(du_func, pas, initstates_mat, ts)
+        @test manual_result[1] == solved_states[1, :]
     end
 
     @testset "test all of the output" begin
-        ele_params_idx = [getaxes(pas[:params])[1][nm].idx for nm in HydroModels.get_param_names(snow_ele)]
-        paramfunc = (p) -> [p[:params][idx] for idx in ele_params_idx]
-        snowpack_vec = HydroModels.solve_prob(snow_ele, input, pas, paramsfunc=paramfunc, timeidx=ts)[1, :]
+        param_func, nn_param_func = HydroModels._get_parameter_extractors(snow_ele, pas)
+        itpfunc_list = map((var) -> LinearInterpolation(var, ts, extrapolate=true), eachrow(input))
+        ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
+        du_func = HydroModels._get_du_func(snow_ele, ode_input_func, param_func, nn_param_func)
+        solver = HydroModels.ODESolver(alg=Tsit5(), reltol=1e-3, abstol=1e-3)
+        initstates_mat = collect(pas[:initstates][HydroModels.get_state_names(snow_ele)])
+        #* solve the problem by call the solver
+        snowpack_vec = solver(du_func, pas, initstates_mat, ts)[1, :]
         pet_vec = snow_funcs[1](Matrix(reduce(hcat, [input_ntp.temp, input_ntp.lday])'), ComponentVector(params=ComponentVector()))[1, :]
         snow_funcs_2_output = snow_funcs[2](Matrix(reduce(hcat, [input_ntp.prcp, input_ntp.temp])'), ComponentVector(params=(Tmin=params.Tmin,)))
         snowfall_vec, rainfall_vec = snow_funcs_2_output[1, :], snow_funcs_2_output[2, :]

@@ -67,42 +67,6 @@ end
 #     @test re ≈ [1.0 0.977722 1.30086 1.90343 1.919 2.31884 2.15305 3.07904 4.39488 5.75286 4.83462 3.89097] atol = 1e-1
 # end
 
-@testset "test unit hydro flux" begin
-    # Define the variables and parameters
-    @variables q1 q1_routed
-    @parameters x1
-    # Define a unit hydrograph function
-    uh_func = HydroModels.UHFunction(:UH_1_HALF)
-    # Create a UnitHydroRouteFlux object
-    # Input: q1 (flow)
-    # Parameter: x1 (routing parameter)
-    # Using uh_1_half as the unit hydrograph function
-    # Solve type: unithydro1 (convolution method)
-    uhflux1 = HydroModels.UnitHydroFlux(q1, q1_routed, x1, uhfunc=uh_func, solvetype=:DISCRETE)
-    uhflux2 = HydroModels.UnitHydroFlux(q1, q1_routed, x1, uhfunc=uh_func, solvetype=:SPARSE)
-    # Test the input names of the router
-    @test HydroModels.get_input_names(uhflux1) == HydroModels.get_input_names(uhflux2) == [:q1]
-    # Test the parameter names of the router
-    @test HydroModels.get_param_names(uhflux1) == HydroModels.get_param_names(uhflux2) == [:x1]
-    # Test the output names of the router
-    @test HydroModels.get_output_names(uhflux1) == HydroModels.get_output_names(uhflux2) == [:q1_routed]
-    # Test the routing function with sample input
-    input_flow = Float32[2 3 4 2 3 1]
-    params = ComponentVector(params=(x1=3.5,))
-    expected_output = [0.0899066  0.643448  2.3442  3.20934  3.44646  2.20934]
-    # [0.08726897695099571 0.5373023715895905 1.6508571480656808 2.839759323622619 3.2301609643779736 2.7991762465729138]
-    @test uhflux1(input_flow, params) ≈ expected_output atol = 1e-3
-    @test uhflux2(input_flow, params) ≈ expected_output atol = 1e-3
-    # test with multiple nodes
-    input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), input_flow for _ in 1:10), (1, 3, 2))
-    ndtypes = [Symbol("node_$i") for i in 1:10]
-    node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
-    node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
-    input_pas = ComponentVector(params=node_params, initstates=node_initstates)
-
-    @test uhflux1(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
-    @test uhflux2(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
-end
 
 @testset "test neural flux (single output)" begin
     @variables a b c d e

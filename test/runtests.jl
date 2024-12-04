@@ -18,8 +18,9 @@ include("../src/HydroModels.jl")
 @testset "HydroModels.jl" begin
     # include("run_flux.jl") # test pass
     # include("run_bucket.jl")
-    include("run_route.jl")
+    # include("run_uh.jl")
+    # include("run_route.jl")
     # include("run_lumped_model.jl")
-    # include("run_spatial_model.jl")
+    include("run_spatial_model.jl")
     # Aqua.test_all(LumpedHydro; ambiguities = false)
 end

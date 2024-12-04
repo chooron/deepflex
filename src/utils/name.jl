@@ -1,12 +1,15 @@
-
 """
-Metadata about the component, including:
-- name: Symbol representing the component's name
-- inputs: Vector of input variable names
-- outputs: Vector of output variable names
-- params: Vector of parameter names
-- states: Vector of state variable names
-- nns: Vector of neural network names
+    HydroMeta
+
+A structure that stores metadata about hydrological components, including variable names and component information.
+
+# Fields
+- `inputs::Vector{Symbol}`: Names of input variables
+- `outputs::Vector{Symbol}`: Names of output variables
+- `states::Vector{Symbol}`: Names of state variables
+- `params::Vector{Symbol}`: Names of parameters
+- `nns::Vector{Symbol}`: Names of neural network components
+- `name::Symbol`: Component name
 """
 struct HydroMeta
     name::Symbol
@@ -35,55 +38,75 @@ struct HydroMeta
     end
 end
 
-get_input_names(func::AbstractFlux) = func.meta.inputs
-get_input_names(ele::AbstractBucket) = ele.meta.inputs
-get_input_names(route::AbstractRoute) = route.meta.inputs
-get_input_names(unit::AbstractModel) = unit.meta.inputs
+"""
+    get_input_names(comp::AbstractComponent)
+    get_input_names(comps::Vector{<:AbstractComponent})
+
+Get the names of input variables from a component or vector of components.
+Returns a vector of symbols representing input variable names.
+"""
 get_input_names(comp::AbstractComponent) = comp.meta.inputs
+get_input_names(comps::Vector{<:AbstractComponent}) = reduce(union, get_input_names.(comps))
 
-get_output_names(func::AbstractFlux) = func.meta.outputs
-get_output_names(::AbstractStateFlux) = Symbol[]
-get_output_names(ele::AbstractBucket) = ele.meta.outputs
-get_output_names(route::AbstractRoute) = route.meta.outputs
-get_output_names(unit::AbstractModel) = unit.meta.outputs
+"""
+    get_output_names(comp::AbstractComponent)
+    get_output_names(comps::Vector{<:AbstractComponent})
+
+Get the names of output variables from a component or vector of components.
+Returns a vector of symbols representing output variable names.
+"""
 get_output_names(comp::AbstractComponent) = comp.meta.outputs
+get_output_names(comps::Vector{<:AbstractComponent}) = reduce(union, get_output_names.(comps))
 
-get_state_names(flux::AbstractFlux) = flux.meta.states
-get_state_names(fluxes::Vector{<:AbstractFlux}) = reduce(union, get_state_names.(fluxes))
-get_state_names(ele::AbstractBucket) = ele.meta.states
-get_state_names(route::AbstractRoute) = route.meta.states
-get_state_names(unit::AbstractModel) = unit.meta.states
+"""
+    get_state_names(comp::AbstractComponent)
+    get_state_names(comps::Vector{<:AbstractComponent})
+
+Get the names of state variables from a component or vector of components.
+Returns a vector of symbols representing state variable names.
+"""
 get_state_names(comp::AbstractComponent) = comp.meta.states
+get_state_names(comps::Vector{<:AbstractComponent}) = reduce(union, get_state_names.(comps))
 
-get_param_names(func::AbstractFlux) = func.meta.params
-get_param_names(::AbstractNeuralFlux) = Symbol[]
-get_param_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_param_names.(funcs))
-get_param_names(ele::AbstractBucket) = ele.meta.params
-get_param_names(route::AbstractRoute) = route.meta.params
-get_param_names(unit::AbstractModel) = unit.meta.params
+"""
+    get_param_names(comp::AbstractComponent)
+    get_param_names(comps::Vector{<:AbstractComponent})
+
+Get the names of parameters from a component or vector of components.
+Returns a vector of symbols representing parameter names.
+"""
 get_param_names(comp::AbstractComponent) = comp.meta.params
+get_param_names(comps::Vector{<:AbstractComponent}) = reduce(union, get_param_names.(comps))
 
-get_nn_names(::AbstractFlux) = Symbol[]
-get_nn_names(func::AbstractNeuralFlux) = func.meta.nns
-get_nn_names(funcs::Vector{<:AbstractFlux}) = reduce(union, get_nn_names.(funcs))
-get_nn_names(ele::AbstractBucket) = ele.meta.nns
-get_nn_names(route::AbstractRoute) = route.meta.nns
-get_nn_names(unit::AbstractModel) = unit.meta.nns
+"""
+    get_nn_names(comp::AbstractComponent)
+    get_nn_names(comps::Vector{<:AbstractComponent})
+
+Get the names of neural network components from a component or vector of components.
+Returns a vector of symbols representing neural network component names.
+"""
 get_nn_names(comp::AbstractComponent) = comp.meta.nns
+get_nn_names(comps::Vector{<:AbstractComponent}) = reduce(union, get_nn_names.(comps))
 
-get_var_names(func::AbstractFlux) = get_input_names(func), get_output_names(func), get_state_names(func)
-#* elements name utils
-get_var_names(ele::AbstractBucket) = ele.meta.inputs, ele.meta.outputs, ele.meta.states
-get_var_names(route::AbstractRoute) = route.meta.inputs, route.meta.outputs, route.meta.states
-get_var_names(unit::AbstractModel) = unit.meta.inputs, unit.meta.outputs, unit.meta.states
+"""
+    get_var_names(comps::AbstractComponent)
 
-function get_var_names(funcs::Vector{<:AbstractFlux})
+Get all variable names (inputs, outputs, and states) from a component.
+Returns a tuple of three vectors: (input_names, output_names, state_names).
+"""
+get_var_names(comps::AbstractComponent) = get_input_names(comps), get_output_names(comps), get_state_names(comps)
+
+"""
+    get_var_names(funcs::Vector{<:AbstractHydroFlux})
+
+Get all variable names from a vector of flux functions, handling dependencies between inputs and outputs.
+Returns a tuple of three vectors: (input_names, output_names, state_names).
+"""
+function get_var_names(funcs::Vector{<:AbstractHydroFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     for func in funcs
-        #* 输入需要排除已有的输出变量，表明这个输入是中间计算得到的，此外state也不作为输入
         tmp_input_names = setdiff(get_input_names(func), output_names)
-        #* 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
         tmp_output_names = setdiff(get_output_names(func), input_names)
         union!(input_names, tmp_input_names)
         union!(output_names, tmp_output_names)
@@ -91,14 +114,18 @@ function get_var_names(funcs::Vector{<:AbstractFlux})
     input_names, output_names
 end
 
+"""
+    get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractStateFlux})
+
+Get all variable names from vectors of flux and state flux functions, handling dependencies between inputs, outputs, and states.
+Returns a tuple of three vectors: (input_names, output_names, state_names).
+"""
 function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractFlux})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = get_state_names(dfuncs)
     for func in vcat(funcs, dfuncs)
-        #* 输入需要排除已有的输出变量，表明这个输入是中间计算得到的，此外state也不作为输入
         tmp_input_names = setdiff(setdiff(get_input_names(func), output_names), state_names)
-        #* 排除一些输出，比如在flux中既作为输入又作为输出的变量，这时候他仅能代表输入
         tmp_output_names = setdiff(get_output_names(func), input_names)
         union!(input_names, tmp_input_names)
         union!(output_names, tmp_output_names)
@@ -106,14 +133,20 @@ function get_var_names(funcs::Vector{<:AbstractFlux}, dfuncs::Vector{<:AbstractF
     input_names, output_names, state_names
 end
 
+"""
+    get_var_names(funcs::Vector{<:AbstractComponent})
+
+Get all variable names from a vector of flux functions, handling dependencies between inputs and outputs.
+Returns a tuple of three vectors: (input_names, output_names, state_names).
+"""
 function get_var_names(components::Vector{<:AbstractComponent})
     input_names = Vector{Symbol}()
     output_names = Vector{Symbol}()
     state_names = Vector{Symbol}()
-    for com in components
-        tmp_input_names = get_input_names(com)
-        tmp_output_names = get_output_names(com)
-        tmp_state_names = get_state_names(com)
+    for comp in components
+        tmp_input_names = get_input_names(comp)
+        tmp_output_names = get_output_names(comp)
+        tmp_state_names = get_state_names(comp)
         tmp_input_names = setdiff(tmp_input_names, output_names)
         tmp_input_names = setdiff(tmp_input_names, state_names)
         union!(input_names, tmp_input_names)

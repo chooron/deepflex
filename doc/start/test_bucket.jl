@@ -3,17 +3,14 @@ using CSV
 using DataFrames
 using ComponentArrays
 using BenchmarkTools
-using NamedTupleTools
-using DataInterpolations
+using HydroModels
+using ModelingToolkit
 
-
-include("../../../src/HydroModels.jl")
+# include("../../../src/HydroModels.jl")
 include("../models/exphydro.jl")
 
 ele = bucket_1
-
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
-ps = [f, Smax, Qmax, Df, Tmax, Tmin]
 params = ComponentVector(f=f, Smax=Smax, Qmax=Qmax, Df=Df, Tmax=Tmax, Tmin=Tmin)
 init_states = ComponentVector(snowpack=0.0, soilwater=1303.004248)
 pas = ComponentVector(params=params, initstates=init_states)
@@ -28,10 +25,7 @@ input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm
 solver = HydroModels.ManualSolver{true}()
 config = (solver=solver,)
 input_arr = Matrix(reduce(hcat, collect(input[ele.meta.inputs]))')
-# bucket_1.ode_func([1, 1, 1], [0], [1, 1, 1], [], [1])
-@btime results = ele(input_arr, pas, config=config, convert_to_ntp=true)
-#  results1 = ele(input, pas, config=config, convert_to_ntp=true)
-
+results = ele(input_arr, pas, config=config, convert_to_ntp=true)
 
 # multi node input
 node_num = 10
@@ -43,7 +37,7 @@ node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
 node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(node_names)))
 node_input = permutedims(node_input, (2, 3, 1))
-run_kwgs = (ptypes=node_names, interpolator=LinearInterpolation, timeidx=ts)
+run_kwgs = (ptypes=node_names, timeidx=ts)
 
 result = ele(node_input, node_pas, kwargs=run_kwgs)
-# node_input = cat(node_input, result, dims=1)
+# # node_input = cat(node_input, result, dims=1)

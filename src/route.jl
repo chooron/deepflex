@@ -1,5 +1,5 @@
 """
-    HydroRoute(; rfunc::AbstractHydroFlux, rstate::Num, projfunc::AbstractHydroFlux, hrunames::Vector{Symbol}, name::Union{Symbol,Nothing}=nothing)
+    HydroRoute(; rfunc::AbstractHydroFlux, rstate::Num, projfunc::AbstractHydroFlux, name::Union{Symbol,Nothing}=nothing)
 
 Represents a routing structure for hydrological modeling.
 
@@ -7,13 +7,11 @@ Represents a routing structure for hydrological modeling.
 - `rfunc::AbstractHydroFlux`: The routing function used for flow calculations.
 - `rstate::Num`: The state variable for routing.
 - `projfunc::AbstractHydroFlux`: Function for projecting outflow to downstream nodes.
-- `hrunames::Vector{Symbol}`: A vector of node identifiers.
 - `name::Union{Symbol,Nothing}=nothing`: Optional name for the routing instance. If not provided, will be automatically generated.
 
 # Fields
 - `rfunc::AbstractHydroFlux`: The routing function used for flow calculations.
 - `projfunc::Function`: Function for projecting outflow to downstream nodes.
-- `hrunames::Vector{Symbol}`: Node identifiers.
 - `meta::HydroMeta`: Contains metadata about the routing instance, including input, output, state, parameter and neural network names.
 
 # Description
@@ -44,8 +42,6 @@ struct HydroRoute{F<:AbstractHydroFlux,PF<:Function,M<:HydroMeta} <: AbstractHyd
     rfunc::F
     "Outflow projection function"
     projfunc::PF
-    "hru names"
-    hrunames::Vector{Symbol}
     "Metadata: contains keys for input, output, param, state, and nn"
     meta::M
 
@@ -53,7 +49,6 @@ struct HydroRoute{F<:AbstractHydroFlux,PF<:Function,M<:HydroMeta} <: AbstractHyd
         rfunc::F,
         rstate::Num,
         projfunc::PF,
-        hrunames::Vector{Symbol},
         name::Union{Symbol,Nothing}=nothing,
     ) where {F<:AbstractHydroFlux,PF<:Function}
         #* Extract all variable names of funcs and dfuncs
@@ -71,7 +66,6 @@ struct HydroRoute{F<:AbstractHydroFlux,PF<:Function,M<:HydroMeta} <: AbstractHyd
         return new{F,PF,typeof(meta)}(
             rfunc,
             projfunc,
-            hrunames,
             meta,
         )
     end
@@ -83,7 +77,6 @@ end
         rstate::Num,
         flwdir::AbstractMatrix,
         positions::AbstractVector,
-        hrunames::Vector{Symbol},
         aggtype::Symbol=:type1,
         name::Union{Symbol,Nothing}=nothing
     )
@@ -95,18 +88,17 @@ Create a HydroRoute instance for grid-based river routing.
 - `rstate::Num`: Symbolic variable representing the routing state
 - `flwdir::AbstractMatrix`: Flow direction matrix using D8 encoding (1-128)
 - `positions::AbstractVector`: Vector of (row,col) positions for each node in the grid
-- `hrunames::Vector{Symbol}`: Vector of node identifiers
-- `aggtype::Symbol=:type1`: Aggregation type for flow routing:
-    - `:type1`: Uses D8 flow direction codes with padding
-    - `:type2`: Uses graph-based adjacency matrix
+- `aggtype::Symbol=:matrix`: Aggregation type for flow routing:
+    - `:matrix`: Uses graph-based adjacency matrix
+    - `:network`: Uses network-based adjacency matrix
 - `name::Union{Symbol,Nothing}=nothing`: Optional name for the routing instance
 
 # Returns
 `HydroRoute`: A configured routing instance for grid-based networks
 
 # Description
-Creates a routing structure for grid-based river networks using either a padding-based
-approach (type1) or graph-based approach (type2) for flow accumulation. The function
+Creates a routing structure for grid-based river networks using either a matrix-based
+approach (matrix) or network-based approach (network) for flow accumulation. The function
 verifies that node positions match node IDs and constructs appropriate projection
 functions based on the chosen aggregation type.
 """
@@ -115,18 +107,14 @@ function GridRoute(;
     rstate::Num,
     flwdir::AbstractMatrix,
     positions::AbstractVector,
-    hrunames::Vector{Symbol},
-    aggtype::Symbol=:type1,
+    aggtype::Symbol=:matrix,
     name::Union{Symbol,Nothing}=nothing
 )
-    @assert length(positions) == length(hrunames) "The length of positions must be the same as the length of hrunames, but got positions: $(length(positions)) and hrunames: $(length(hrunames))"
-    if aggtype == :type1
+    if aggtype == :matrix
         d8_codes = [1, 2, 4, 8, 16, 32, 64, 128]
         d8_nn_pads = [(1, 1, 2, 0), (2, 0, 2, 0), (2, 0, 1, 1), (2, 0, 0, 2), (1, 1, 0, 2), (0, 2, 0, 2), (0, 2, 1, 1), (0, 2, 2, 0),]
 
-        """
-        input dims: node_num * ts_len
-        """
+        #* input dims: node_num * ts_len
         function grid_routing(input::AbstractVector, positions::AbstractVector, flwdir::AbstractMatrix)
             #* 转换为input的稀疏矩阵
             input_arr = Array(sparse([pos[1] for pos in positions], [pos[2] for pos in positions], input, size(flwdir)[1], size(flwdir)[2]))
@@ -140,7 +128,7 @@ function GridRoute(;
         #* build the outflow projection function
         projfunc = (outflow) -> grid_routing(outflow, positions, flwdir)
 
-    elseif aggtype == :type2
+    elseif aggtype == :network
         network = build_grid_digraph(flwdir, positions)
         #* build the outflow projection function
         adjacency = adjacency_matrix(network)'
@@ -149,7 +137,7 @@ function GridRoute(;
         @error "the $aggtype is not support"
     end
 
-    return HydroRoute(; rfunc, rstate, projfunc, hrunames, name)
+    return HydroRoute(; rfunc, rstate, projfunc, name)
 end
 
 """
@@ -157,7 +145,6 @@ end
         rfunc::AbstractHydroFlux,
         rstate::Num,
         network::DiGraph,
-        hrunames::Vector{Symbol},
         name::Union{Symbol,Nothing}=nothing
     )
 
@@ -167,7 +154,6 @@ Create a HydroRoute instance for vector-based river routing.
 - `rfunc::AbstractHydroFlux`: Routing function that calculates outflow from each node
 - `rstate::Num`: Symbolic variable representing the routing state
 - `network::DiGraph`: Directed graph representing the river network connectivity
-- `hrunames::Vector{Symbol}`: Vector of node identifiers
 - `name::Union{Symbol,Nothing}=nothing`: Optional name for the routing instance
 
 # Returns
@@ -183,15 +169,28 @@ function VectorRoute(;
     rfunc::AbstractHydroFlux,
     rstate::Num,
     network::DiGraph,
-    hrunames::Vector{Symbol},
     name::Union{Symbol,Nothing}=nothing,
 )
-    @assert length(hrunames) == nv(network) "The length of hrunames must be the same as the number of nodes, but got hrunames: $(length(hrunames)) and nodes: $(nv(network))"
     #* generate adjacency matrix from network
     adjacency = adjacency_matrix(network)'
     #* build the outflow projection function
     projfunc = (outflow) -> adjacency * outflow
-    return HydroRoute(; rfunc, rstate, projfunc, hrunames, name)
+    return HydroRoute(; rfunc, rstate, projfunc, name)
+end
+
+function _get_parameter_extractors(route::HydroRoute, pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    if route.rfunc isa AbstractNeuralFlux
+        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(route)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
+        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(route.rfunc)]
+        param_func = (p) -> Ref([p[:nn][idx] for idx in nn_params_idx])
+    else
+        for ptype in ptypes
+            @assert all(param_name in keys(pas[:params][ptype]) for param_name in get_param_names(route.rfunc)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params][ptype])) at param type: $ptype."
+        end
+        rflux_params_idx = [getaxes(pas[:params][ptypes[1]])[1][nm].idx for nm in get_param_names(route.rfunc)]
+        param_func = (p) -> [p[:params][ptype][rflux_params_idx] for ptype in ptypes]
+    end
+    return param_func
 end
 
 """
@@ -232,43 +231,44 @@ function (route::HydroRoute{F,PF,M})(
 ) where {F<:AbstractHydroFlux,PF<:Function,M<:HydroMeta,T<:Number}
     #* get the parameter types and state types
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
-    stypes = get(config, :stypes, route.hrunames)
-    # hrunames = get(config, :stypes, route.hrunames)
+    stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     #* get the interpolation type and solver type
     interp = get(config, :interp, LinearInterpolation)
     solver = get(config, :solver, ODESolver())
     #* get the time index
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+    #* get the solver
+    solver = get(config, :solver, ODESolver())
 
-    #* check the length of ptypes, route.hrunames
+    #* check the length of ptypes
     @assert(length(ptypes) == size(input, 2),
         "The length of ptypes must match the number of nodes ($(size(input,2))), but got $(length(ptypes)) ptypes")
-    @assert(all(ptype in keys(pas[:params]) for ptype in ptypes),
-        "Invalid parameter types. All ptypes must be one of $(keys(pas[:params])), but got $(ptypes)")
     @assert(all(stype in keys(pas[:initstates]) for stype in stypes),
         "Invalid HRU names. All names must be one of $(keys(pas[:initstates])), but got $(stypes)")
-    @assert(all(stype in keys(pas[:initstates]) for stype in route.hrunames),
-        "Invalid HRU names. All names must be one of $(keys(pas[:initstates])), but got $(route.hrunames)")   
 
-    #* Extract the idx range of each variable in params,
-    #* this extraction method is significantly more efficient than extracting by name
-    #* Construct a function for the ode_func input variable. Because of the difference in t, the ode_func input is not fixed.
-    #* The input format is the input variable plus the intermediate state, which is consistent with the input of ode_func
-    if route.rfunc isa AbstractNeuralFlux
-        nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(route.rfunc)]
-        param_func = (p) -> Ref([p[:nn][idx] for idx in nn_params_idx])
-    else
-        rflux_params_idx = [getaxes(pas[:params][ptypes[1]])[1][nm].idx for nm in get_param_names(route.rfunc)]
-        param_func = (p) -> [p[:params][ptype][rflux_params_idx] for ptype in ptypes]
+    #* Extract the idx range of each variable in params, this extraction method is significantly more efficient than extracting by name
+    param_func = _get_parameter_extractors(route, pas, ptypes)
+    #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
+    #* so an interpolation function can be constructed to apply to each time point.
+    itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
+    #* prepare the initial states matrix (dims: state_num * node_num)
+    init_states_mat = reduce(hcat, [collect(pas[:initstates][stype][get_state_names(route)]) for stype in stypes])'
+
+    function du_func(u, p, t)
+        q_gen = [itp_func(t) for itp_func in itp_funcs]
+        q_out_vec = route.rfunc.func.(eachslice(hcat(q_gen, u), dims=1), param_func(p), Ref(t))
+        q_out = reduce(vcat, q_out_vec)
+        q_in = route.projfunc(q_out)
+        q_in .+ q_gen .- q_out
     end
 
     #* solve the problem
-    sol_arr = solve_prob(route, input, pas, paramfunc=param_func, timeidx=timeidx, solver=solver, interp=interp)
+    sol_arr = solver(du_func, pas, init_states_mat, timeidx, convert_to_array=true)
     sol_arr_permuted = permutedims(sol_arr, (2, 1, 3))
     cont_arr = cat(input, sol_arr_permuted, dims=1)
     output_vec = [route.rfunc.func.(eachslice(cont_arr[:, :, i], dims=2), param_func(pas), timeidx[i]) for i in 1:size(input)[3]]
     out_arr = reduce(hcat, reduce.(vcat, output_vec))
-    #  return route_states and q_out
+    #* return route_states and q_out
     return cat(sol_arr_permuted, reshape(out_arr, 1, size(out_arr)...), dims=1)
 end
 
@@ -281,67 +281,101 @@ function (route::HydroRoute)(input::Vector{<:NamedTuple}, pas::ComponentVector; 
     route(input_arr, pas; config=config, kwargs...)
 end
 
+
 """
-    solve_prob(
-        route::HydroRoute,
-        input::Array,
-        pas::ComponentVector;
-        paramfunc::Function,
-        timeidx::Vector{<:Number}=collect(1:size(input, 3)),
-        solver::AbstractHydroSolver=ODESolver(),
-        interp::Type{<:AbstractInterpolation}=LinearInterpolation,
+    RapidRoute<: AbstractRoute
+
+A structure representing a vector-based routing scheme for hydrological modeling.
+
+# Fields
+- `rfunc::AbstractVector{<:AbstractRouteFlux}`: Vector of routing flux functions for each node.
+- `network::DiGraph`: A directed graph representing the routing network topology.
+- `infos::NamedTuple`: Contains information about the VectorRoute instance, including input, output, state, and parameter names.
+
+# Constructor
+    RapidRoute(
+        name::Symbol;
+        rfunc::AbstractRouteFlux,
+        network::DiGraph
     )
 
-Solve the routing problem for a HydroRoute model.
+Constructs a `RapidRoute` object with the given name, routing flux function, and network structure.
 
 # Arguments
-- `route::HydroRoute`: The routing model
-- `input::Array`: Input data array (dims: variables × nodes × time)
-- `pas::ComponentVector`: Parameters and initial states
-- `paramfunc::Function`: Function to extract parameters for the routing function
-- `timeidx::Vector{<:Number}`: Vector of time indices (default: 1:size(input, 3))
-- `solver::AbstractHydroSolver`: Solver to use for ODE solving (default: ODESolver())
-- `interp::Type{<:AbstractInterpolation}`: Interpolation method for input data (default: LinearInterpolation)
+- `name::Symbol`: A symbol representing the name of the routing scheme.
+- `rfunc::AbstractRouteFlux`: The routing flux function to be applied at each node.
+- `network::DiGraph`: A directed graph representing the routing network topology.
 
-# Returns
-Array containing the solved states over time (dims: nodes × states × time)
+The constructor extracts variable names, parameter names, and neural network names from the provided
+routing flux function to set up the internal information structure of the `RapidRoute` object.
 
-# Description
-This function solves the routing equations for a hydrological network. It:
-1. Interpolates the input data for continuous time calculations
-2. Prepares initial states for all nodes
-3. Constructs and solves the coupled ODEs that represent routing between nodes
-4. Returns the evolution of states over time
-
-The routing equations consider both local runoff generation (from input) and flow between nodes
-based on the routing function and projection matrix specified in the HydroRoute model.
+Note: from Rapid
 """
+struct RapidRoute <: AbstractRapidRoute
+    "Routing adjacency matrix"
+    adjacency::AbstractMatrix
+    "Metadata: contains keys for input, output, param, state, and nn"
+    meta::HydroMeta
 
-function solve_prob(
-    route::HydroRoute{F,PF,M},
-    input::AbstractArray{T,3},
+    function RapidRoute(
+        fluxes::Pair{Vector{Num},Vector{Num}};
+        network::DiGraph,
+        name::Union{Symbol,Nothing}=nothing,
+    )
+        #* Extract all variable names of funcs and dfuncs
+        inputs, outputs = fluxes[1], fluxes[2]
+        @assert length(inputs) == length(outputs) == 1 "The length of inputs and outputs must be the 1, but got inputs: $(length(inputs)) and outputs: $(length(outputs))"
+        input_names = Symbolics.tosymbol.(inputs)
+        output_names = Symbolics.tosymbol.(outputs)
+        #* Extract all parameters names of funcs and dfuncs
+        param_names = [:rapid_k, :rapid_x]
+        #* Setup the name information of the hydrobucket
+        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_vector_route) : name
+        meta = HydroMeta(route_name, input_names, output_names, param_names, Symbol[], Symbol[])
+        #* generate adjacency matrix from network
+        adjacency = adjacency_matrix(network)'
+        return new(
+            adjacency,
+            meta,
+        )
+    end
+end
+
+function (route::RapidRoute)(
+    input::Array,
     pas::ComponentVector;
-    paramfunc::Function,
-    timeidx::Vector{<:Number}=collect(1:size(input, 3)),
-    solver::AbstractHydroSolver=ODESolver(),
-    interp::Type{<:AbstractInterpolation}=LinearInterpolation,
-) where {F<:AbstractHydroFlux,PF<:Function,M<:HydroMeta,T<:Number}
-    #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
-    #* so an interpolation function can be constructed to apply to each time point.
-    itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
-    #* prepare the initial states matrix (dims: state_num * node_num)
-    init_states_mat = reduce(hcat, [collect(pas[:initstates][hname][get_state_names(route)]) for hname in route.hrunames])'
+    config::NamedTuple=NamedTuple(),
+    kwargs...
+)
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    interp = get(config, :interp, LinearInterpolation)
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+    delta_t = get(config, :delta_t, 1.0)
+    solver = get(config, :solver, DiscreteSolver())
 
-    #* Construct a temporary function that couples multiple ode functions to construct the solution for all states under the bucket
-    function route_ode!(du, u, p, t)
+    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
+
+    #* var num * node num * ts len
+    itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
+
+    #* prepare the parameters for the routing function
+    k_ps = [pas[:params][ptype][:k] for ptype in ptypes]
+    x_ps = [pas[:params][ptype][:x] for ptype in ptypes]
+    c0 = @. ((delta_t / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
+    c1 = @. ((delta_t / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
+    c2 = @. ((2 * (1 - x_ps)) - (delta_t / k_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
+    A = (p) -> Matrix(I, size(route.adjacency)...) .- diagm(p.c0) * route.adjacency
+
+    function du_func(u, p, t)
+        q_out_t1 = u
         q_gen = [itp_func(t) for itp_func in itp_funcs]
-        q_out_vec = route.rfunc.func.(eachslice(hcat(q_gen, u), dims=1), paramfunc(p), Ref(t))
-        q_out = reduce(vcat, q_out_vec)
-        q_in = route.projfunc(q_out)
-        du[:] = q_in .+ q_gen .- q_out
+        #* Ax = b, x is the q_out(t+1)
+        rflux_b = p.c0 .* q_gen .+ p.c1 .* (route.adjacency * q_out_t1 .+ q_gen) .+ p.c2 .* q_out_t1
+        #* solve the linear equation (simple solve by matrix inversion)
+        A(p) \ (rflux_b .- A(p) * u)
     end
 
-    #* Solve the problem using the solver wrapper
-    sol = solver(route_ode!, pas, init_states_mat, timeidx, convert_to_array=true)
-    sol
+    #* solve the ode
+    sol_arr = solver(du_func, ComponentVector(c0=c0, c1=c1, c2=c2), zeros(size(input)[2]), timeidx, convert_to_array=true)
+    return reshape(sol_arr, 1, size(sol_arr)...)
 end

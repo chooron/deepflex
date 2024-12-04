@@ -10,8 +10,9 @@ using OrdinaryDiffEq
 using Statistics
 using BenchmarkTools
 using Plots
-using OptimizationOptimisers
+using OptimizationBBO
 using SciMLSensitivity
+using JLD2
 # using HydroModels
 include("../../../src/HydroModels.jl")
 include("../models/exphydro.jl")
@@ -28,9 +29,9 @@ q_vec = df[ts, "flow(mm)"]
 
 model_hydro_opt = HydroModels.HydroOptimizer(
     component=exphydro_model,
-    maxiters=100,
+    maxiters=10000,
     warmup=100,
-    alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
+    solve_alg=BBO_adaptive_de_rand_1_bin_radiuslimited(),
     loss_func=(obs, sim) -> sum((obs .- sim) .^ 2) / length(obs)
 )
 tunable_pas = ComponentVector(params=ComponentVector(
@@ -49,11 +50,12 @@ exphydro_hydro_opt_params, loss_df = model_hydro_opt(
     ub=[0.1, 2000.0, 50.0, 5.0, 3.0, 0.0],
     return_loss_df=true
 )
-
-exphydro_grad_opt_params, loss_df = model_grad_opt(
-    [input], [(flow=q_vec,)],
-    tunable_pas=tunable_pas,
-    const_pas=const_pas,
-    config=[config],
-    return_loss_df=true
-)
+output = exphydro_model(input, exphydro_hydro_opt_params, config=config, convert_to_ntp=true)
+save("doc/tutorials/implements/save/exphydro_opt.jld2", "loss_df", loss_df, "opt_params", exphydro_hydro_opt_params, "output", output)
+# exphydro_grad_opt_params, loss_df = model_grad_opt(
+#     [input], [(flow=q_vec,)],
+#     tunable_pas=tunable_pas,
+#     const_pas=const_pas,
+#     config=[config],
+#     return_loss_df=true
+# )

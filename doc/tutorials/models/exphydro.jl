@@ -1,11 +1,3 @@
-using ModelingToolkit
-
-# include need add the module name: HydroModels
-HydroFlux = HydroModels.HydroFlux
-StateFlux = HydroModels.StateFlux
-HydroBucket = HydroModels.HydroBucket
-HydroModel = HydroModels.HydroModel
-
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 # define variables and parameters
 

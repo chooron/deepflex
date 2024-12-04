@@ -10,6 +10,7 @@ using OrdinaryDiffEq
 using Statistics
 using BenchmarkTools
 using Plots
+using JLD2
 using OptimizationOptimisers
 using SciMLSensitivity
 # using HydroModels
@@ -18,37 +19,28 @@ include("../models/m50.jl")
 
 # load data
 data = CSV.read("data/exphydro/01013500.csv", DataFrame)
-
+ts = collect(1:10000)
+input = (lday=data[ts, "dayl(day)"], temp=data[ts, "tmean(C)"], prcp=data[ts, "prcp(mm/day)"])
+flow_vec = data[ts, "flow(mm)"]
+load_exphydro = load("doc/tutorials/implements/save/exphydro_opt.jld2")
+exphydro_output = load_exphydro["output"]
+exphydro_opt_params = load_exphydro["opt_params"]
 # predefine the parameters
-f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
-
-# load data
-file_path = "data/m50/01013500.csv"
-data = CSV.File(file_path)
-df = DataFrame(data)
-ts = collect(1:1000)
-# cols: Baseflow,Evap,Flow,Infiltration,Lday,Melt,Pet,Prcp,Rainfall,Snowfall,Surfaceflow,Temp,SoilWater,SnowWater
-lday_vec = df[ts, "Lday"]
-prcp_vec = df[ts, "Prcp"]
-temp_vec = df[ts, "Temp"]
-flow_vec = df[ts, "Flow"]
-snw_vec = df[ts, "SnowWater"]
-slw_vec = df[ts, "SoilWater"]
-ep_vec = df[ts, "Evap"]
+Df, Tmax, Tmin = exphydro_opt_params.params.Df, exphydro_opt_params.params.Tmax, exphydro_opt_params.params.Tmin
 
 #* prepare the nn input
-log_flow_vec = log.(flow_vec)
-log_evap_div_lday_vec = log.(ep_vec ./ lday_vec)
-norm_prcp_vec = (prcp_vec .- mean(prcp_vec)) ./ std(prcp_vec)
-norm_temp_vec = (temp_vec .- mean(temp_vec)) ./ std(temp_vec)
-norm_snw_vec = (snw_vec .- mean(snw_vec)) ./ std(snw_vec)
-norm_slw_vec = (slw_vec .- mean(slw_vec)) ./ std(slw_vec)
+log_flow_vec = log.(exphydro_output.flow)
+log_evap_div_lday_vec = log.(exphydro_output.evap ./ exphydro_output.lday)
+norm_prcp_vec = (exphydro_output.prcp .- mean(exphydro_output.prcp)) ./ std(exphydro_output.prcp)
+norm_temp_vec = (exphydro_output.temp .- mean(exphydro_output.temp)) ./ std(exphydro_output.temp)
+norm_snw_vec = (exphydro_output.snowpack .- mean(exphydro_output.snowpack)) ./ std(exphydro_output.snowpack)
+norm_slw_vec = (exphydro_output.soilwater .- mean(exphydro_output.soilwater)) ./ std(exphydro_output.soilwater)
 nn_input = (norm_snw=norm_snw_vec, norm_slw=norm_slw_vec, norm_temp=norm_temp_vec, norm_prcp=norm_prcp_vec)
 ep_input_matrix = Matrix(reduce(hcat, collect(nn_input[HydroModels.get_input_names(ep_nn_flux)]))')
 q_input_matrix = Matrix(reduce(hcat, collect(nn_input[HydroModels.get_input_names(q_nn_flux)]))')
 
 #* train the ep nn
-ep_grad_opt = HydroModels.GradOptimizer(component=ep_nn_flux, solve_alg=Adam(1e-2), adtype=Optimization.AutoZygote(), maxiters=1000)
+ep_grad_opt = HydroModels.GradOptimizer(component=ep_nn_flux, solve_alg=Adam(1e-2), adtype=AutoZygote(), maxiters=1000)
 ep_output = (log_evap_div_lday=log_evap_div_lday_vec,)
 ep_opt_params, epnn_loss_df = ep_grad_opt(
     [ep_input_matrix], [ep_output],
@@ -57,41 +49,54 @@ ep_opt_params, epnn_loss_df = ep_grad_opt(
     return_loss_df=true
 )
 #* train the q nn
-q_grad_opt = HydroModels.GradOptimizer(component=q_nn_flux, solve_alg=Adam(1e-2), adtype=Optimization.AutoZygote(), maxiters=1000)
-q_output = (log_flow=log_flow_vec,)
+q_grad_opt = HydroModels.GradOptimizer(component=q_nn_flux, solve_alg=Adam(1e-2), adtype=AutoZygote(), maxiters=1000)
 q_opt_params, qnn_loss_df = q_grad_opt(
-    [q_input_matrix], [q_output],
+    [q_input_matrix], [(log_flow=log_flow_vec,)],
     tunable_pas=ComponentVector(nn=(qnn=q_nn_params,)),
     const_pas=ComponentVector(),
     return_loss_df=true
 )
+q_flux_output = q_nn_flux(q_input_matrix, q_opt_params)
 
-# m50_opt = HydroModels.GradOptimizer(component=m50_model, solve_alg=Adam(1e-2), adtype=Optimization.AutoForwardDiff(), maxiters=100)
-# # config = (solver=HydroModels.ODESolver(sensealg=BacksolveAdjoint(autodiff=ZygoteVJP())), interp=LinearInterpolation)
-# # config = (solver=HydroModels.DiscreteSolver(sensealg=ZygoteAdjoint()),)
-# norm_pas = ComponentVector(
-#     snowpack_mean=mean(norm_snw_vec), soilwater_mean=mean(norm_slw_vec), prcp_mean=mean(norm_prcp_vec), temp_mean=mean(norm_temp_vec),
-#     snowpack_std=std(norm_snw_vec), soilwater_std=std(norm_slw_vec), prcp_std=std(norm_prcp_vec), temp_std=std(norm_temp_vec)
-# )
-# m50_const_pas = ComponentVector(
-#     initstates=ComponentVector(snowpack=0.0, soilwater=1300.0),
-#     params=ComponentVector(Tmin=Tmin, Tmax=Tmax, Df=Df; norm_pas...)
-# )
-# m50_tunable_pas = ComponentVector(
-#     nn=ComponentVector(epnn=ep_nn_params, qnn=q_nn_params)
-# )
-# m50_input = (prcp=prcp_vec, lday=lday_vec, temp=temp_vec)
-# pas = ComponentVector(
-#     initstates=ComponentVector(snowpack=0.0, soilwater=1300.0),
-#     params=ComponentVector(Tmin=Tmin, Tmax=Tmax, Df=Df; norm_pas...),
-#     nn=ComponentVector(epnn=ep_nn_params, qnn=q_nn_params)
-# )
-# HydroModels.update_ca(pas, m50_tunable_pas)
+# save("doc/tutorials/implements/save/m50_nn_opt.jld2", "epnn_params", ep_opt_params, "qnn_params", q_opt_params, "epnn_loss_df", epnn_loss_df, "qnn_loss_df", qnn_loss_df)
 
-# # m50_opt_params, m50_loss_df = m50_opt(
-# #     [m50_input], [q_output],
-# #     tunable_pas=m50_tunable_pas,
-# #     const_pas=m50_const_pas,
-# #     config=[config],
-# #     return_loss_df=true
-# # )
+#* define parameters
+norm_pas = ComponentVector(
+    snowpack_mean=mean(exphydro_output.snowpack), soilwater_mean=mean(exphydro_output.snowpack), prcp_mean=mean(input.prcp), temp_mean=mean(input.temp),
+    snowpack_std=std(exphydro_output.snowpack), soilwater_std=std(exphydro_output.snowpack), prcp_std=std(input.prcp), temp_std=std(input.temp)
+)
+m50_const_pas = ComponentVector(
+    initstates=ComponentVector(snowpack=0.0, soilwater=1300.0),
+    params=ComponentVector(Tmin=Tmin, Tmax=Tmax, Df=Df; norm_pas...)
+)
+m50_tunable_pas = ComponentVector(
+    nn=ComponentVector(epnn=ep_nn_params, qnn=q_nn_params)
+)
+#* build optimizer for m50 model
+m50_opt = HydroModels.GradOptimizer(component=m50_model, solve_alg=Adam(1e-2), adtype=AutoZygote(), maxiters=100)
+
+#* prepare input and config
+m50_input = (prcp=exphydro_output.prcp, lday=exphydro_output.lday, temp=exphydro_output.temp)
+config = (solver=HydroModels.ODESolver(sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())), interp=LinearInterpolation, alg=BS3())
+q_output = (flow=flow_vec,)
+
+#* optimize the model
+m50_opt_params, m50_loss_df = m50_opt(
+    [m50_input], [q_output],
+    tunable_pas=m50_tunable_pas,
+    const_pas=m50_const_pas,
+    config=[config],
+    return_loss_df=true
+)
+save("doc/tutorials/implements/save/m50_opt.jld2", "loss_df", m50_loss_df, "opt_params",
+    m50_opt_params, "epnn_params", ep_opt_params, "qnn_params", q_opt_params)
+
+m50_opt_params = load("doc/tutorials/implements/save/m50_opt.jld2")["opt_params"]
+m50_output = m50_model(input, m50_opt_params, config=config, convert_to_ntp=true)
+result = (exphydro=exphydro_output.flow, m50=exp.(m50_output.log_flow), sim=flow_vec)
+# plot(m50_output.flow)
+# plot(exp.(q_flux_output)[1,:])
+# plot!(exphydro_output.flow)
+# plot!(flow_vec)
+
+# plot(m50_loss_df.loss)

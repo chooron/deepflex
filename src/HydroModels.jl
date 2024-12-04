@@ -3,7 +3,9 @@ module HydroModels
 ## External packages
 # common packages
 using Accessors
-using ComponentArrays
+using Reexport
+
+@reexport using ComponentArrays
 using ComponentArrays: indexmap, getval
 using Dates
 using DataFrames
@@ -11,7 +13,6 @@ using IterTools: ncycle
 using LinearAlgebra
 using NamedTupleTools
 using ProgressMeter
-using Reexport
 using SparseArrays
 using StableRNGs
 using Statistics
@@ -26,9 +27,9 @@ using Symbolics
 using Symbolics: tosymbol
 using SymbolicUtils
 using SymbolicUtils.Code
-using ModelingToolkit: @variables, @parameters
-using ModelingToolkit: t_nounits as t
+@reexport using ModelingToolkit: @variables, @parameters
 using ModelingToolkit: isparameter
+using ModelingToolkit: t_nounits as t
 # graph compute
 using Graphs
 
@@ -62,31 +63,26 @@ struct HydroEquation end
 abstract type AbstractComponent end
 abstract type AbstractHydroSolver end
 abstract type AbstractHydroOptimizer end
+abstract type AbstractHydroWrapper <: AbstractComponent end
+abstract type AbstractNeuralWrapper <: AbstractComponent end
 
 abstract type AbstractFlux <: AbstractComponent end
-abstract type AbstractElement <: AbstractComponent end
-abstract type AbstractBucket <: AbstractElement end
-abstract type AbstractRoute <: AbstractElement end
-abstract type AbstractModel <: AbstractComponent end
-
 abstract type AbstractHydroFlux <: AbstractFlux end
 abstract type AbstractNeuralFlux <: AbstractHydroFlux end
 abstract type AbstractStateFlux <: AbstractFlux end
-abstract type AbstractUnitHydroFlux <: AbstractFlux end
 
-abstract type AbstractDirectRoute <: AbstractRoute end
+abstract type AbstractElement <: AbstractComponent end
+abstract type AbstractBucket <: AbstractElement end
+abstract type AbstractHydrograph <: AbstractElement end
+abstract type AbstractRoute <: AbstractElement end
 abstract type AbstractHydroRoute <: AbstractRoute end
 abstract type AbstractRapidRoute <: AbstractRoute end
-
-abstract type AbstractHydroWrapper <: AbstractComponent end
-abstract type AbstractNeuralWrapper <: AbstractComponent end
+abstract type AbstractModel <: AbstractComponent end
 # utils
-include("utils/uh.jl")
-export UHFunction, UH_1_HALF, UH_2_FULL
 include("utils/attr.jl")
 include("utils/ca.jl")
 include("utils/name.jl")
-# include("utils/show.jl")
+include("utils/show.jl")
 include("utils/build.jl")
 include("utils/callback.jl")
 include("utils/sort.jl")
@@ -104,6 +100,8 @@ include("bucket.jl")
 export HydroBucket
 include("route.jl")
 export DirectRoute, GridRoute, VectorRoute, HydroRoute # , RapidRoute
+include("uh.jl")
+export UHFunction, UH_1_HALF, UH_2_FULL
 include("model.jl")
 export HydroModel
 include("wrapper.jl")

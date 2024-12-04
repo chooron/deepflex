@@ -2,7 +2,7 @@ HydroFlux = HydroModels.HydroFlux
 StateFlux = HydroModels.StateFlux
 HydroBucket = HydroModels.HydroBucket
 HydroModel = HydroModels.HydroModel
-UnitHydroFlux = HydroModels.UnitHydroFlux
+UnitHydrograph = HydroModels.UnitHydrograph
 NeuralFlux = HydroModels.NeuralFlux
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
@@ -46,7 +46,8 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
     positions = [[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [2, 3], [3, 1], [3, 2], [3, 3]]
     node_names = [Symbol(:node_, i) for i in 1:9]
     rflux = HydroModels.HydroFlux([q, s_river] => [q_routed], [lag], exprs=[s_river / (1 + lag) + q])
-    discharge_route = HydroModels.GridRoute(name=:exphydro_routed, rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions, nodeids=node_names)
+    route = HydroModels.GridRoute(rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions)
+    discharge_route = HydroModels.GridRoute(name=:exphydro_routed, rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions)
     #! define the Exp-Hydro model
     model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele, convertflux, discharge_route])
 
@@ -117,7 +118,7 @@ end
     convertflux = HydroModels.HydroFlux([flow] => [q], [area_coef], exprs=[flow * area_coef])
     node_names = [Symbol(:node_, i) for i in 1:9]
     rflux = HydroModels.HydroFlux([q, s_river] => [q_routed], [lag], exprs=[s_river / (1 + lag) + q])
-    discharge_route = HydroModels.VectorRoute(name=:exphydro_routed, rfunc=rflux, rstate=s_river, network=network, nodeids=node_names)
+    discharge_route = HydroModels.VectorRoute(name=:exphydro_routed, rfunc=rflux, rstate=s_river, network=network)
 
     #! define the Exp-Hydro model
     model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele, convertflux, discharge_route])

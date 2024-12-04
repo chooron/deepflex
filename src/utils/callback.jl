@@ -1,5 +1,7 @@
 function get_callback_func(progress, recorder)
     default_callback_func!(state, l) = begin
+        # println()
+        # println((iter=state.iter, loss=l))
         push!(recorder, (iter=state.iter, loss=l, time=now(), params=state.u))
         next!(progress)
         false

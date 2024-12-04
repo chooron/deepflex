@@ -13,7 +13,7 @@
     params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(lag=0.2,) for _ in eachindex(ndtypes)]))
     initstates = ComponentVector(NamedTuple{Tuple(hrunames)}([(s_river=0.1,) for _ in eachindex(hrunames)]))
     pas = ComponentVector(; params, initstates)
-    route = HydroModels.GridRoute(rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions, hrunames=hrunames)
+    route = HydroModels.GridRoute(rfunc=rflux, rstate=s_river, flwdir=flwdir, positions=positions)
     @test HydroModels.get_input_names(route) == [:q1]
     @test HydroModels.get_output_names(route) == [:q1_routed]
     @test HydroModels.get_param_names(route) == [:lag]
@@ -47,7 +47,7 @@ end
     params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(lag=0.2,) for _ in eachindex(ndtypes)]))
     initstates = ComponentVector(NamedTuple{Tuple(hrunames)}([(s_river=0.0,) for _ in eachindex(hrunames)]))
     pas = ComponentVector(; params, initstates)
-    vroute = HydroModels.VectorRoute(rfunc=rflux, rstate=s_river, network=network, hrunames=hrunames)
+    vroute = HydroModels.VectorRoute(rfunc=rflux, rstate=s_river, network=network)
     # 24 * 3600 / (10.0 * 1e6) * 1e3
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
@@ -56,29 +56,28 @@ end
     @test size(sol_2) == size(ones(2, 9, 20))
 end
 
-# @testset "test rapid route based on muskingum route flux" begin
-#     @variables q
-#     rflux_1 = HydroModels.MuskingumRouteFlux(q)
+@testset "test rapid route based on muskingum route flux" begin
+    @variables q q_routed
 
-#     network = DiGraph(9)
-#     add_edge!(network, 1, 2)
-#     add_edge!(network, 2, 5)
-#     add_edge!(network, 3, 5)
-#     add_edge!(network, 4, 5)
-#     add_edge!(network, 5, 8)
-#     add_edge!(network, 6, 9)
-#     add_edge!(network, 7, 8)
-#     add_edge!(network, 8, 9)
+    network = DiGraph(9)
+    add_edge!(network, 1, 2)
+    add_edge!(network, 2, 5)
+    add_edge!(network, 3, 5)
+    add_edge!(network, 4, 5)
+    add_edge!(network, 5, 8)
+    add_edge!(network, 6, 9)
+    add_edge!(network, 7, 8)
+    add_edge!(network, 8, 9)
 
-#     ndtypes = [:ntype1, :ntype2, :ntype3]
-#     params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(k=2.0, x=0.2) for _ in eachindex(ndtypes)]))
-#     initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.0,) for _ in eachindex(ndtypes)]))
-#     pas = ComponentVector(; params, initstates)
-#     vroute = HydroModels.RapidRoute(rfunc=rflux_1, network=network, subareas=10.0)
-#     # 24 * 3600 / (10.0 * 1e6) * 1e3
-#     input_arr = ones(1, 9, 20)
-#     timeidx = collect(1:20)
-#     ptypes = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-#     sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, solver=HydroModels.DiscreteSolver()))
-#     @test size(sol_2) == size(ones(1, 9, 20))
-# end
+    ndtypes = [:ntype1, :ntype2, :ntype3]
+    params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(k=2.0, x=0.2) for _ in eachindex(ndtypes)]))
+    initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.0,) for _ in eachindex(ndtypes)]))
+    pas = ComponentVector(; params, initstates)
+    vroute = HydroModels.RapidRoute([q]=>[q_routed], network=network)
+    # 24 * 3600 / (10.0 * 1e6) * 1e3
+    input_arr = ones(1, 9, 20)
+    timeidx = collect(1:20)
+    ptypes = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
+    sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, solver=HydroModels.DiscreteSolver()))
+    @test size(sol_2) == size(ones(1, 9, 20))
+end

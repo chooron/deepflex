@@ -2,17 +2,49 @@
 CurrentModule = HydroModels
 ```
 
-# HydroModels.jl
+# HydroModels.jl Documentation
 
-HydroModels.jl是一个基于julia语言编写的用于构建概念性水文模型的包，通过这个包可以构建从单一的计算模块到一个完整的概念性水文模型。
+Welcome to the documentation of HydroModels.jl!
 
-## 安装
+## Overview
 
-To install HydroModels.jl, use the Julia package manager:
+HydroModels.jl is a Julia package for hydrological modeling. It provides a flexible framework for implementing and running various hydrological models.
+
+## Features
+
+- Flexible model structure
+- Support for both single-node and multi-node simulations
+- Various built-in hydrological models
+- Easy-to-use interface for model implementation and execution
+
+## Getting Started
+
+To get started with HydroModels.jl, check out our tutorials:
+
+<!-- 1. [Run a Bucket Model](start/run_a_bucket.md)
+2. [Run ExpHydro Model](start/run_a_exphydro_model.md) -->
+
+## Installation
+
+To install HydroModels.jl, use Julia's package manager:
 
 ```julia
 using Pkg
 Pkg.add("HydroModels")
+```
+
+## Quick Example
+
+```julia
+using HydroModels
+
+# Load model configuration
+params = ComponentVector(f=0.01674478, Smax=1709.461015, Qmax=18.46996175,
+                       Df=2.674548848, Tmax=0.175739196, Tmin=-2.092959084)
+init_states = ComponentVector(snowpack=0.0, soilwater=1303.004248)
+
+# Run simulation
+results = model(input_data, params, init_states)
 ```
 
 ## 运行一个ExpHydro水文模型
@@ -59,7 +91,7 @@ lines!(ax, ts, result_df[!,"flow"], color=:blue)
 fig
 ```
 
-![figure](doc/picture/predictions.png)
+<!-- ![figure](doc/picture/predictions.png) -->
 
 ## 特性
 

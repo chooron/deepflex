@@ -1,3 +1,29 @@
+using ModelingToolkit
+
+HydroFlux = HydroModels.HydroFlux
+StateFlux = HydroModels.StateFlux
+NeuralFlux = HydroModels.NeuralFlux
+HydroBucket = HydroModels.HydroBucket
+NeuralWrapper = HydroModels.NeuralWrapper
+HydroModel = HydroModels.HydroModel
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+
+function LSTMCompact(in_dims, hidden_dims, out_dims)
+    lstm_cell = LSTMCell(in_dims => hidden_dims)
+    classifier = Dense(hidden_dims => out_dims, sigmoid)
+    return @compact(; lstm_cell, classifier) do x::AbstractArray{T,2} where {T}
+        x = reshape(x, size(x)..., 1)
+        x_init, x_rest = Iterators.peel(LuxOps.eachslice(x, Val(2)))
+        y, carry = lstm_cell(x_init)
+        output = [vec(classifier(y))]
+        for x in x_rest
+            y, carry = lstm_cell((x, carry))
+            output = vcat(output, [vec(classifier(y))])
+        end
+        @return reduce(hcat, output)
+    end
+end
+
 @variables soilwater snowpack meltwater suz slz
 @variables prcp pet temp
 @variables rainfall snowfall melt refreeze infil excess recharge evap q0 q1 q2 q perc
@@ -5,7 +31,7 @@
 @variables BETA GAMMA
 #* parameters estimate by NN
 params_nn = LSTMCompact(3, 10, 2)
-nn_wrapper = NeuralWrapper([prcp, temp, pet] => [BETA, GAMMA], params_nn, name=:pnn)
+nn_wrapper = HydroModels.NeuralWrapper([prcp, temp, pet] => [BETA, GAMMA], params_nn, name=:pnn)
 
 #* snowfall and rainfall split flux
 split_flux = HydroFlux([prcp, temp] => [snowfall, rainfall], [TT],
@@ -40,28 +66,3 @@ zone_dfuncs = [StateFlux([recharge, excess] => [perc, q0, q1], suz), StateFlux([
 zone_bucket = HydroBucket(name=:hbv_zone, funcs=zone_funcs, dfuncs=zone_dfuncs)
 model = HydroModel(name=:dpl_hbv, components=[nn_wrapper, split_flux, snow_bucket, soil_bucket, zone_bucket])
 
-using ModelingToolkit
-
-HydroFlux = HydroModels.HydroFlux
-StateFlux = HydroModels.StateFlux
-NeuralFlux = HydroModels.NeuralFlux
-HydroBucket = HydroModels.HydroBucket
-NeuralWrapper = HydroModels.NeuralWrapper
-HydroModel = HydroModels.HydroModel
-step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
-
-function LSTMCompact(in_dims, hidden_dims, out_dims)
-    lstm_cell = LSTMCell(in_dims => hidden_dims)
-    classifier = Dense(hidden_dims => out_dims, sigmoid)
-    return @compact(; lstm_cell, classifier) do x::AbstractArray{T,2} where {T}
-        x = reshape(x, size(x)..., 1)
-        x_init, x_rest = Iterators.peel(LuxOps.eachslice(x, Val(2)))
-        y, carry = lstm_cell(x_init)
-        output = [vec(classifier(y))]
-        for x in x_rest
-            y, carry = lstm_cell((x, carry))
-            output = vcat(output, [vec(classifier(y))])
-        end
-        @return hcat(output...)
-    end
-end
