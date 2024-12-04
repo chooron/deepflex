@@ -3,3 +3,6 @@ doc/build
 .vscode
 project
 .gitignore
+.cursorrules
+WorkLog.md
+DesignMind.md
