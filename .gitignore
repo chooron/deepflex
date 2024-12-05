@@ -1,5 +1,7 @@
 temp
 docs/build
+docs/tutorials
+docs/start
 .vscode
 project
 .gitignore
