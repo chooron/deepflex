@@ -1,6 +1,6 @@
 # HydroModels.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://hydromodels.github.io/HydroModels.jl/)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://chooron.github.io/HydroModels.jl/)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 ## Overview
