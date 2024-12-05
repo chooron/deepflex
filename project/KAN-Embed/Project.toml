@@ -1,0 +1,5 @@
+[deps]
+KolmogorovArnold = "eec8b66d-f71a-4a43-b228-0fe5d6721cd3"
+Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
+LuxCUDA = "d0bbae9a-e099-4d5b-a835-1c6931763bda"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
