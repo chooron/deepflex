@@ -1057,7 +1057,7 @@ version = "2.11.2+1"
 
 [[deps.HydroModels]]
 deps = ["Accessors", "ComponentArrays", "DataFrames", "DataInterpolations", "Dates", "ForwardDiff", "Graphs", "Integrals", "IterTools", "LinearAlgebra", "LinearSolve", "Lux", "LuxCore", "ModelingToolkit", "NNlib", "NamedTupleTools", "Optimization", "OptimizationBBO", "OptimizationOptimisers", "OrdinaryDiffEq", "ProgressMeter", "Random", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "SciMLSensitivity", "SparseArrays", "StableRNGs", "Statistics", "SymbolicUtils", "Symbolics", "TOML", "Zygote"]
-path = "D:\\Julia\\Julia-1.10.4\\packages\\dev\\HydroModels"
+path = "E:\\JlCode\\HydroModels"
 uuid = "7e3cde01-c141-467b-bff6-5350a0af19fc"
 version = "0.1.0"
 

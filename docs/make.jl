@@ -8,7 +8,7 @@ makedocs(
     format = Documenter.HTML(
         # 启用 pretty URLs，移除 .html 后缀
         # 设置文档的规范 URL
-        canonical = "https://chooron.github.io/HydroModels.jl/dev",
+        canonical = "https://chooron.github.io/HydroModels.jl",
         # 设置资源文件
         assets = ["assets/icons.ico"],
         # 配置侧边栏
@@ -20,6 +20,8 @@ makedocs(
     clean = true,
     doctest = false,
     linkcheck = true,
+    source = "src",
+    build = "build",
     # 配置页面结构
     pages = [
         "Home" => "index.md",
