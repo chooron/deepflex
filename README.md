@@ -25,18 +25,6 @@ HydroModels.jl offers:
   - Neural network enhanced models
   - Distributed hydrological systems
 
-## Case Studies
-
-The framework has been validated through various applications, including:
-1. M50 Model Implementation
-2. GR4J-based Distributed Hydrological Model
-
-## Getting Started
-
-Check out our tutorials to start using HydroModels.jl:
-- [Run a Bucket Model](tutorials/run_a_bucket.md)
-- [Run ExpHydro Model](tutorials/run_a_exphydro_model.md)
-
 ## Installation
 
 ```julia
@@ -47,7 +35,3 @@ Pkg.add("HydroModels")
 ## Contributing
 
 HydroModels.jl is an open-source project available on Github. We welcome contributions from the community to help advance deep learning applications in hydrology.
-
-## Documentation
-
-For detailed information about using HydroModels.jl, please refer to our comprehensive documentation and tutorials in this site.
