@@ -77,4 +77,4 @@ end
 
 # 绘制图形
 p = plot_predictions(result)
-savefig(p, "tutorials/implements/save/m50_predict.png")
+savefig(p, "tutorials/implements/plot/figures/m50_predict.png")
