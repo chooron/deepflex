@@ -4,6 +4,7 @@ requirejs.config({
     'highlight-julia': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia.min',
     'headroom': 'https://cdnjs.cloudflare.com/ajax/libs/headroom/0.12.0/headroom.min',
     'jqueryui': 'https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min',
+    'highlight-yaml': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/yaml.min',
     'katex-auto-render': 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/contrib/auto-render.min',
     'jquery': 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min',
     'headroom-jquery': 'https://cdnjs.cloudflare.com/ajax/libs/headroom/0.12.0/jQuery.headroom.min',
@@ -13,6 +14,11 @@ requirejs.config({
   },
   shim: {
   "highlight-julia": {
+    "deps": [
+      "highlight"
+    ]
+  },
+  "highlight-yaml": {
     "deps": [
       "highlight"
     ]
@@ -65,7 +71,7 @@ $(document).ready(function() {
 
 })
 ////////////////////////////////////////////////////////////////////////////////
-require(['jquery', 'highlight', 'highlight-julia', 'highlight-julia-repl'], function($) {
+require(['jquery', 'highlight', 'highlight-julia', 'highlight-julia-repl', 'highlight-yaml'], function($) {
 $(document).ready(function() {
     hljs.highlightAll();
 })
