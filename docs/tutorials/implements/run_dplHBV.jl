@@ -44,17 +44,17 @@ config = (solver=HydroModels.ODESolver(), timeidx=ts, interp=LinearInterpolation
 # sum((result.q .- qobs_vec) .^ 2)  / sum((qobs_vec .- mean(qobs_vec)) .^2) 
 # # # #! set the tunable parameters boundary
 # # #! prepare flow
-tunable_pas = ComponentVector(params=params, nn=(pnn=psnn_ps_vec,))
-const_pas = ComponentVector(initstates=init_states)
+# tunable_pas = ComponentVector(params=params, nn=(pnn=psnn_ps_vec,))
+# const_pas = ComponentVector(initstates=init_states)
 
-model_grad_opt = HydroModels.GradOptimizer(component=model, maxiters=100, adtype=AutoZygote(), solve_alg=Adam(1e-2))
-config = (solver=HydroModels.ODESolver(sensealg=BacksolveAdjoint(autodiff=true)), timeidx=ts, interp=LinearInterpolation)
-hbv_hydro_opt_params, loss_df = model_grad_opt(
-    [input], [(q=qobs_vec,)],
-    tunable_pas=tunable_pas,
-    const_pas=const_pas,
-    return_loss_df=true
-)
+# model_grad_opt = HydroModels.GradOptimizer(component=model, maxiters=100, adtype=AutoZygote(), solve_alg=Adam(1e-2))
+# config = (solver=HydroModels.ODESolver(sensealg=BacksolveAdjoint(autodiff=true)), timeidx=ts, interp=LinearInterpolation)
+# hbv_hydro_opt_params, loss_df = model_grad_opt(
+#     [input], [(q=qobs_vec,)],
+#     tunable_pas=tunable_pas,
+#     const_pas=const_pas,
+#     return_loss_df=true
+# )
 
 # mse_value, fhv_value, nse_value = mse(qobs_vec, result.q), fhv(qobs_vec, result.q, 0.1), nse(qobs_vec, result.q)
 
