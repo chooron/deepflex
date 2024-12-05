@@ -5,7 +5,17 @@ on:
     branches:
       - main # update to match your development branch (master, main, dev, trunk, ...)
     tags: '*'
+    paths:
+      - 'docs/**'          # 只有docs目录下的文件改变时触发
+      - 'src/**'           # 源代码改变时触发
+      - '*.toml'          # 项目配置文件改变时触发
+      - '.github/workflows/documentation.yml'  # 工作流配置改变时触发
   pull_request:
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '*.toml'
+      - '.github/workflows/documentation.yml'
 
 jobs:
   build:
@@ -17,14 +27,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      # 缓存整个 Julia 环境
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
+      
+      # 优化缓存配置
       - uses: julia-actions/cache@v2
+        with:
+          cache-registries: "true"    # 缓存包注册表
+          cache-packages: "true"      # 缓存已安装的包
+          cache-artifacts: "true"     # 缓存构建产物
+      
+      # 缓存文档构建依赖
+      - uses: actions/cache@v3
+        with:
+          path: |
+            docs/build
+            docs/src/__site
+          key: ${{ runner.os }}-docs-${{ hashFiles('docs/Project.toml', 'docs/make.jl') }}
+          restore-keys: |
+            ${{ runner.os }}-docs-
+      
+      # 只在缓存未命中时安装依赖
       - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+      
       - name: Build and deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl
