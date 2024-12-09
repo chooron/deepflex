@@ -3,17 +3,17 @@ function Base.show(io::IO, flux::AbstractHydroFlux)
 
     if compact
         print(io, "HydroFlux(")
-        print(io, "inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
-        print(io, ", outputs: ", isempty(flux.meta.output) ? "nothing" : join(flux.meta.output, ", "))
-        print(io, ", params: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))
+        print(io, "inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+        print(io, ", outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
+        print(io, ", params: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
         print(io, ")")
     else
         println(io, "HydroFlux:")
-        println(io, "  Inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
-        println(io, "  Outputs: ", isempty(flux.meta.output) ? "nothing" : join(flux.meta.output, ", "))
-        println(io, "  Parameters: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))
+        println(io, "  Inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+        println(io, "  Outputs: ", isempty(flux.meta.outputs) ? "nothing" : join(flux.meta.outputs, ", "))
+        println(io, "  Parameters: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
         println(io, "  Expressions:")
-        for (output, expr) in zip(flux.meta.output, flux.exprs)
+        for (output, expr) in zip(flux.meta.outputs, flux.exprs)
             println(io, "    $output = $expr")
         end
     end
@@ -25,15 +25,15 @@ function Base.show(io::IO, flux::AbstractStateFlux)
 
     if compact
         print(io, "StateFlux(")
-        print(io, "inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
-        print(io, ", params: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))
-        print(io, ", states: ", isempty(flux.meta.state) ? "nothing" : join(flux.meta.state, ", "))
+        print(io, "inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+        print(io, ", params: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
+        print(io, ", states: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
         print(io, ")")
     else
         println(io, "StateFlux:")
-        println(io, "  Inputs: ", isempty(flux.meta.input) ? "nothing" : join(flux.meta.input, ", "))
-        println(io, "  Parameters: ", isempty(flux.meta.param) ? "nothing" : join(flux.meta.param, ", "))
-        println(io, "  States: ", isempty(flux.meta.state) ? "nothing" : join(flux.meta.state, ", "))
+        println(io, "  Inputs: ", isempty(flux.meta.inputs) ? "nothing" : join(flux.meta.inputs, ", "))
+        println(io, "  Parameters: ", isempty(flux.meta.params) ? "nothing" : join(flux.meta.params, ", "))
+        println(io, "  States: ", isempty(flux.meta.states) ? "nothing" : join(flux.meta.states, ", "))
         println(io, "  Expressions:")
         println(io, "    $(flux.state) = $(flux.expr)")
     end
@@ -142,29 +142,14 @@ function Base.show(io::IO, model::AbstractModel)
     buckets_in_model = filter(x -> x isa AbstractBucket, model.components)
     routes_in_model = filter(x -> x isa AbstractRoute, model.components)
     @assert(length(routes_in_model) <= 1, "Only one route is allowed in a model")
-    model_type = :LumpedModel
-    if length(routes_in_model) == 1
-        if routes_in_model[1] isa AbstractGridRoute
-            model_type = :GridModel
-        elseif routes_in_model[1] isa AbstractVectorRoute
-            model_type = :VectorModel
-        elseif routes_in_model[1] isa AbstractSumRoute
-            model_type = :MultiNodesModel
-        else
-            @error "Unknown route type: $(typeof(routes_in_model[1]))"
-        end
-    end
-
     compact = get(io, :compact, false)
     if compact
         print(io, "HydroModel(")
         print(io, "name: ", model.meta.name)
-        print(io, ", type: ", model_type)
         print(io, ", components: ", length(model.components))
         print(io, ")")
     else
         println(io, "HydroModel: ", model.meta.name)
-        println(io, "  Type: ", model_type)
         println(io, "  Components: ", join(map(c -> c.meta.name, model.components), ", "))
         println(io, "  Inputs: ", isempty(model.meta.inputs) ? "nothing" : join(model.meta.inputs, ", "))
         println(io, "  Outputs: ", isempty(model.meta.outputs) ? "nothing" : join(model.meta.outputs, ", "))

@@ -184,21 +184,18 @@ This is useful for focusing analysis on a particular outlet point in a hydrologi
 """
 struct ComputeComponentOutlet{C<:AbstractComponent,M<:HydroMeta} <: AbstractHydroWrapper
     component::C
-    outlet::Symbol
+    outlet::Integer
     meta::M
 
-    function ComputeComponentOutlet(component::C, outlet::S) where {C<:AbstractComponent,S<:Symbol}
-        @assert outlet in component.hrunames "Outlet $outlet is not a valid output name for component $component"
-        new{C,typeof(meta)}(component, outlet, meta)
+    function ComputeComponentOutlet(component::C, outlet::I) where {C<:AbstractComponent,I<:Integer}
+        new{C,typeof(component.meta)}(component, outlet, component.meta)
     end
 end
 
 function (wrapper::ComputeComponentOutlet)(input::AbstractVector{<:NamedTuple}, pas::ComponentVector; kwargs...)
     convert_to_ntp = get(kwargs, :convert_to_ntp, true)
-    @assert wrapper.outlet in wrapper.component.varnames "Outlet $wrapper.outlet is not a valid output name for component $wrapper.component"
-    outlet_idx = findfirst(nm -> nm == wrapper.outlet, wrapper.component.varnames)
     output = wrapper.component(input, pas; kwargs...)
-    return convert_to_ntp ? output[outlet_idx] : output[:, outlet_idx, :]
+    return convert_to_ntp ? output[wrapper.outlet] : output[:, wrapper.outlet, :]
 end
 
 """
@@ -285,11 +282,11 @@ end
 
 function (wrapper::NeuralWrapper)(input::Array{T,3}, pas::ComponentVector; kwargs...) where {T}
     nn_ps = pas[:nn][wrapper.meta.name]
-    output = wrapper.func.(eachslice(input, dims=2), Ref(nn_ps))
+    output = wrapper.func.(Matrix.(eachslice(input, dims=2)), Ref(nn_ps))
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        return [NamedTuple{Tuple(get_output_names(wrapper))}(eachslice(output[:, i, :], dims=1)) for i in axes(output, 2)]
+        return [NamedTuple{Tuple(get_output_names(wrapper))}(eachslice(output_, dims=1)) for output_ in eachslice(output, dims=2)]
     else
-        return output
+        return permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output), (1,3,2))
     end
 end

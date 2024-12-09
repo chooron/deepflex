@@ -119,5 +119,5 @@ function (model::HydroModel)(
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
-    return convert_to_ntp ? [NamedTuple{Tuple(model.varnames)}(eachslice(fluxes[:, i, :], dims=1)) for i in axes(fluxes, 2)] : fluxes
+    return convert_to_ntp ? [NamedTuple{Tuple(model.varnames)}(eachslice(fluxes_, dims=1)) for fluxes_ in eachslice(fluxes, dims=2)] : fluxes
 end

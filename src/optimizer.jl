@@ -74,7 +74,7 @@ function (opt::HydroOptimizer{C,S})(
     target::Vector;
     tunable_pas::ComponentVector,
     const_pas::ComponentVector,
-    config::Vector{<:NamedTuple}=fill(NamedTuple(), length(input)),
+    config::Vector=fill(NamedTuple(), length(input)),
     kwargs...
 ) where {C,S}
     lb = get(kwargs, :lb, zeros(length(tunable_pas)))
@@ -89,6 +89,7 @@ function (opt::HydroOptimizer{C,S})(
     prob_args = (input, target, config, run_kwargs, tunable_axes, default_model_pas)
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(opt.objective_func)
+    @info "The size of tunable parameters is $(length(tunable_pas))"
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args, lb=lb, ub=ub)
     sol = Optimization.solve(optprob, opt.solve_alg, callback=callback_func, maxiters=opt.maxiters)
     opt_pas = update_ca(default_model_pas, ComponentVector(sol.u, tunable_axes))
@@ -105,7 +106,7 @@ function (opt::GradOptimizer{C,S})(
     target::Vector;
     tunable_pas::ComponentVector,
     const_pas::ComponentVector,
-    config::Vector{<:NamedTuple}=fill(NamedTuple(), length(input)),
+    config::Vector=fill(NamedTuple(), length(input)),
     kwargs...
 ) where {C,S}
     run_kwargs = get(kwargs, :run_kwargs, (convert_to_ntp=true,))
@@ -117,6 +118,7 @@ function (opt::GradOptimizer{C,S})(
     prob_args = (input, target, config, run_kwargs, tunable_axes, default_model_pas)
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(opt.objective_func, opt.adtype)
+    @info "The size of tunable parameters is $(length(tunable_pas))"
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
     sol = Optimization.solve(optprob, opt.solve_alg, callback=callback_func, maxiters=opt.maxiters)
     opt_pas = update_ca(default_model_pas, ComponentVector(sol.u, tunable_axes))
@@ -133,7 +135,7 @@ function (opt::BatchOptimizer{C,S})(
     target::Vector;
     tunable_pas::ComponentVector,
     const_pas::ComponentVector,
-    config::Vector{<:NamedTuple}=fill(NamedTuple(), length(input)),
+    config::Vector=fill(NamedTuple(), length(input)),
     kwargs...
 ) where {C,S}
     loss_recorder = NamedTuple[]
@@ -154,6 +156,7 @@ function (opt::BatchOptimizer{C,S})(
 
     #* Constructing and solving optimization problems
     optf = Optimization.OptimizationFunction(opt.objective_func, opt.adtype)
+    @info "The size of tunable parameters is $(length(tunable_pas))"
     optprob = Optimization.OptimizationProblem(optf, collect(tunable_pas), prob_args)
     sol = Optimization.solve(optprob, opt.solve_alg, ncycle(train_batch, opt.maxiters), callback=callback_func)
     #* Returns the optimized model parameters

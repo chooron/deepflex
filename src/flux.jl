@@ -118,14 +118,7 @@ function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVect
     @assert length(timeidx) == size(input, 3) "Time index length does not match the number of time steps"
 
     #* extract params and nn params
-    node_params = [pas[:params][ptype] for ptype in ptypes]
-    # 批量检查参数
-    required_params = Set(get_param_names(flux))
-    for (ptype, node_param) in zip(ptypes, node_params)
-        missing_params = setdiff(required_params, keys(node_param))
-        @assert isempty(missing_params) "Missing parameters for $ptype: $missing_params"
-    end
-    params_vec = collect([collect([params_item[pname] for pname in get_param_names(flux)]) for params_item in node_params])
+    params_vec = collect([collect([pas[:params][ptype][pname] for pname in get_param_names(flux)]) for ptype in ptypes])
 
     #* array dims: (var_names * node_names * ts_len)
     flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
@@ -135,9 +128,6 @@ function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVect
     else
         flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
     end
-    # flux_output_arr = mapslices(input, dims=[1,2]) do slice
-    #     reduce(hcat, flux.func.(eachcol(slice), params_vec, timeidx))
-    # end
     flux_output_arr
 end
 

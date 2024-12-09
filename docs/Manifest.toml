@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "ad4b8e8aabb6dad13d819587f280889b1bd2f545"
+project_hash = "620786bb65c2992bc73165cb134818fb2070b24e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "72af59f5b8f09faee36b4ec48e014a79210f2f4f"
@@ -1056,7 +1056,7 @@ uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
 version = "2.11.2+1"
 
 [[deps.HydroModels]]
-deps = ["Accessors", "ComponentArrays", "DataFrames", "DataInterpolations", "Dates", "ForwardDiff", "Graphs", "Integrals", "IterTools", "LinearAlgebra", "LinearSolve", "Lux", "LuxCore", "ModelingToolkit", "NNlib", "NamedTupleTools", "Optimization", "OptimizationBBO", "OptimizationOptimisers", "OrdinaryDiffEq", "ProgressMeter", "Random", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "SciMLSensitivity", "SparseArrays", "StableRNGs", "Statistics", "SymbolicUtils", "Symbolics", "TOML", "Zygote"]
+deps = ["Accessors", "CSV", "ComponentArrays", "DataFrames", "DataInterpolations", "Dates", "ForwardDiff", "Graphs", "Integrals", "IterTools", "LinearAlgebra", "LinearSolve", "Lux", "LuxCore", "ModelingToolkit", "NNlib", "NamedTupleTools", "Optimization", "OptimizationBBO", "OptimizationOptimisers", "OrdinaryDiffEq", "ProgressMeter", "Random", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "SciMLSensitivity", "SparseArrays", "StableRNGs", "Statistics", "SymbolicUtils", "Symbolics", "TOML", "Zygote"]
 path = "E:\\JlCode\\HydroModels"
 uuid = "7e3cde01-c141-467b-bff6-5350a0af19fc"
 version = "0.1.0"

@@ -330,7 +330,7 @@ struct RapidRoute <: AbstractRapidRoute
         #* Extract all parameters names of funcs and dfuncs
         param_names = [:rapid_k, :rapid_x]
         #* Setup the name information of the hydrobucket
-        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_vector_route) : name
+        route_name = name === nothing ? Symbol(Symbol(reduce((x, y) -> Symbol(x, y), input_names)), :_rapid_route) : name
         meta = HydroMeta(route_name, input_names, output_names, param_names, Symbol[], Symbol[])
         #* generate adjacency matrix from network
         adjacency = adjacency_matrix(network)'

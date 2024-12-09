@@ -289,14 +289,15 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     ele_output_vec = [ele.flux_func.(eachslice(fluxes[:, :, i], dims=2), param_func(pas), nn_param_func(pas), timeidx[i]) for i in axes(fluxes, 3)]
     ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
     #* merge state and output, if solved_states is not nothing, then cat it at the first dim
-    final_output_arr = cat(solved_states, ele_output_arr, dims=1)
+    combine_output_arr = cat(solved_states, ele_output_arr, dims=1)
 
     #* convert to NamedTuple if convert_to_ntp is true
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        return [NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(final_output_arr[:, i, :], dims=1)) for i in axes(final_output_arr, 2)]
+        output_names_tuple = Tuple(vcat(get_state_names(ele), get_output_names(ele)))
+        return [NamedTuple{output_names_tuple}(eachslice(output_arr_, dims=1)) for output_arr_ in eachslice(combine_output_arr, dims=2)]
     else
-        return final_output_arr
+        return combine_output_arr
     end
 end
 
@@ -326,7 +327,8 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     #* convert to NamedTuple if convert_to_ntp is true
     convert_to_ntp = get(kwargs, :convert_to_ntp, false)
     if convert_to_ntp
-        return [NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(final_output_arr[:, i, :], dims=1)) for i in axes(final_output_arr, 2)]
+        output_names_tuple = Tuple(vcat(get_state_names(ele), get_output_names(ele)))
+        return [NamedTuple{output_names_tuple}(eachslice(output_arr_, dims=1)) for output_arr_ in eachslice(final_output_arr, dims=2)]
     else
         return final_output_arr
     end

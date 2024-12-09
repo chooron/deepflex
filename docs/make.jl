@@ -28,7 +28,11 @@ makedocs(
         "Tutorials" => [
             "Run a Bucket Model" => "tutorials/run_a_bucket.md",
             "Run ExpHydro Model" => "tutorials/run_a_exphydro_model.md"
-        ]
+        ],
+        "Extent Content" => [
+            "Modeling Framework Comparisons" => "docs/src/extent/framework comparision - en.md",
+        ],
+        
     ],
     # 其他选项
     checkdocs = :none,

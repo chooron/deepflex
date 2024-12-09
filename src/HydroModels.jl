@@ -64,6 +64,7 @@ struct HydroEquation end
 abstract type AbstractComponent end
 abstract type AbstractHydroSolver end
 abstract type AbstractHydroOptimizer end
+abstract type AbstractIOAdapter end
 abstract type AbstractHydroWrapper <: AbstractComponent end
 abstract type AbstractNeuralWrapper <: AbstractComponent end
 
@@ -92,6 +93,8 @@ include("utils/show.jl")
 include("utils/build.jl")
 include("utils/callback.jl")
 include("utils/sort.jl")
+include("utils/io.jl")
+export NamedTupleIOAdapter
 
 include("optimizer.jl")
 export BatchOptimizer, HydroOptimizer, GradOptimizer

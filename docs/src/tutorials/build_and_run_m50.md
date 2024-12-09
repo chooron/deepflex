@@ -1,0 +1,1 @@
+# Embedding Neural Networks in ExpHydro Model: Implementation of [M50 and M100](https://hess.copernicus.org/articles/26/5085/2022/) Model

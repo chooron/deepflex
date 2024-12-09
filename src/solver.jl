@@ -44,7 +44,7 @@ A custom ODEProblem solver
 """
 @kwdef struct DiscreteSolver <: AbstractHydroSolver
     alg = FunctionMap{true}()
-    sensealg = InterpolatingAdjoint()
+    sensealg = ZygoteAdjoint()
 end
 
 function (solver::DiscreteSolver)(
@@ -58,7 +58,7 @@ function (solver::DiscreteSolver)(
     #* build problem
     prob = DiscreteProblem(ode_func!, initstates, (timeidx[1], timeidx[end]), params)
     #* solve problem
-    sol = solve(prob, solver.alg, saveat=timeidx, sensealg=solver.sensealg)
+    sol = solve(prob, solver.alg, saveat=timeidx) # , sensealg=solver.sensealg
     if convert_to_array
         if SciMLBase.successful_retcode(sol)
             sol_arr = Array(sol)
@@ -90,8 +90,9 @@ struct ManualSolver{mutable} <: AbstractHydroSolver end
 function (solver::ManualSolver{true})(
     du_func::Function,
     pas::ComponentVector,
-    initstates::AbstractArray,
-    timeidx::AbstractVector
+    initstates::AbstractArray{<:Number, 1},
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
 )
     T1 = promote_type(eltype(pas), eltype(initstates))
     states_results = zeros(T1, size(initstates)..., length(timeidx))
@@ -104,18 +105,55 @@ function (solver::ManualSolver{true})(
     states_results
 end
 
+function (solver::ManualSolver{true})(
+    du_func::Function,
+    pas::ComponentVector,
+    initstates::AbstractArray{<:Number, 2},
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
+)
+    T1 = promote_type(eltype(pas), eltype(initstates))
+    states_results = zeros(T1, size(initstates)..., length(timeidx))
+    tmp_initstates = copy(initstates)
+    for (i, t) in enumerate(timeidx)
+        tmp_du = du_func(tmp_initstates, pas, t)
+        tmp_initstates = tmp_initstates .+ tmp_du
+        states_results[:, :, i] .= tmp_initstates
+    end
+    states_results
+end
+
 function (solver::ManualSolver{false})(
     du_func::Function,
     pas::ComponentVector,
-    initstates::AbstractArray,
-    timeidx::AbstractVector
+    initstates::AbstractArray{<:Number, 1},
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
 )
     states_results = []
     tmp_initstates = copy(initstates)
     for t in timeidx
         tmp_du = du_func(tmp_initstates, pas, t)
         tmp_initstates = tmp_initstates .+ tmp_du
-        states_results = vcat(states_results, tmp_initstates)
+        states_results = vcat(states_results, [tmp_initstates])
     end
     reduce((m1, m2) -> cat(m1, m2, dims=length(size(initstates))+1), states_results)
+end
+
+function (solver::ManualSolver{false})(
+    du_func::Function,
+    pas::ComponentVector,
+    initstates::AbstractArray{<:Number, 2},
+    timeidx::AbstractVector;
+    convert_to_array::Bool=true
+)
+    states_results = []
+    tmp_initstates = copy(initstates)
+    for t in timeidx
+        tmp_du = du_func(tmp_initstates, pas, t)
+        tmp_initstates = tmp_initstates .+ tmp_du
+        states_results = vcat(states_results, [tmp_initstates])
+    end
+    output = reduce((m1, m2) -> cat(m1, m2, dims=length(size(initstates))+1), states_results)
+    output
 end
