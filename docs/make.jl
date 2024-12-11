@@ -26,6 +26,7 @@ makedocs(
         "Model Implementations" => [
             "construct a ExpHydro Model" => "implements/build_exphydro_model_en.md",
             "construct a M50 Model" => "implements/build_m50_model_en.md",
+            "construct discharge route model" => "implements/build_discharge_route_en.md",
         ],
         "Run Models" => [
             "Run a Bucket Model" => "tutorials/run_a_bucket.md",

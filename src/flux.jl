@@ -58,13 +58,8 @@ struct HydroFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractHydroFlux
         flux_name = Symbol(Symbol(reduce((x, y) -> Symbol(x, y), output_names)), :_sflux)
         #* construct meta
         meta = HydroMeta(name=flux_name, inputs=inputs, outputs=outputs, params=params)
+        @assert length(exprs) == length(outputs) "The number of expressions and outputs must match, but got expressions: $(length(exprs)) and outputs: $(length(outputs))"
         #* if no expression provided, use the hydrology formula library to build the flux
-        if length(exprs) == 0
-            @info "No expression provided, using the hydrology formula library (`HydroModelLibrary.jl`) to build the flux"
-            #* Get the corresponding calculation formula according to the input and output parameter names
-            hydrofunc = HydroEquation(input_names, output_names, param_names)
-            exprs = HydroModelLibrary.expr(hydrofunc)
-        end
         #* build flux function
         flux_func = build_flux_func(inputs, outputs, params, exprs)
 
