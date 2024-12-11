@@ -234,11 +234,10 @@ function (route::HydroRoute{F,PF,M})(
     stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     #* get the interpolation type and solver type
     interp = get(config, :interp, LinearInterpolation)
-    solver = get(config, :solver, ODESolver())
+    solver = get(config, :solver, ManualSolver{true}())
     #* get the time index
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-    #* get the solver
-    solver = get(config, :solver, ODESolver())
+
 
     #* check the length of ptypes
     @assert(length(ptypes) == size(input, 2),
@@ -351,7 +350,7 @@ function (route::RapidRoute)(
     interp = get(config, :interp, LinearInterpolation)
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
     delta_t = get(config, :delta_t, 1.0)
-    solver = get(config, :solver, DiscreteSolver())
+    solver = get(config, :solver, ManualSolver{true}())
 
     @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
 

@@ -10,7 +10,7 @@ end
 function (adapter::NamedTupleIOAdapter)(
     input::NamedTuple,
     pas::ComponentVector;
-    config::NamedTuple=NamedTuple(),
+    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
     kwargs...
 )::NamedTuple
     @assert((all(input_name in keys(input) for input_name in get_input_names(adapter))),
@@ -23,7 +23,7 @@ end
 function (adapter::NamedTupleIOAdapter)(
     input::Vector{<:NamedTuple},
     pas::ComponentVector;
-    config::NamedTuple=NamedTuple(),
+    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
     kwargs...
 )::Vector{<:NamedTuple}
     for i in eachindex(input)

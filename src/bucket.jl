@@ -180,10 +180,9 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     kwargs...
 ) where {F,D,FF,OF<:Function,M,T}
     #* get kwargs
-    solver = get(config, :solver, ODESolver())
+    solver = get(config, :solver, ManualSolver{true}())
     interp = get(config, :interp, LinearInterpolation)
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
@@ -209,11 +208,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     flux_output_mat = reduce(hcat, flux_output)
     #* merge output and state, if solved_states is not nothing, then cat it at the first dim
     output_mat = cat(solved_states, flux_output_mat, dims=1)
-    if convert_to_ntp
-        return NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(output_mat, dims=1))
-    else
-        return output_mat
-    end
+    output_mat
 end
 
 function (ele::HydroBucket{F,D,FF,OF,M})(
@@ -224,7 +219,6 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
 ) where {F,D,FF,OF<:Nothing,M,T}
     #* get kwargs
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
 
     @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
     @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
@@ -241,11 +235,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     flux_output = ele.flux_func.(eachslice(input, dims=2), Ref(params_vec), Ref(nn_params_vec), timeidx)
     #* convert vector{vector} to matrix
     flux_output_matrix = reduce(hcat, flux_output)
-    if convert_to_ntp
-        return NamedTuple{Tuple(vcat(get_state_names(ele), get_output_names(ele)))}(eachslice(flux_output_matrix, dims=1))
-    else
-        return output_matrix
-    end
+    flux_output_matrix
 end
 
 function (ele::HydroBucket{F,D,FF,OF,M})(
@@ -255,7 +245,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     kwargs...
 ) where {F,D,FF,OF<:Function,M,T}
     #* get kwargs
-    solver = get(config, :solver, ODESolver())
+    solver = get(config, :solver, ManualSolver{true}())
     interp = get(config, :interp, LinearInterpolation)
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     stypes = get(config, :stypes, collect(keys(pas[:initstates])))
@@ -290,15 +280,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
     #* merge state and output, if solved_states is not nothing, then cat it at the first dim
     combine_output_arr = cat(solved_states, ele_output_arr, dims=1)
-
-    #* convert to NamedTuple if convert_to_ntp is true
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
-    if convert_to_ntp
-        output_names_tuple = Tuple(vcat(get_state_names(ele), get_output_names(ele)))
-        return [NamedTuple{output_names_tuple}(eachslice(output_arr_, dims=1)) for output_arr_ in eachslice(combine_output_arr, dims=2)]
-    else
-        return combine_output_arr
-    end
+    combine_output_arr
 end
 
 function (ele::HydroBucket{F,D,FF,OF,M})(
@@ -324,14 +306,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     #* array dims: (num of node, sequence length, variable dim)
     ele_output_vec = [ele.flux_func.(eachslice(input[:, :, i], dims=2), param_func(pas), nn_param_func(pas), timeidx[i]) for i in 1:size(input)[3]]
     final_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
-    #* convert to NamedTuple if convert_to_ntp is true
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
-    if convert_to_ntp
-        output_names_tuple = Tuple(vcat(get_state_names(ele), get_output_names(ele)))
-        return [NamedTuple{output_names_tuple}(eachslice(output_arr_, dims=1)) for output_arr_ in eachslice(final_output_arr, dims=2)]
-    else
-        return final_output_arr
-    end
+    final_output_arr
 end
 
 function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)

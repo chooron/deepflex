@@ -61,17 +61,6 @@ struct HydroModel{M<:HydroMeta,C<:AbstractComponent,VI<:AbstractVector{<:Abstrac
     end
 end
 
-function (model::HydroModel{M,C,VI,VN})(
-    input::NamedTuple,
-    pas::ComponentVector;
-    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
-    kwargs...
-) where {M,C,VI,VN}
-    @assert all(nm -> nm in keys(input), get_input_names(model)) "input must contain all input names"
-    input_matrix = Matrix(reduce(hcat, [input[nm] for nm in get_input_names(model)])')
-    return model(input_matrix, pas; config=config, kwargs...)
-end
-
 # 求解并计算
 function (model::HydroModel)(
     input::AbstractArray{T,2}, 
@@ -87,20 +76,7 @@ function (model::HydroModel)(
         tmp_fluxes = comp_(fluxes[idx, :], pas; config=config_, convert_to_ntp=false)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
-    return convert_to_ntp ? NamedTuple{Tuple(model.varnames)}(eachrow(fluxes)) : fluxes
-end
-
-#* 多输入构建大型方程求解并计算
-function (model::HydroModel)(
-    inputs::Vector{<:NamedTuple},
-    pas::ComponentVector;
-    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
-    kwargs...
-)
-    fluxes = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, [input[nm] for nm in get_input_names(model)]) for input in inputs])
-    fluxes = permutedims(fluxes, (2, 3, 1))
-    model(fluxes, pas; config=config, kwargs...)
+    return fluxes
 end
 
 function (model::HydroModel)(
@@ -118,6 +94,5 @@ function (model::HydroModel)(
         tmp_fluxes = comp_(fluxes[idx_, :, :], pas; config=config_, convert_to_ntp=false)
         fluxes = cat(fluxes, tmp_fluxes, dims=1)
     end
-    convert_to_ntp = get(kwargs, :convert_to_ntp, false)
-    return convert_to_ntp ? [NamedTuple{Tuple(model.varnames)}(eachslice(fluxes_, dims=1)) for fluxes_ in eachslice(fluxes, dims=2)] : fluxes
+    return fluxes
 end

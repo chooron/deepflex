@@ -107,8 +107,7 @@ function (flux::AbstractHydroFlux)(input::AbstractArray{N,2}, pas::ComponentVect
     @assert all(nm in keys(pas[:params]) for nm in get_param_names(flux)) "Input parameters do not match the flux parameters, the flux parameters should be: $(get_param_names(flux))"
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
     output_arr = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
-    to_ntp = get(kwargs, :convert_to_ntp, false)
-    return to_ntp ? NamedTuple{Tuple(get_output_names(flux))}(eachslice(output_arr, dims=1)) : output_arr
+    output_arr
 end
 
 function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {N}
@@ -267,8 +266,7 @@ end
 function (flux::AbstractNeuralFlux)(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
     output_arr = flux.func(input, nn_params_vec)
-    to_ntp = get(kwargs, :convert_to_ntp, false)
-    return to_ntp ? NamedTuple{Tuple(get_output_names(flux))}(eachslice(output_arr, dims=1)) : output_arr
+    output_arr
 end
 
 function (flux::AbstractNeuralFlux)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
