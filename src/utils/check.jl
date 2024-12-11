@@ -18,13 +18,13 @@ end
 
 function check_pas(component::AbstractComponent, pas::ComponentVector)
     check_parameters(component, pas)
-    check_states(component, pas)
+    check_initstates(component, pas)
     check_nns(component, pas)
 end
 
 function check_pas(component::AbstractComponent, pas::ComponentVector, ptypes::AbstractVector{Symbol}, stypes::AbstractVector{Symbol})
     check_parameters(component, pas, ptypes)
-    check_states(component, pas, stypes)
+    check_initstates(component, pas, stypes)
     check_nns(component, pas)
 end
 
@@ -42,31 +42,34 @@ function check_parameters(component::AbstractComponent, pas::ComponentVector, pt
     param_names = get_param_names(component)
     cpt_name = get_name(component)
     for ptype in ptypes
+        tmp_ptype_params_keys = keys(pas[:params][ptype])
         for param_name in param_names
-            @assert(param_name in keys(pas[ptype][:params]),
-                "Parameter '$(param_name)' in component '$(cpt_name)' is required but not found in parameter type '$(ptype)'. Available parameters: $(keys(pas[ptype][:params]))"
+            @assert(param_name in tmp_ptype_params_keys,
+                "Parameter '$(param_name)' in component '$(cpt_name)' is required but not found in parameter type '$(ptype)'. Available parameters: $(tmp_ptype_params_keys)"
             )
         end
     end
 end
 
-function check_states(component::AbstractComponent, pas::ComponentVector)
+function check_initstates(component::AbstractComponent, pas::ComponentVector)
     state_names = get_state_names(component)
     cpt_name = get_name(component)
     for state_name in state_names
-        @assert(state_name in keys(pas[:initstates]),
-            "Initial state '$(state_name)' in component '$(cpt_name)' is required but not found in pas[:initstates]. Available states: $(keys(pas[:initstates]))"
+        tmp_ptype_initstates_keys = keys(pas[:initstates])
+        @assert(state_name in tmp_ptype_initstates_keys,
+            "Initial state '$(state_name)' in component '$(cpt_name)' is required but not found in parameter type '$(ptype)'. Available states: $(tmp_ptype_initstates_keys)"
         )
     end
 end
 
-function check_states(component::AbstractComponent, pas::ComponentVector, stypes::AbstractVector{Symbol})
+function check_initstates(component::AbstractComponent, pas::ComponentVector, stypes::AbstractVector{Symbol})
     state_names = get_state_names(component)
     cpt_name = get_name(component)
     for stype in stypes
+        tmp_ptype_initstates_keys = keys(pas[:initstates][stype])
         for state_name in state_names
-            @assert(state_name in keys(pas[stype][:initstates]),
-                "Initial state '$(state_name)' in component '$(cpt_name)' is required but not found in state type '$(stype)'. Available states: $(keys(pas[stype][:initstates]))"
+            @assert(state_name in tmp_ptype_initstates_keys,
+                "Initial state '$(state_name)' in component '$(cpt_name)' is required but not found in state type '$(stype)'. Available states: $(tmp_ptype_initstates_keys)"
             )
         end
     end

@@ -219,8 +219,8 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     params_vec, nn_params_vec = param_func(pas), nn_param_func(pas)
     flux_output = ele.flux_func.(eachslice(input, dims=2), Ref(params_vec), Ref(nn_params_vec), timeidx)
     #* convert vector{vector} to matrix
-    flux_output_matrix = reduce(hcat, flux_output)
-    flux_output_matrix
+    flux_output_mat = reduce(hcat, flux_output)
+    flux_output_mat
 end
 
 function (ele::HydroBucket{F,D,FF,OF,M})(
@@ -241,7 +241,7 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     check_ptypes(ele, input, ptypes)
     check_stypes(ele, input, stypes)
     #* check initial states
-    check_initstates(ele, pas)
+    check_initstates(ele, pas, stypes)
     #* prepare initial states
     init_states_mat = reduce(hcat, [collect(pas[:initstates][stype][get_state_names(ele)]) for stype in stypes])
     #* extract params and nn params

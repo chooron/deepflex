@@ -25,12 +25,13 @@
     @test uh1(input_flow, params) ≈ expected_output atol = 1e-3
     @test uh2(input_flow, params) ≈ expected_output atol = 1e-3
     # test with multiple nodes
-    input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), input_flow for _ in 1:10), (1, 3, 2))
+    input_arr = repeat(reshape(input_flow, 1, 1, length(input_flow)), 1, 10, 1)
     ndtypes = [Symbol("node_$i") for i in 1:10]
     node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
     node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
     input_pas = ComponentVector(params=node_params, initstates=node_initstates)
-
-    @test uh1(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
-    @test uh2(input_arr, input_pas, ptypes=ndtypes) ≈ permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), expected_output for _ in 1:10), (1, 3, 2)) atol = 1e-3
+    config = (ptypes=ndtypes, solver=ManualSolver{true}())
+    expected_output_arr = repeat(reshape(expected_output, 1, 1, length(expected_output)), 1, 10, 1)
+    @test uh1(input_arr, input_pas, config=config) ≈ expected_output_arr atol = 1e-3
+    @test uh2(input_arr, input_pas, config=config) ≈ expected_output_arr atol = 1e-3
 end

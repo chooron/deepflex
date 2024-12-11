@@ -1,9 +1,3 @@
-HydroFlux = HydroModels.HydroFlux
-StateFlux = HydroModels.StateFlux
-HydroBucket = HydroModels.HydroBucket
-HydroModel = HydroModels.HydroModel
-UnitHydrograph = HydroModels.UnitHydrograph
-NeuralFlux = HydroModels.NeuralFlux
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 
 @testset "test grid route hydro model (multiple hydrology nodes based on exp-hydro)" begin
@@ -14,7 +8,7 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
     ts = collect(1:100)
     df = DataFrame(CSV.File("../data/exphydro/01013500.csv"))
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-    input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
+    input_mat = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 
     initstates = ComponentVector(snowpack=0.0, soilwater=1303.00, s_river=0.0)
     params = ComponentVector(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, lag=0.2, area_coef=1.0)
@@ -57,15 +51,15 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
     @test Set(HydroModels.get_output_names(model)) == Set([:pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :q, :q_routed])
     @test Set(reduce(union, HydroModels.get_var_names(model))) == Set([:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :flow, :snowpack, :soilwater, :s_river, :q, :q_routed])
 
-    input_ntp_vec = repeat([input_ntp], 9)
+    input_arr = repeat(reshape(input_mat, size(input_mat)[1], 1, size(input_mat)[2]), 1, 9, 1)
     node_names = [Symbol(:node_, i) for i in 1:9]
     node_params = NamedTuple{Tuple(node_names)}(repeat([params], 9))
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 9))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
     config = (timeidx=ts, ptypes=node_names)
-    result_mat_vec = model(input_ntp_vec, node_pas, config=config)
-    @test size(result_mat_vec) == (length(reduce(union, HydroModels.get_var_names(model))), length(input_ntp_vec), length(ts))
+    result_mat_vec = model(input_arr, node_pas, config=config)
+    @test size(result_mat_vec) == (length(reduce(union, HydroModels.get_var_names(model))), 9, length(ts))
 end
 
 @testset "test vector route hydro model (spatial hydrology model based on vector route and exp-hydro)" begin
@@ -76,7 +70,7 @@ end
     ts = collect(1:100)
     df = DataFrame(CSV.File("../data/exphydro/01013500.csv"))
     input_ntp = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
-    input = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
+    input_mat = Matrix(reduce(hcat, collect(input_ntp[[:temp, :lday, :prcp]]))')
 
     initstates = ComponentVector(snowpack=0.0, soilwater=1303.00, s_river=0.0)
     params = ComponentVector(f=0.0167, Smax=1709.46, Qmax=18.47, Df=2.674, Tmax=0.17, Tmin=-2.09, lag=0.2, k=0.5, x=0.2, area_coef=1.0)
@@ -131,12 +125,12 @@ end
         [:temp, :lday, :prcp, :pet, :snowfall, :rainfall, :melt, :evap, :baseflow, :surfaceflow, :s_river, :flow, :snowpack, :soilwater, :q, :q_routed]
     )
 
-    input_ntp_vec = repeat([input_ntp], 9)
+    input_arr = repeat(reshape(input_mat, size(input_mat)[1], 1, size(input_mat)[2]), 1, 9, 1)
     node_params = NamedTuple{Tuple(node_names)}(repeat([params], 9))
     node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 9))
     node_pas = ComponentVector(params=node_params, initstates=node_initstates)
 
     config = (timeidx=ts, ptypes=node_names)
-    result_mat_vec = model(input_ntp_vec, node_pas, config=config, convert_to_ntp=false)
-    @test size(result_mat_vec) == (length(reduce(union, HydroModels.get_var_names(model))), length(input_ntp_vec), length(ts))
+    result_mat_vec = model(input_arr, node_pas, config=config)
+    @test size(result_mat_vec) == (length(reduce(union, HydroModels.get_var_names(model))), 9, length(ts))
 end

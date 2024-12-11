@@ -69,9 +69,11 @@ include("utils/name.jl")
 include("utils/show.jl")
 include("utils/build.jl")
 include("utils/sort.jl")
+include("utils/check.jl")
 include("utils/io.jl")
-inclue("utils/check.jl")
 export NamedTupleIOAdapter
+include("utils/solver.jl")
+export ManualSolver
 
 # framework build
 include("flux.jl")

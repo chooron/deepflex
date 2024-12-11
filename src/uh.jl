@@ -151,12 +151,12 @@ Apply the unit hydrograph flux model to input data of various dimensions.
 
 (::UnitHydrograph)(::AbstractVector, ::ComponentVector; kwargs...) = @error "UnitHydrograph is not support for single timepoint"
 
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
+function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
     solver = get(config, :solver, ManualSolver{true}())
-    timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
+    timeidx = get(config, :timeidx, collect(1:size(input, 2)))
     input_vec = input[1, :]
     #* convert the lagflux to a discrete problem
-    lag_du_func(u,p,t) = input_vec[Int(t)] .* p[:weight] .+ [diff(u); -u[end]]
+    lag_du_func(u, p, t) = input_vec[Int(t)] .* p[:weight] .+ [diff(u); -u[end]]
     #* prepare the initial states
     lag = pas[:params][get_param_names(flux)[1]]
     uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
@@ -164,9 +164,8 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArra
         @warn "The unit hydrograph weight is empty, please check the unit hydrograph function"
         return input
     else
-        initstates = input_vec[1] .* uh_weight ./ sum(uh_weight)
         #* solve the problem
-        sol = solver(lag_du_func, ComponentVector(weight=uh_weight ./ sum(uh_weight)), initstates, timeidx)
+        sol = solver(lag_du_func, ComponentVector(weight=uh_weight ./ sum(uh_weight)), zeros(length(uh_weight)), timeidx)
         reshape(sol[1, :], 1, length(input_vec))
     end
 end
@@ -191,9 +190,9 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{
 end
 
 # todo: 卷积计算的结果与前两个计算结果不太一致
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
+function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArray{T,2}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
     input_vec = input[1, :]
-    itp_method = get(kwargs, :interp, LinearInterpolation)
+    itp_method = get(config, :interp, LinearInterpolation)
     itp = itp_method(input_vec, collect(1:length(input_vec)), extrapolate=true)
     #* construct the unit hydrograph function based on the interpolation method and parameter
     lag = pas[:params][get_param_names(flux)[1]]

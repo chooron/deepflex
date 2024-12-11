@@ -65,15 +65,15 @@ function Base.show(io::IO, uh::AbstractHydrograph)
         print(io, "inputs: ", isempty(uh.meta.inputs) ? "nothing" : join(uh.meta.inputs, ", "))
         print(io, ", outputs: ", isempty(uh.meta.outputs) ? "nothing" : join(uh.meta.outputs, ", "))
         print(io, ", params: ", isempty(uh.meta.params) ? "nothing" : join(uh.meta.params, ", "))
-        print(io, ", uhfunc: ", nameof(typeof(uh.uhfunc).parameters[1]))
+        print(io, ", uhfunc: ", typeof(uh.uhfunc).parameters[1])
         print(io, ")")
     else
         println(io, "UnitHydroFlux:")
         println(io, "  Inputs: ", isempty(uh.meta.inputs) ? "nothing" : join(uh.meta.inputs, ", "))
         println(io, "  Outputs: ", isempty(uh.meta.outputs) ? "nothing" : join(uh.meta.outputs, ", "))
         println(io, "  Parameters: ", isempty(uh.meta.params) ? "nothing" : join(uh.meta.params, ", "))
-        println(io, "  UnitFunction: ", nameof(typeof(uh.uhfunc).parameters[1]))
-        println(io, "  SolveType: ", nameof(typeof(uh).parameters[end]))
+        println(io, "  UnitFunction: ", typeof(uh.uhfunc).parameters[1])
+        println(io, "  SolveType: ", typeof(uh).parameters[end])
     end
 end
 

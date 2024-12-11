@@ -22,7 +22,7 @@
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     node_types = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    config = (solver=HydroModels.ODESolver(saveat=timeidx), interp=LinearInterpolation, ptypes=node_types, stypes=hrunames, timeidx=timeidx)
+    config = (solver=ManualSolver{true}(), interp=LinearInterpolation, ptypes=node_types, stypes=hrunames, timeidx=timeidx)
     output_arr = route(input_arr, pas, config=config)
     @test size(output_arr) == size(ones(2, 9, 20))
 end
@@ -52,7 +52,7 @@ end
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     ptypes = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, stypes=hrunames, solver=HydroModels.DiscreteSolver()))
+    sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, stypes=hrunames, solver=ManualSolver{true}()))
     @test size(sol_2) == size(ones(2, 9, 20))
 end
 
@@ -70,14 +70,13 @@ end
     add_edge!(network, 8, 9)
 
     ndtypes = [:ntype1, :ntype2, :ntype3]
-    params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(k=2.0, x=0.2) for _ in eachindex(ndtypes)]))
+    params = ComponentVector(NamedTuple{Tuple(ndtypes)}([(rapid_k=2.0, rapid_x=0.2) for _ in eachindex(ndtypes)]))
     initstates = ComponentVector(NamedTuple{Tuple(ndtypes)}([(s_river=0.0,) for _ in eachindex(ndtypes)]))
     pas = ComponentVector(; params, initstates)
     vroute = HydroModels.RapidRoute([q]=>[q_routed], network=network)
-    # 24 * 3600 / (10.0 * 1e6) * 1e3
     input_arr = ones(1, 9, 20)
     timeidx = collect(1:20)
     ptypes = [:ntype1, :ntype2, :ntype3, :ntype2, :ntype1, :ntype2, :ntype3, :ntype1, :ntype3]
-    sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, solver=HydroModels.DiscreteSolver()))
+    sol_2 = vroute(input_arr, pas, config=(timeidx=timeidx, ptypes=ptypes, solver=ManualSolver{true}()))
     @test size(sol_2) == size(ones(1, 9, 20))
 end

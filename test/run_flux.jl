@@ -46,26 +46,6 @@ end
     @test HydroModels.get_state_names(state_flux_3) == [:d,]
 end
 
-# todo muskingum need rebuild
-# @testset "test muskingum route flux" begin
-#     @variables q1
-
-#     # Building the Muskingum routing flux
-#     k, x = 3.0, 0.2
-#     pas = ComponentVector(params=(k=k, x=x,))
-#     msk_flux = HydroModels.MuskingumRouteFlux(q1)
-#     input = Float64[1 2 3 2 3 2 5 7 8 3 2 1]
-#     re = msk_flux(input, pas)
-
-#     # Verifying the input, output, and parameter names
-#     @test HydroModels.get_input_names(msk_flux) == [:q1]
-#     @test HydroModels.get_output_names(msk_flux) == [:q1_routed]
-#     @test HydroModels.get_param_names(msk_flux) == [:k, :x]
-
-#     # Checking the size and values of the output
-#     @test size(re) == size(input)
-#     @test re ≈ [1.0 0.977722 1.30086 1.90343 1.919 2.31884 2.15305 3.07904 4.39488 5.75286 4.83462 3.89097] atol = 1e-1
-# end
 
 
 @testset "test neural flux (single output)" begin

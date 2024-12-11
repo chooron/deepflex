@@ -262,7 +262,7 @@ function (route::HydroRoute{F,PF,M})(
     sol_arr = solver(du_func, pas, init_states_mat, timeidx, convert_to_array=true)
     sol_arr_permuted = permutedims(sol_arr, (2, 1, 3))
     cat_arr = cat(input, sol_arr_permuted, dims=1)
-    output_vec = [route.rfunc.func.(eachslice(cat_arr_, dims=2), param_func(pas), timeidx[i]) for cat_arr_ in eachslice(cat_arr, dims=3)]
+    output_vec = [route.rfunc.func.(eachslice(cat_arr[:, :, i], dims=2), param_func(pas), timeidx[i]) for i in axes(cat_arr, 3)]
     out_arr = reduce(hcat, reduce.(vcat, output_vec))
     #* return route_states and q_out
     return cat(sol_arr_permuted, reshape(out_arr, 1, size(out_arr)...), dims=1)
@@ -345,8 +345,8 @@ function (route::RapidRoute)(
     itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
 
     #* prepare the parameters for the routing function
-    k_ps = [pas[:params][ptype][:k] for ptype in ptypes]
-    x_ps = [pas[:params][ptype][:x] for ptype in ptypes]
+    k_ps = [pas[:params][ptype][:rapid_k] for ptype in ptypes]
+    x_ps = [pas[:params][ptype][:rapid_x] for ptype in ptypes]
     c0 = @. ((delta_t / k_ps) - (2 * x_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
     c1 = @. ((delta_t / k_ps) + (2 * x_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
     c2 = @. ((2 * (1 - x_ps)) - (delta_t / k_ps)) / ((2 * (1 - x_ps)) + (delta_t / k_ps))
