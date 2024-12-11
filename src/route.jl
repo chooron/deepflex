@@ -311,7 +311,7 @@ routing flux function to set up the internal information structure of the `Rapid
 
 Note: from Rapid
 """
-struct RapidRoute <: AbstractRapidRoute
+struct RapidRoute <: AbstractRoute
     "Routing adjacency matrix"
     adjacency::AbstractMatrix
     "Metadata: contains keys for input, output, param, state, and nn"

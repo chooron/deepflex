@@ -23,12 +23,7 @@ The ExpHydro model consists of two computational modules: the Snowpack Bucket an
 \end{aligned}
 ```
 
-Where:
-- $H(x)$ represents the Heaviside step function, equals 1 when $x > 0$, otherwise 0
-- $T_{min}, T_{max}, D_f, S_{max}, Q_{max}, f$ are model parameters
-- $temp, lday, prcp$ are input variables
-- $snowpack, soilwater$ are state variables
-- Other variables are intermediate calculation variables
+Where: $H(x)$ represents the Heaviside step function, equals 1 when $x > 0$, otherwise 0; $T_{min}, T_{max}, D_f, S_{max}, Q_{max}, f$ are model parameters;$temp, lday, prcp$ are input variables;$snowpack, soilwater$ are state variables;Other variables are intermediate calculation variables
 
 ## Complete Model Construction Process
 

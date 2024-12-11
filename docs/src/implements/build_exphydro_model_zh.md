@@ -1,4 +1,4 @@
-# Build a ExHydro Model
+# 构建ExpHydro模型
 
 ## ExpHydro模型介绍
 
@@ -123,7 +123,7 @@ soilwater_bucket = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
 
 `HydroBucket`的构建由`HydroFlux`和`StateFlux`组成, 其中`HydroFlux`用于定义模型的计算公式,`StateFlux`用于定义状态变量的平衡方程.
 
-最后将`HydroBucket`组合成`HydroModel`,得到ExpHydro模型如下所示:
+最后将`HydroBucket`组合成`HydroModel`,作为components输入到模型中,得到ExpHydro模型如下所示:
 
 ```julia
 # define the Exp-Hydro model

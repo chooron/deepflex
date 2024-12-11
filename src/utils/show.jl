@@ -120,22 +120,22 @@ function Base.show(io::IO, route::AbstractHydroRoute)
     end
 end
 
-function Base.show(io::IO, route::AbstractRapidRoute)
-    compact = get(io, :compact, false)
-    if compact
-        print(io, "RapidRoute(")
-        print(io, "name: ", route.meta.name)
-        print(io, ", inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
-        print(io, ", outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
-        print(io, ", params: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
-        print(io, ")")
-    else
-        println(io, "RapidRoute: ", route.meta.name)
-        println(io, "  Inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
-        println(io, "  Outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
-        println(io, "  Parameters: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
-    end
-end
+# function Base.show(io::IO, route::AbstractRapidRoute)
+#     compact = get(io, :compact, false)
+#     if compact
+#         print(io, "RapidRoute(")
+#         print(io, "name: ", route.meta.name)
+#         print(io, ", inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
+#         print(io, ", outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
+#         print(io, ", params: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
+#         print(io, ")")
+#     else
+#         println(io, "RapidRoute: ", route.meta.name)
+#         println(io, "  Inputs: ", isempty(route.meta.inputs) ? "nothing" : join(route.meta.inputs, ", "))
+#         println(io, "  Outputs: ", isempty(route.meta.outputs) ? "nothing" : join(route.meta.outputs, ", "))
+#         println(io, "  Parameters: ", isempty(route.meta.params) ? "nothing" : join(route.meta.params, ", "))
+#     end
+# end
 
 function Base.show(io::IO, model::AbstractModel)
     fluxes_in_model = filter(x -> x isa AbstractFlux, model.components)
