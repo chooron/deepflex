@@ -70,6 +70,7 @@ include("utils/show.jl")
 include("utils/build.jl")
 include("utils/sort.jl")
 include("utils/io.jl")
+inclue("utils/check.jl")
 export NamedTupleIOAdapter
 
 # framework build

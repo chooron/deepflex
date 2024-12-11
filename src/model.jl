@@ -70,7 +70,6 @@ function (model::HydroModel)(
 ) where {T<:Number}
     comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
     @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
-    @assert size(input, 1) == length(get_input_names(model)) "input matrix must have the same number of columns as the input names"
     fluxes = input
     for (comp_, idx, config_) in zip(model.components, model.varindices, comp_configs)
         tmp_fluxes = comp_(fluxes[idx, :], pas; config=config_, convert_to_ntp=false)
@@ -87,7 +86,6 @@ function (model::HydroModel)(
 ) where {T<:Number}
     comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
     @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
-    @assert size(input, 1) == length(get_input_names(model)) "input matrix must have the same number of rows as the input names"
     
     fluxes = input
     for (comp_, idx_, config_) in zip(model.components, model.varindices, comp_configs)

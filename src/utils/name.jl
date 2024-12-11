@@ -38,6 +38,15 @@ struct HydroMeta
     end
 end
 
+
+"""
+    get_names(comp::AbstractComponent)
+
+Get the name of a component.
+Returns a symbol representing the component name.
+"""
+get_name(comp::AbstractComponent) = comp.meta.name
+
 """
     get_input_names(comp::AbstractComponent)
     get_input_names(comps::Vector{<:AbstractComponent})

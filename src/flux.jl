@@ -102,9 +102,10 @@ end
 
 function (flux::AbstractHydroFlux)(input::AbstractArray{N,2}, pas::ComponentVector; kwargs...) where {N}
     timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
-    # assert the input params must include all the parameters in the flux
-    @assert length(timeidx) == size(input, 2) "Time index length does not match the number of time steps"
-    @assert all(nm in keys(pas[:params]) for nm in get_param_names(flux)) "Input parameters do not match the flux parameters, the flux parameters should be: $(get_param_names(flux))"
+    #* check input
+    check_input(flux, input, timeidx)
+    #* check parameters
+    check_parameters(flux, pas)
     params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
     output_arr = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
     output_arr
@@ -114,11 +115,11 @@ function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVect
     #* get kwargs
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-    @assert length(timeidx) == size(input, 3) "Time index length does not match the number of time steps"
-
+    check_input(flux, input, timeidx)
+    #* check parameters
+    check_parameters(flux, pas, ptypes)
     #* extract params and nn params
     params_vec = collect([collect([pas[:params][ptype][pname] for pname in get_param_names(flux)]) for ptype in ptypes])
-
     #* array dims: (var_names * node_names * ts_len)
     flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
     if length(flux_output_vec) == 1
@@ -264,12 +265,14 @@ function (flux::AbstractNeuralFlux)(input::AbstractVector, pas::ComponentVector;
 end
 
 function (flux::AbstractNeuralFlux)(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
+    check_nns(flux, pas)
     nn_params_vec = pas[:nn][get_nn_names(flux)[1]]
     output_arr = flux.func(input, nn_params_vec)
     output_arr
 end
 
 function (flux::AbstractNeuralFlux)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
+    check_nns(flux, pas)
     nn_params = pas[:nn][get_nn_names(flux)[1]]
     #* array dims: (ts_len * node_names * var_names)
     flux_output_vec = [flux.func(input[:, i, :], nn_params) for i in 1:size(input)[2]]

@@ -210,10 +210,13 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArra
     reshape(routed_result, 1, length(input_vec))
 end
 
-function (uh::UnitHydrograph)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
+function (uh::UnitHydrograph)(input::AbstractArray{T,3}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
-    ptypes = get(kwargs, :ptypes, collect(keys(pas[:params])))
+    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
+    check_input(uh, input, timeidx)
+    check_ptypes(uh, input, ptypes)
     pytype_params = [pas[:params][ptype] for ptype in ptypes]
 
     sols = map(eachindex(ptypes)) do (idx)

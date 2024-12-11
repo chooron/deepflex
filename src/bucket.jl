@@ -89,12 +89,10 @@ end
 function _get_parameter_extractors(ele::HydroBucket, pas::ComponentVector)
     #* extract params and nn params
     #* Check if all required parameter names are present in pas[:params]
-    @assert all(param_name in keys(pas[:params]) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params]))."
-    #* check initstates input is correct
-    @assert all(state_name in keys(pas[:initstates]) for state_name in get_state_names(ele)) "Missing required initial states. Expected all of $(get_state_names(ele)), but got $(keys(pas[:initstates]))."
+    check_parameters(ele, pas)
     #* Check if all required neural network names are present in pas[:nn] (if any)
     if !isempty(get_nn_names(ele))
-        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(ele)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
+        check_nns(ele, pas)
         nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(ele)]
         nn_param_func = (p) -> [p[:nn][idx] for idx in nn_params_idx]
     else
@@ -107,14 +105,10 @@ end
 
 function _get_parameter_extractors(ele::HydroBucket, pas::ComponentVector, ptypes::AbstractVector{Symbol})
     #* extract params and nn params
-    #* check params input is correct
-    for ptype in ptypes
-        @assert all(param_name in keys(pas[:params][ptype]) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params][ptype])) at param type: $ptype."
-    end
-
+    check_parameters(ele, pas, ptypes)
     #* Check if all required neural network names are present in pas[:nn] (if any)
     if !isempty(get_nn_names(ele))
-        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(ele)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
+        check_nns(ele, pas)
         nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(ele)]
         nn_param_func = (p) -> Ref([p[:nn][idx] for idx in nn_params_idx])
     else
@@ -183,14 +177,12 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     solver = get(config, :solver, ManualSolver{true}())
     interp = get(config, :interp, LinearInterpolation)
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
-
-    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
-    @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
-
+    #* check input data
+    check_input(ele, input, timeidx)
     #* get initial states matrix
+    check_initstates(ele, pas)
     initstates_mat = collect(pas[:initstates][get_state_names(ele)])
-    #* extract params and nn params
-    #* build differential equation function
+    #* extract params and nn params function
     param_func, nn_param_func = _get_parameter_extractors(ele, pas)
     itpfunc_list = map((var) -> interp(var, timeidx, extrapolate=true), eachrow(input))
     ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
@@ -219,15 +211,8 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
 ) where {F,D,FF,OF<:Nothing,M,T}
     #* get kwargs
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
-
-    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
-    @assert size(input, 2) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 2))."
-
-    #* extract params and nn params
-    #* Check if all required parameter names are present in pas[:params]
-    @assert all(param_name in keys(pas[:params]) for param_name in get_param_names(ele)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params]))."
-    #* check initstates input is correct
-    @assert all(state_name in keys(pas[:initstates]) for state_name in get_state_names(ele)) "Missing required initial states. Expected all of $(get_state_names(ele)), but got $(keys(pas[:initstates]))."
+    #* check input and parameter
+    check_input(ele, input, timeidx)
     #* extract params and nn params
     param_func, nn_param_func = _get_parameter_extractors(ele, pas)
     #* calculate output, slice input on time dim, then calculate each output
@@ -250,17 +235,15 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     stypes = get(config, :stypes, collect(keys(pas[:initstates])))
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-
-    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
-    @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
-    @assert length(ptypes) == size(input, 2) "Number of parameter types mismatch. Expected $(size(input, 2)) parameter types, got $(length(ptypes))."
-    @assert length(stypes) == size(input, 2) "Number of state types mismatch. Expected $(size(input, 2)) state types, got $(length(stypes))."
-    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-    @assert all(stype in keys(pas[:initstates]) for stype in stypes) "Missing required initial states. Expected all of $(keys(pas[:initstates])), but got $(stypes)."
-
+    #* check input data
+    check_input(ele, input, timeidx)
+    #* check ptypes and stypes
+    check_ptypes(ele, input, ptypes)
+    check_stypes(ele, input, stypes)
+    #* check initial states
+    check_initstates(ele, pas)
     #* prepare initial states
-    init_states_vec = collect([collect(pas[:initstates][stype][get_state_names(ele)]) for stype in stypes])
-    init_states_mat = reduce(hcat, init_states_vec)
+    init_states_mat = reduce(hcat, [collect(pas[:initstates][stype][get_state_names(ele)]) for stype in stypes])
     #* extract params and nn params
     param_func, nn_param_func = _get_parameter_extractors(ele, pas, ptypes)
     #* prepare input function
@@ -268,19 +251,16 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     ode_input_func = (t) -> [[itpfunc(t) for itpfunc in itpfunc_vec] for itpfunc_vec in itpfunc_vecs]
     #* build differential equation function
     du_func = _get_dum_func(ele, ode_input_func, param_func, nn_param_func)
-
     #* Call the solve_prob method to solve the state of bucket at the specified timeidx
     solved_states = solver(du_func, pas, init_states_mat, timeidx; convert_to_array=true)
-
     #* Store the solved bucket state in fluxes
     fluxes = cat(input, solved_states, dims=1)
-
     #* array dims: (num of node, sequence length, variable dim)
     ele_output_vec = [ele.flux_func.(eachslice(fluxes[:, :, i], dims=2), param_func(pas), nn_param_func(pas), timeidx[i]) for i in axes(fluxes, 3)]
     ele_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
     #* merge state and output, if solved_states is not nothing, then cat it at the first dim
-    combine_output_arr = cat(solved_states, ele_output_arr, dims=1)
-    combine_output_arr
+    output_arr = cat(solved_states, ele_output_arr, dims=1)
+    output_arr
 end
 
 function (ele::HydroBucket{F,D,FF,OF,M})(
@@ -292,34 +272,14 @@ function (ele::HydroBucket{F,D,FF,OF,M})(
     #* get kwargs
     ptypes = get(config, :ptypes, collect(keys(pas[:params])))
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-    #* check input and parameter
-    @assert size(input, 1) == length(get_input_names(ele)) "Input dimensions mismatch. Expected $(length(get_input_names(ele))) variables, got $(size(input, 1))."
-    @assert size(input, 3) == length(timeidx) "Time steps mismatch. Expected $(length(timeidx)) time steps, got $(size(input, 3))."
-    @assert length(ptypes) == size(input, 2) "Number of parameter types mismatch. Expected $(size(input, 2)) parameter types, got $(length(ptypes))."
-    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-    #* check initstates input is correct
-    for stype in stypes
-        @assert all(state_name in keys(pas[:initstates][stype]) for state_name in get_state_names(ele)) "Missing required initial states. Expected all of $(get_state_names(ele)), but got $(keys(init_states_item)) at state type: $stype."
-    end
+    #* check input data
+    check_input(ele, input, timeidx)
+    #* check ptypes and stypes
+    check_ptypes(ele, input, ptypes)
     #* extract params and nn params
     param_func, nn_param_func = _get_parameter_extractors(ele, pas, ptypes)
     #* array dims: (num of node, sequence length, variable dim)
     ele_output_vec = [ele.flux_func.(eachslice(input[:, :, i], dims=2), param_func(pas), nn_param_func(pas), timeidx[i]) for i in 1:size(input)[3]]
-    final_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
-    final_output_arr
-end
-
-function (ele::HydroBucket)(input::NamedTuple, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
-    @assert all(input_name in keys(input) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input))."
-    input_matrix = Matrix(reduce(hcat, [input[k] for k in get_input_names(ele)])')
-    ele(input_matrix, pas; config=config, kwargs...)
-end
-
-function (ele::HydroBucket)(input::Vector{<:NamedTuple}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
-    for i in eachindex(input)
-        @assert all(input_name in keys(input[i]) for input_name in get_input_names(ele)) "Missing required inputs. Expected all of $(get_input_names(ele)), but got $(keys(input[i])) at $i input."
-    end
-    input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(ele))) for i in eachindex(input)]
-    input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
-    ele(input_arr, pas; config=config, kwargs...)
+    output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), [reduce(hcat, u) for u in ele_output_vec])
+    output_arr
 end

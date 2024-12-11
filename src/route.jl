@@ -179,14 +179,13 @@ function VectorRoute(;
 end
 
 function _get_parameter_extractors(route::HydroRoute, pas::ComponentVector, ptypes::AbstractVector{Symbol})
+    #* extract params and nn params
     if route.rfunc isa AbstractNeuralFlux
-        @assert all(nn_name in keys(pas[:nn]) for nn_name in get_nn_names(route)) "Missing required neural networks. Expected all of $(get_nn_names(ele)), but got $(keys(pas[:nn]))."
+        check_nns(route.rfunc, pas)
         nn_params_idx = [getaxes(pas[:nn])[1][nm].idx for nm in get_nn_names(route.rfunc)]
         param_func = (p) -> Ref([p[:nn][idx] for idx in nn_params_idx])
     else
-        for ptype in ptypes
-            @assert all(param_name in keys(pas[:params][ptype]) for param_name in get_param_names(route.rfunc)) "Missing required parameters. Expected all of $(get_param_names(ele)), but got $(keys(pas[:params][ptype])) at param type: $ptype."
-        end
+        check_parameters(route.rfunc, pas, ptypes)
         rflux_params_idx = [getaxes(pas[:params][ptypes[1]])[1][nm].idx for nm in get_param_names(route.rfunc)]
         param_func = (p) -> [p[:params][ptype][rflux_params_idx] for ptype in ptypes]
     end
@@ -237,18 +236,16 @@ function (route::HydroRoute{F,PF,M})(
     solver = get(config, :solver, ManualSolver{true}())
     #* get the time index
     timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-
-
-    #* check the length of ptypes
-    @assert(length(ptypes) == size(input, 2),
-        "The length of ptypes must match the number of nodes ($(size(input,2))), but got $(length(ptypes)) ptypes")
-    @assert(all(stype in keys(pas[:initstates]) for stype in stypes),
-        "Invalid HRU names. All names must be one of $(keys(pas[:initstates])), but got $(stypes)")
-
+    #* check input data
+    check_input(route, input, timeidx)
+    #* check ptypes and stypes
+    check_ptypes(route, input, ptypes)
+    check_stypes(route, input, stypes)
     #* Extract the idx range of each variable in params, this extraction method is significantly more efficient than extracting by name
     param_func = _get_parameter_extractors(route, pas, ptypes)
     #* Interpolate the input data. Since ordinary differential calculation is required, the data input must be continuous,
     #* so an interpolation function can be constructed to apply to each time point.
+    # TODO there is only support for one input
     itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
     #* prepare the initial states matrix (dims: state_num * node_num)
     init_states_mat = reduce(hcat, [collect(pas[:initstates][stype][get_state_names(route)]) for stype in stypes])'
@@ -264,22 +261,12 @@ function (route::HydroRoute{F,PF,M})(
     #* solve the problem
     sol_arr = solver(du_func, pas, init_states_mat, timeidx, convert_to_array=true)
     sol_arr_permuted = permutedims(sol_arr, (2, 1, 3))
-    cont_arr = cat(input, sol_arr_permuted, dims=1)
-    output_vec = [route.rfunc.func.(eachslice(cont_arr[:, :, i], dims=2), param_func(pas), timeidx[i]) for i in 1:size(input)[3]]
+    cat_arr = cat(input, sol_arr_permuted, dims=1)
+    output_vec = [route.rfunc.func.(eachslice(cat_arr_, dims=2), param_func(pas), timeidx[i]) for cat_arr_ in eachslice(cat_arr, dims=3)]
     out_arr = reduce(hcat, reduce.(vcat, output_vec))
     #* return route_states and q_out
     return cat(sol_arr_permuted, reshape(out_arr, 1, size(out_arr)...), dims=1)
 end
-
-function (route::HydroRoute)(input::Vector{<:NamedTuple}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...)
-    for i in eachindex(input)
-        @assert all(input_name in keys(input[i]) for input_name in get_input_names(route)) "Missing required inputs. Expected all of $(get_input_names(route)), but got $(keys(input[i])) at $i input."
-    end
-    input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(route))) for i in eachindex(input)]
-    input_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats)
-    route(input_arr, pas; config=config, kwargs...)
-end
-
 
 """
     RapidRoute<: AbstractRoute
@@ -352,8 +339,8 @@ function (route::RapidRoute)(
     delta_t = get(config, :delta_t, 1.0)
     solver = get(config, :solver, ManualSolver{true}())
 
-    @assert all(ptype in keys(pas[:params]) for ptype in ptypes) "Missing required parameters. Expected all of $(keys(pas[:params])), but got $(ptypes)."
-
+    check_ptypes(route, input, ptypes)
+    check_parameters(route, pas, ptypes)
     #* var num * node num * ts len
     itp_funcs = interp.(eachslice(input[1, :, :], dims=1), Ref(timeidx), extrapolate=true)
 
