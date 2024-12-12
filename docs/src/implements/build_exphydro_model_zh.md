@@ -42,6 +42,9 @@ using HydroModels
 @variables snowpack soilwater
 @parameters Tmin Tmax Df Smax Qmax f
 
+# define step function
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+
 # define snowpack bucket
 fluxes_1 = [
     HydroFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
@@ -89,6 +92,7 @@ using HydroModels
 `HydroFlux`的定义需要根据计算公式确定模型的输入输出变量和模型参数,例如在模型的雨雪划分计算公式,该公式的输入变量为`prcp`和`temp`,输出变量为`snowfall`和`rainfall`,模型参数为`Tmin`, 公式转译为`HydroFlux`的结果如下所示:
 
 ```julia
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 split_flux = HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp])
 ```
 

@@ -37,6 +37,9 @@ using HydroModels
 @variables snowpack soilwater
 @parameters Tmin Tmax Df Smax Qmax f
 
+# define step function
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+
 # define snowpack bucket
 fluxes_1 = [
     HydroFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
@@ -88,6 +91,7 @@ In this code segment, we define all variables used in the ExpHydro model, includ
 The definition of `HydroFlux` requires determining input/output variables and model parameters based on calculation formulas. For example, in the rain-snow partitioning formula, the input variables are `prcp` and `temp`, output variables are `snowfall` and `rainfall`, and the model parameter is `Tmin`. The formula translation to `HydroFlux` looks like this:
 
 ```julia
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 split_flux = HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp])
 ```
 
