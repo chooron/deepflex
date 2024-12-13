@@ -21,6 +21,7 @@ using Test
     include("run_route.jl")
     include("run_lumped_model.jl")
     include("run_spatial_model.jl")
+    include("run_io.jl")
 end
 
 Aqua.test_all(HydroModels)

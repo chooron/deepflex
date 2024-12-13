@@ -43,6 +43,29 @@ Qout_ =  exp.(ann_Q(permutedims([S1_ P_interp]),p[:p2])[1,:])
 
 ## HydroModels.jl中M50的实现方法
 
+首先需要定义M50模型中设计的参数和变量:
+
+```julia
+using HydroModels
+
+#! parameters in the Exp-Hydro model
+@parameters Tmin Tmax Df Smax f Qmax
+#! parameters in normalize flux
+@parameters snowpack_std snowpack_mean
+@parameters soilwater_std soilwater_mean
+@parameters prcp_std prcp_mean
+@parameters temp_std temp_mean
+
+#! hydrological flux in the Exp-Hydro model
+@variables prcp temp lday pet rainfall snowfall
+@variables snowpack soilwater lday pet
+@variables melt log_evap_div_lday log_flow flow
+@variables norm_snw norm_slw norm_temp norm_prcp
+
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+```
+
+
 相比较普通的概念式水文模型,M50模型使用神经网络模型替换了水文通量的计算公式(`ET`和`Q`),这个神经网络相比普通的计算公式有着明显的差异,因此在HydroModels.jl中采用了`NeuralFlux`来表示神经网络, 用于ET和Q预测的NeuralFlux如下表示:
 
 ```julia
@@ -95,7 +118,7 @@ soil_funcs = [
     q_nn_flux
 ]
 state_expr = rainfall + melt - step_func(soilwater) * lday * exp(log_evap_div_lday) - step_func(soilwater) * exp(log_flow)
-soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
+soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, expr=state_expr)]
 soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 convert_flux = HydroFlux([log_flow] => [flow], exprs=[exp(log_flow)])
 # define the Exp-Hydro model

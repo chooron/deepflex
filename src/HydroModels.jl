@@ -40,7 +40,6 @@ using Lux
 using LuxCore
 using NNlib
 
-struct HydroEquation end
 ## Abstract Component Types
 abstract type AbstractComponent end
 abstract type AbstractIOAdapter end
@@ -64,14 +63,13 @@ export AbstractFlux, AbstractHydroFlux, AbstractNeuralFlux, AbstractStateFlux
 export AbstractElement, AbstractBucket, AbstractHydrograph, AbstractRoute, AbstractHydroRoute, AbstractModel
 
 # utils
-include("utils/attr.jl")
 include("utils/name.jl")
+include("utils/attr.jl")
 include("utils/show.jl")
 include("utils/build.jl")
 include("utils/sort.jl")
 include("utils/check.jl")
-include("utils/io.jl")
-export NamedTupleIOAdapter
+# A discrete ODE solver, if want to use more efficient solver, please import HydroModelTools.jl
 include("utils/solver.jl")
 export ManualSolver
 
@@ -86,6 +84,16 @@ include("uh.jl")
 export UHFunction, UnitHydrograph
 include("model.jl")
 export HydroModel
-include("wrapper.jl")
-export RecordComponentState, EstimateComponentParams, WeightSumComponentOutlet, ComputeComponentOutlet
+
+# include model wrappers
+include("wappers/estimate_params.jl")
+export EstimateComponentParams
+include("wappers/record_states.jl")
+export RecordComponentState
+include("wappers/neural_wrapper.jl")
+export NeuralWrapper
+include("wappers/io_adapter.jl")
+export NamedTupleIOAdapter
+include("wappers/stats_outlet.jl")
+export WeightSumComponentOutlet, ComputeComponentOutlet
 end # module HydroModels

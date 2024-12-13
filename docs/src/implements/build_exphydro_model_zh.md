@@ -89,6 +89,9 @@ using HydroModels
 `HydroFlux`的定义需要根据计算公式确定模型的输入输出变量和模型参数,例如在模型的雨雪划分计算公式,该公式的输入变量为`prcp`和`temp`,输出变量为`snowfall`和`rainfall`,模型参数为`Tmin`, 公式转译为`HydroFlux`的结果如下所示:
 
 ```julia
+# 定义平滑函数
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+# 定义雨雪划分函数
 split_flux = HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp])
 ```
 
