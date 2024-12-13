@@ -1,6 +1,6 @@
 push!(LOAD_PATH, "../src/")
 using Documenter
-# using HydroModels
+using HydroModels
 
 # English Documentation
 makedocs(
