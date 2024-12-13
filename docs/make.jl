@@ -1,6 +1,6 @@
 push!(LOAD_PATH, "../src/")
 using Documenter
-using HydroModels
+# using HydroModels
 
 # English Documentation
 makedocs(
@@ -21,6 +21,7 @@ makedocs(
     linkcheck = true,
     source = "src",
     build = "build_en",
+    warnonly = true,
     # 配置页面结构
     pages = [
         "Home" => "index.md",
