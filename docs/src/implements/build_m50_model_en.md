@@ -43,9 +43,34 @@ While this code follows the standard style of the DifferentialEquations.jl libra
 
 ## M50 Implementation in HydroModels.jl
 
+First, we need to define the parameters and variables designed in the M50 model:
+
+```julia
+using HydroModels
+
+#! parameters in the Exp-Hydro model
+@parameters Tmin Tmax Df Smax f Qmax
+#! parameters in normalize flux
+@parameters snowpack_std snowpack_mean
+@parameters soilwater_std soilwater_mean
+@parameters prcp_std prcp_mean
+@parameters temp_std temp_mean
+
+#! hydrological flux in the Exp-Hydro model
+@variables prcp temp lday pet rainfall snowfall
+@variables snowpack soilwater lday pet
+@variables melt log_evap_div_lday log_flow flow
+@variables norm_snw norm_slw norm_temp norm_prcp
+
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+```
+
 Compared to conventional conceptual hydrological models, the M50 model uses neural networks to replace hydrological flux calculation formulas (`ET` and `Q`). These neural networks differ significantly from standard calculation formulas, so HydroModels.jl uses `NeuralFlux` to represent neural networks. The NeuralFlux for ET and Q predictions is shown below:
 
 ```julia
+using Lux
+using StableRNGs
+
 # define the ET NN and Q NN
 ep_nn = Lux.Chain(
     Lux.Dense(3 => 16, tanh),
@@ -94,7 +119,7 @@ soil_funcs = [
     q_nn_flux
 ]
 state_expr = rainfall + melt - step_func(soilwater) * lday * exp(log_evap_div_lday) - step_func(soilwater) * exp(log_flow)
-soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr)]
+soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, expr=state_expr)]
 soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
 convert_flux = HydroFlux([log_flow] => [flow], exprs=[exp(log_flow)])
 # define the Exp-Hydro model

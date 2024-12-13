@@ -32,6 +32,7 @@ Q_{rf,n} &= S_{rf,n} \cdot \frac{1}{\text{LAG}_{rf} + 1} && (5)
 The $Q_{rf,n-1}$ term is removed because in continuous change, $S_{rf,n}$ is constantly evolving, making it unnecessary to consider $Q_{rf,n-1}$ in calculating $Q_{rf,n}$. Additionally, there are dimensional differences between $S_{rf,n}$ and $Q_{rf,n}$, and including $Q_{rf,n}$ would add an instantaneous state variable, which is unsuitable as a state variable. In HydroRoute construction, the primary focus is expressing the outflow calculation formula. Like HydroBucket, HydroRoute accepts HydroFlux to represent the $Q_{rf,n}$ calculation formula:
 
 ```julia
+using HydroModels
 # Define parameters and variables
 @variables q q_routed s_river
 @parameters lag
@@ -48,6 +49,7 @@ The method of obtaining upstream flow inputs is another crucial component of the
 The Vector-Based routing model is based on watershed subdivision and topological relationships, using an adjacency matrix for flow accumulation:
 
 ```julia
+using Graphs
 # Build river network topology
 network = DiGraph(9)
 add_edge!(network, 1, 2)

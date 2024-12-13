@@ -51,7 +51,7 @@ struct HydroFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractHydroFlux
         inputs::Vector{T},
         outputs::Vector{T},
         params::Vector{T};
-        exprs::Vector{T}=T[],
+        exprs::Vector{T},
     ) where {T<:Num}
         #* name the flux
         output_names = Symbolics.tosymbol.(outputs, escape=false)
@@ -62,12 +62,11 @@ struct HydroFlux{T<:Num,F<:Function,M<:HydroMeta} <: AbstractHydroFlux
         #* if no expression provided, use the hydrology formula library to build the flux
         #* build flux function
         flux_func = build_flux_func(inputs, outputs, params, exprs)
-
         return new{T,typeof(flux_func),typeof(meta)}(inputs, outputs, params, exprs, flux_func, meta)
     end
 
     #* construct hydro flux with input fluxes and output fluxes
-    HydroFlux(fluxes::Pair{Vector{Num},Vector{Num}}, params::Vector{Num}=Num[]; exprs::Vector{Num}=Num[]) = HydroFlux(fluxes[1], fluxes[2], params, exprs=exprs)
+    HydroFlux(fluxes::Pair{Vector{Num},Vector{Num}}, params::Vector{Num}=Num[]; exprs::Vector{Num}) = HydroFlux(fluxes[1], fluxes[2], params, exprs=exprs)
 end
 
 """
