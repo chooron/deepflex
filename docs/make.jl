@@ -27,7 +27,7 @@ makedocs(
         "Run Models" => [
             "Run ExpHydro Model" => "tutorials/run_exphydro_model.md",
         ],
-        "Basic Concepts" => "basic_concepts_en.md",
+        "Basic Concepts" => "concepts_en.md",
         "Model Implementations" => [
             "construct the ExpHydro Model" => "implements/build_exphydro_model_en.md",
             "construct the M50 Model" => "implements/build_m50_model_en.md",
