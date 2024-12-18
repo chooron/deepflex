@@ -42,7 +42,7 @@ struct HydroModel{C<:AbstractComponent,M<:HydroMeta} <: AbstractModel
     ) where {C<:AbstractComponent}
         components = sort_components ? sort_components(components) : components
         input_names, output_names, state_names = get_var_names(components)
-        vcat_names = reduce(vcat, [input_names, output_names, state_names])
+        vcat_names = reduce(vcat, [input_names, state_names, output_names])
         nn_names = reduce(union, get_nn_names.(components))
         param_names = reduce(union, get_param_names.(components))
         var_names = input_names

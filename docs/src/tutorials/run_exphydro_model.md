@@ -170,6 +170,7 @@ Multi-node setup for distributed computing:
 ```julia
 # Setup multiple nodes
 node_num = 10  # Number of nodes
+# convert to 3D array (variables, node_num, time)
 inputs = repeat(reshape(input, size(input)[1], 1, size(input)[2]), 1, node_num, 1)
 ptypes = [Symbol(:node, i) for i in 1:node_num]
 
@@ -180,9 +181,3 @@ pas_multi = ComponentVector(params=params_multi, initstates=init_states_multi)
 # Run multi-node simulation
 results = exphydro_model(inputs, pas_multi, config=(solver=solver, timeidx=ts))
 ```
-
-### Multi-Node Benchmarking
-
-```julia
-# Multi-node performance testing
-@btime exphydro_model(inputs, pas_multi, config=(solver=solver, timeidx=ts));

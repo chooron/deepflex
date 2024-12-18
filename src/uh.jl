@@ -100,27 +100,27 @@ struct UnitHydrograph{T<:Num,UF<:UHFunction,M<:HydroMeta,ST} <: AbstractHydrogra
     function UnitHydrograph(
         input::T,
         output::T,
-        param::T;
+        params::AbstractVector{T};
         uhfunc::UF,
         solvetype::Symbol=:SPARSE,
     ) where {T<:Num,UF<:UHFunction}
         output_name = Symbolics.tosymbol(output, escape=false)
         @assert solvetype in [:DISCRETE, :SPARSE, :INTEGRAL] "solvetype must be one of [:DISCRETE, :SPARSE, :INTEGRAL]"
         #* Setup the name information of the hydroroutement
-        meta = HydroMeta(inputs=[input], outputs=[output], params=[param], name=Symbol(output_name, :_uh))
+        meta = HydroMeta(inputs=[input], outputs=[output], params=params, name=Symbol(output_name, :_uh))
 
-        return new{T,UF,typeof(meta),solvetype}([input], [output], [param], uhfunc, meta)
+        return new{T,UF,typeof(meta),solvetype}([input], [output], params, uhfunc, meta)
     end
 
     function UnitHydrograph(
         fluxes::Pair{Vector{T},Vector{T}},
-        param::T;
+        params::AbstractVector{T};
         uhfunc::UF,
         solvetype::Symbol=:SPARSE,
     ) where {T<:Num,UF<:UHFunction}
         input = fluxes[1][1]
         output = fluxes[2][1]
-        return new{T,UF,typeof(meta),solvetype}(input, output, [param], uhfunc, meta)
+        return UnitHydrograph(input, output, params, uhfunc, solvetype=solvetype)
     end
 end
 

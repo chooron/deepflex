@@ -1,6 +1,5 @@
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 # define variables and parameters
-
 @variables temp lday pet prcp snowfall rainfall snowpack melt
 @parameters Tmin Tmax Df Smax Qmax f
 
