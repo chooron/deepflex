@@ -14,8 +14,9 @@ function (adapter::NamedTupleIOAdapter)(
     config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
     kwargs...
 )::NamedTuple
-    @assert((all(input_name in keys(input) for input_name in get_input_names(adapter.component))),
-        "Missing required inputs. Expected all of $(get_input_names(adapter.component)), but got $(keys(input)).")
+    for input_name in get_input_names(adapter.component)
+        @assert(input_name in keys(input), "Missing required inputs. Expected $input_name in input, but got $(keys(input)).")
+    end
     input_matrix = Matrix(reduce(hcat, [input[k] for k in get_input_names(adapter.component)])')
     output_matrix = adapter.component(input_matrix, pas; config=config, kwargs...)
     output_names_tuple = Tuple(vcat(get_state_names(adapter.component), get_output_names(adapter.component)))
@@ -29,8 +30,9 @@ function (adapter::NamedTupleIOAdapter)(
     kwargs...
 )::Vector{<:NamedTuple}
     for i in eachindex(input)
-        @assert(all(input_name in keys(input[i]) for input_name in get_input_names(adapter.component)),
-            "Missing required inputs. Expected all of $(get_input_names(adapter.component)), but got $(keys(input[i])) at $i input.")
+        for input_name in get_input_names(adapter.component)
+            @assert(input_name in keys(input[i]), "Missing required inputs. Expected $input_name in input, but got $(keys(input)).")
+        end
     end
     input_mats = [reduce(hcat, collect(input[i][k] for k in get_input_names(adapter.component))) for i in eachindex(input)]
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), input_mats), (2, 3, 1))
