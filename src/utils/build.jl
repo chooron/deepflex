@@ -59,6 +59,13 @@ function build_ele_func(
     funcs_states = collect(funcs_vars_ntp[meta.states])
     funcs_params = reduce(union, get_param_vars.(funcs))
     funcs_nns = reduce(union, get_nnparam_vars.(funcs))
+    funcs_nns_bounds = nothing
+    if !isempty(funcs_nns)
+        funcs_nns_len = length.(funcs_nns)
+        start_indices = [1; cumsum(funcs_nns_len)[1:end-1] .+ 1]
+        end_indices = cumsum(funcs_nns_len)
+        funcs_nns_bounds = [start:stop for (start, stop) in zip(start_indices, end_indices)]
+    end
 
     #* Call the method in SymbolicUtils.jl to build the Flux Function
     assign_list = Assignment[]
@@ -85,41 +92,30 @@ function build_ele_func(
         end
     end
     #* convert flux output to array
-    flux_output_array = MakeArray(output_list, Vector)
+    # flux_output_array = MakeArray(output_list, Vector)
+    combine_list = vcat(funcs_states, output_list)
+    flux_output_array = MakeArray(combine_list, Vector)
 
     #* Set the input argument of ODE Function
     func_args = [
-        #* argument 1: Function input and state variables
-        DestructuredArgs(vcat(funcs_inputs, funcs_states)),
+        #* argument 1: Function input variables
+        DestructuredArgs(funcs_inputs, :inputs, inbounds=true), 
+        #* argument 2: Function state variables
+        DestructuredArgs(funcs_states, :states, inbounds=true),
         #* argument 2: Function calculation parameters
-        DestructuredArgs(funcs_params),
+        DestructuredArgs(funcs_params, :params, inbounds=true),
         #* argument 3: Function neuralnetwork parameters
-        DestructuredArgs(funcs_nns),
-        #* argument 4: current time idx for time-varying flux
-        DestructuredArgs(t),
+        DestructuredArgs(funcs_nns, :nns, inds=funcs_nns_bounds, inbounds=true),
     ]
 
     #* Construct Flux Function: Func(args, kwargs, body), where body represents the matching formula between each variable and expression
     merged_flux_func = @RuntimeGeneratedFunction(toexpr(Func(func_args, [], Let(assign_list, flux_output_array, false))))
 
-    if length(dfuncs) > 0
+    if !isempty(dfuncs)
         #* convert diff state output to array
         diffst_output_array = MakeArray(reduce(vcat, get_exprs.(dfuncs)), Vector)
-        #* Set the input argument of ODE Function
-        dfunc_args = [
-            #* argument 1: Function input variables
-            DestructuredArgs(funcs_inputs),
-            #* argument 2: Function state variables
-            DestructuredArgs(funcs_states),
-            #* argument 3: Function calculation parameters
-            DestructuredArgs(funcs_params),
-            #* argument 4: Function neuralnetwork parameters
-            DestructuredArgs(funcs_nns),
-            #* argument 5: current time idx for time-varying flux
-            DestructuredArgs(t),
-        ]
         merged_state_func = @RuntimeGeneratedFunction(
-            toexpr(Func(dfunc_args, [], Let(assign_list, diffst_output_array, false)))
+            toexpr(Func(func_args, [], Let(assign_list, diffst_output_array, false)))
         )
     else
         merged_state_func = nothing

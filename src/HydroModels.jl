@@ -37,7 +37,6 @@ using DataInterpolations: AbstractInterpolation
 using Integrals
 # deep learning
 using Lux
-using LuxCore
 using NNlib
 
 ## Abstract Component Types
@@ -76,7 +75,8 @@ export ManualSolver
 # framework build
 include("flux.jl")
 export HydroFlux, StateFlux, NeuralFlux
-include("bucket.jl")
+include("bucketv2.jl")
+# include("bucket.jl")
 export HydroBucket
 include("route.jl")
 export GridRoute, VectorRoute, HydroRoute, RapidRoute
