@@ -33,8 +33,6 @@ using Graphs
 using DataInterpolations
 using DataInterpolations: AbstractInterpolation
 
-# integral
-using Integrals
 # deep learning
 using Lux
 using NNlib
@@ -75,8 +73,7 @@ export ManualSolver
 # framework build
 include("flux.jl")
 export HydroFlux, StateFlux, NeuralFlux
-include("bucketv2.jl")
-# include("bucket.jl")
+include("bucket.jl")
 export HydroBucket
 include("route.jl")
 export GridRoute, VectorRoute, HydroRoute, RapidRoute

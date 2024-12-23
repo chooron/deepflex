@@ -259,7 +259,7 @@ function (route::HydroRoute{F,PF,M})(
     end
 
     #* solve the problem
-    sol_arr = solver(du_func, pas, init_states_mat, timeidx, convert_to_array=true)
+    sol_arr = solver(du_func, pas, init_states_mat, timeidx)
     sol_arr_permuted = permutedims(sol_arr, (2, 1, 3))
     cat_arr = cat(input, sol_arr_permuted, dims=1)
     output_vec = [route.rfunc.func.(eachslice(cat_arr[:, :, i], dims=2), param_func(pas), timeidx[i]) for i in axes(cat_arr, 3)]

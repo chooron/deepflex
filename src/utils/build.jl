@@ -59,7 +59,7 @@ function build_ele_func(
     funcs_states = collect(funcs_vars_ntp[meta.states])
     funcs_params = reduce(union, get_param_vars.(funcs))
     funcs_nns = reduce(union, get_nnparam_vars.(funcs))
-    funcs_nns_bounds = nothing
+    funcs_nns_bounds = []
     if !isempty(funcs_nns)
         funcs_nns_len = length.(funcs_nns)
         start_indices = [1; cumsum(funcs_nns_len)[1:end-1] .+ 1]

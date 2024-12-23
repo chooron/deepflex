@@ -84,3 +84,29 @@ function check_nns(component::AbstractComponent, pas::ComponentVector)
         end
     end
 end
+
+# 处理pas，避免在后续计算中反复转换
+function process_pas(c::AbstractComponent, pas::ComponentVector)
+    check_pas(c, pas)
+    pas_type = eltype(pas)
+    new_pas = ComponentVector(
+        params=haskey(pas, :params) ? Vector(pas[:params][HydroModels.get_param_names(c)]) : Vector{pas_type}(undef,0),
+        initstates=haskey(pas, :initstates) ? Vector(pas[:initstates][HydroModels.get_state_names(c)]) : Vector{pas_type}(undef,0),
+        nns=haskey(pas, :nns) ? Vector(pas[:nns][HydroModels.get_nn_names(c)]) : Vector{pas_type}(undef,0),
+    )
+    return new_pas
+end
+
+function process_pas(c::AbstractComponent, pas::ComponentVector, ptypes::AbstractVector{Symbol}, stypes::AbstractVector{Symbol})
+    check_pas(c, pas, ptypes, stypes)
+    pas_type = eltype(pas)
+    params_names,state_names = get_param_names(c), get_state_names(c)
+    params_mat = isempty(params_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:params][ptype][params_names]) for ptype in ptypes])
+    initstates_mat = isempty(state_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:initstates][stype][state_names]) for stype in stypes])
+    new_pas = ComponentVector(
+        params=params_mat,
+        initstates=initstates_mat,
+        nns=haskey(pas, :nns) ? Vector(pas[:nns][HydroModels.get_nn_names(c)]) : Vector{pas_type}(undef,0),
+    )
+    return new_pas
+end
