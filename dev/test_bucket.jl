@@ -5,10 +5,8 @@ using ComponentArrays
 using ModelingToolkit
 using Lux
 using BenchmarkTools
-using HydroModelTools
 using DataInterpolations
-using Zygote
-using SciMLSensitivity
+using HydroModelTools
 
 include("../src/HydroModels.jl")
 
@@ -31,27 +29,45 @@ ts = collect(1:10000)
 
 # single node input
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]) 
-# solver = HydroModels.ManualSolver{true}()
-solver = ODESolver(sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
-config = (solver=solver,)
-input_arr = Matrix(reduce(hcat, collect(input[ele.meta.inputs]))')
-results = ele(input_arr, pas, config=config)
+input_arr = Matrix(reduce(hcat, collect(input[ele.meta.inputs])))
+results = ele(input_arr, pas)
 
-Zygote.gradient((p) -> sum(ele(input_arr, p, config=config)[end, :]), pas)
-
-# multi node input
+# # multi node input
 # node_num = 10
 # node_names = [Symbol(:node, i) for i in 1:node_num]
-# node_params = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([params], length(node_names))))
-# node_initstates = ComponentVector(NamedTuple{Tuple(node_names)}(repeat([init_states], length(node_names))))
-# node_pas = ComponentVector(params=node_params, initstates=node_initstates)
+# node_params = ComponentVector(
+#     f=fill(f, node_num), Smax=fill(Smax, node_num), Qmax=fill(Qmax, node_num),
+#     Df=fill(Df, node_num), Tmax=fill(Tmax, node_num), Tmin=fill(Tmin, node_num)
+# )
+# node_states = ComponentVector(
+#     snowpack=fill(0.0, node_num), soilwater=fill(1303.004248, node_num)
+# )
 
+# node_pas = ComponentVector(params=node_params[HydroModels.get_param_names(ele)], initstates=node_states[HydroModels.get_state_names(ele)])
 # input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
 # node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], length(node_names)))
 # node_input = permutedims(node_input, (2, 3, 1))
-# run_kwgs = (ptypes=node_names, timeidx=ts)
+# config = (ptyidx=1:10, styidx=1:10, timeidx=ts)
+# result = ele(node_input, node_pas, config=config)
 
-# result = ele(node_input, node_pas, config=config, kwargs=run_kwgs)
+
+# # share parameters
+# node_num = 3
+# node_names = [Symbol(:node, i) for i in 1:node_num]
+# node_params = ComponentVector(
+#     f=fill(f, node_num), Smax=fill(Smax, node_num), Qmax=fill(Qmax, node_num),
+#     Df=fill(Df, node_num), Tmax=fill(Tmax, node_num), Tmin=fill(Tmin, node_num)
+# )
+# node_states = ComponentVector(
+#     snowpack=fill(0.0, node_num), soilwater=fill(1303.004248, node_num)
+# )
+
+# node_pas = ComponentVector(params=node_params[HydroModels.get_param_names(ele)], initstates=node_states[HydroModels.get_state_names(ele)])
+# input_arr = reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))
+# node_input = reduce((m1, m2) -> cat(m1, m2, dims=3), repeat([input_arr], 10))
+# node_input = permutedims(node_input, (2, 3, 1))
+# config = (ptyidx=[1,2,2,2,1,3,3,2,3,2], styidx=[1,2,2,2,1,3,3,2,3,2], timeidx=ts)
+# result = ele(node_input, node_pas, config=config)
 
 # test_arr = ones(3, 3, 100)
 # # node_input = cat(node_input, result, dims=1)

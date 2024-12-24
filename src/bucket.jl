@@ -36,25 +36,15 @@ multiple HydroBucket instances to represent different components of a water syst
 
 """
 struct HydroBucket{S,N} <: AbstractBucket
-    """
-    Vector of flux functions describing hydrological processes.
-    """
+    "Vector of flux functions describing hydrological processes."
     funcs::Vector{<:AbstractHydroFlux}
-    """
-    Vector of state derivative functions for ODE calculations.
-    """
+    "Vector of state derivative functions for ODE calculations."
     dfuncs::Vector{<:AbstractStateFlux}
-    """
-    Generated function for calculating all hydrological fluxes.
-    """
+    "Generated function for calculating all hydrological fluxes."
     flux_func::Function
-    """
-    Generated function for ordinary differential equations (ODE) calculations, or nothing if no ODE calculations are needed.
-    """
+    "Generated function for ordinary differential equations (ODE) calculations, or nothing if no ODE calculations are needed."
     ode_func::Union{Nothing,Function}
-    """
-    Metadata about the bucket, including input, output, state, parameter, and neural network names.
-    """
+    "Metadata about the bucket, including input, output, state, parameter, and neural network names."
     meta::HydroMeta
 
     function HydroBucket(;
@@ -75,7 +65,7 @@ struct HydroBucket{S,N} <: AbstractBucket
         meta = HydroMeta(bucket_name, input_names, output_names, param_names, state_names, nn_names)
         #* Construct a function for ordinary differential calculation based on dfunc and funcs
         flux_func, ode_func = build_ele_func(funcs, dfuncs, meta)
-        return new{length(state_names) > 0 ? Tuple(state_names) : nothing, length(nn_names) > 0}(
+        return new{length(state_names) > 0 ? Tuple(state_names) : nothing, !isempty(nn_names)}(
             funcs,
             dfuncs,
             flux_func,
@@ -135,18 +125,22 @@ function (ele::HydroBucket{S,N})(
     interp = get(config, :interp, DataInterpolations.LinearInterpolation)
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
 
-    initstates_vec = pas[:initstates]
-    model_params = pas[:params]
-    nn_params = ifelse(N, pas[:nns], Vector{eltype(pas)}[])
+    initstates_vec = Vector(view(pas, :initstates))
+    model_params = Vector(view(pas, :params))
+    nn_params = if N
+        Vector(view(pas, :nns))
+    else 
+        Vector{eltype(pas)}[]
+    end
 
     #* prepare input interpolation
     itpfunc_list = map((var) -> interp(var, timeidx), eachrow(input))
     ode_input_func = (t) -> [itpfunc(t) for itpfunc in itpfunc_list]
 
     #* prepare parameter and nn parameter
-    pas_vec = vcat(nn_params, model_params)
-    nn_idx_bounds = 1:length(nn_params)
-    params_idx_bound = length(nn_params)+1:length(pas_vec)
+    pas_vec = vcat(model_params, nn_params)
+    params_idx_bound = 1:length(model_params)
+    nn_idx_bounds = length(model_params)+1:length(pas_vec)
 
     #* define the ODE function
     function du_func(u,p,t)
@@ -169,8 +163,12 @@ function (ele::HydroBucket{nothing,N})(
     config::NamedTuple=NamedTuple(),
     kwargs...
 ) where {N,T}
-    model_params = pas[:params]
-    nn_params = ifelse(N, pas[:nns], Vector{eltype(pas)}[])
+    model_params = Vector(view(pas,:params))
+    nn_params = if N
+        Vector(view(pas,:nns))
+    else 
+        Vector{eltype(pas)}[]
+    end
     #* calculate output, slice input on time dim, then calculate each output
     tmp_flux_func = (i) -> ele.flux_func(i, nothing, model_params, nn_params)
     flux_output = tmp_flux_func.(eachslice(input, dims=2))
@@ -185,24 +183,33 @@ function (ele::HydroBucket{S,N})(
     kwargs...
 ) where {S,N,T}
     input_dims, num_nodes, time_len = size(input)
-    #* get kwargs
-    solver = get(config, :solver, ManualSolver{true}())
+    #* get the parameter types and state types
+    ptyidx = get(config, :ptyidx, 1:size(input, 2))
+    styidx = get(config, :styidx, 1:size(input, 2))
+    #* get the interpolation type and solver type
     interp = get(config, :interp, LinearInterpolation)
-    timeidx = get(config, :timeidx, Vector(1:size(input, 3)))
+    solver = get(config, :solver, ManualSolver{true}())
+    #* get the time index
+    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
 
     #* prepare parameter and nn parameter
     params_len = length(get_param_names(ele))
-    initstates_mat = pas[:initstates]
+    states_len = length(get_state_names(ele))
+    #* convert to matrix (params_len/states_len, params_types/state_types)
+    initstates_mat = reshape(Vector(view(pas, :initstates)), :, states_len)'
+    params_mat = reshape(Vector(view(pas, :params)), :, params_len)'
+    extract_initstates_mat = view(initstates_mat, :, styidx)
+    extract_params_mat = view(params_mat, :, ptyidx)
 
-    params_mat = pas[:params]
-    nn_params_vec = if N
-        vec(pas[:nns])
+    nn_params = if N
+        Vector(view(pas, :nns))
     else 
         Vector{eltype(pas)}[]
     end
-    vcat_pas = vcat(nn_params_vec, vec(params_mat))
-    nn_idx_bounds = 1:length(nn_params_vec)
-    params_idx_bound = length(nn_params_vec)+1:length(vcat_pas)
+    extract_params_vec = vec(extract_params_mat)
+    vcat_pas = vcat(extract_params_vec, nn_params)
+    params_idx_bound = 1:length(extract_params_vec)
+    nn_idx_bounds = length(extract_params_vec)+1:length(vcat_pas)
 
     #* prepare input function
     itpfunc_vecs = [interp.(eachslice(input_, dims=1), Ref(timeidx), extrapolate=true) for input_ in eachslice(input, dims=2)]
@@ -210,19 +217,19 @@ function (ele::HydroBucket{S,N})(
 
     #* define the ODE function
     function du_func(u,p,t)
-        @views ps, nn_ps = reshape(p[params_idx_bound], params_len, num_nodes), p[nn_idx_bounds]
+        @views ps, nn_ps = reshape(view(p, params_idx_bound), params_len, num_nodes), view(p, nn_idx_bounds)
         ele.ode_func.(ode_input_func(t), eachslice(u, dims=2), eachslice(ps, dims=2), Ref(nn_ps))
     end
 
     #* Call the solve_prob method to solve the state of bucket at the specified timeidx
-    solved_states = solver(du_func, vcat_pas, initstates_mat, timeidx)
+    solved_states = solver(du_func, vcat_pas, extract_initstates_mat, timeidx)
 
     #* run other functions
     tmp_flux_func(i,s,p) = ele.flux_func(i, s, p, nn_params)
     ele_output_vec = map(1:size(input, 3)) do i
         input_ = @view input[:, :, i]
         states_ = @view solved_states[:, :, i]
-        reduce(hcat, ele.flux_func.(eachslice(input_, dims=2), eachslice(states_, dims=2), eachslice(params_mat, dims=2), Ref(nn_params_vec)))
+        reduce(hcat, ele.flux_func.(eachslice(input_, dims=2), eachslice(states_, dims=2), eachslice(extract_params_mat, dims=2), Ref(nn_params)))
     end
     reduce((m1, m2) -> cat(m1, m2, dims=3), ele_output_vec)
 end
@@ -233,10 +240,16 @@ function (ele::HydroBucket{nothing,N})(
     config::NamedTuple=NamedTuple(),
     kwargs...
 ) where {N,T}
-    initstates_mat = pas[:initstates]
-    params_mat = pas[:params]
+    ptyidx = get(config, :ptyidx, 1:size(input, 2))
+
+    #* prepare parameter and nn parameter
+    params_len = length(get_param_names(ele))
+    #* convert to matrix (params_len, params_types)
+    params_mat = reshape(Vector(view(pas, :params)), :, params_len)'
+    extract_params_mat = view(params_mat, :, ptyidx)
+
     nn_params_vec = if N
-        vec(pas[:nns])
+        Vector(view(pas, :nns))
     else 
         Vector{eltype(pas)}[]
     end
@@ -245,7 +258,7 @@ function (ele::HydroBucket{nothing,N})(
     ele_output_vec = map(1:size(input, 3)) do i
         input_ = @view input[:, :, i]
         states_ = @view solved_states[:, :, i]
-        reduce(hcat, ele.flux_func.(eachslice(input_, dims=2), eachslice(states_, dims=2), eachslice(params_mat, dims=2), Ref(nn_params_vec)))
+        reduce(hcat, ele.flux_func.(eachslice(input_, dims=2), eachslice(states_, dims=2), eachslice(extract_params_mat, dims=2), Ref(nn_params_vec)))
     end
     reduce((m1, m2) -> cat(m1, m2, dims=3), ele_output_vec)
 end

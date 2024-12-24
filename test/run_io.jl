@@ -31,7 +31,6 @@ soil_ele = HydroBucket(funcs=soil_funcs, dfuncs=soil_dfuncs)
 #! define the Exp-Hydro model
 model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele])
 
-
 @testset "test NamedTupleIOAdapter" begin
     @testset "test single node input" begin
         ioadapter = NamedTupleIOAdapter(model)
@@ -42,10 +41,10 @@ model = HydroModel(name=:exphydro, components=[snow_ele, soil_ele])
     @testset "test multiple node input" begin
         ioadapter = NamedTupleIOAdapter(model)
         node_names = [Symbol(:node_, i) for i in 1:10]
-        node_params = NamedTuple{Tuple(node_names)}(repeat([params], 10))
-        node_initstates = NamedTuple{Tuple(node_names)}(repeat([initstates], 10))
+        node_params = ComponentVector(f=fill(0.0167, 10), Smax=fill(1709.46, 10), Qmax=fill(18.47, 10), Df=fill(2.674, 10), Tmax=fill(0.17, 10), Tmin=fill(-2.09, 10))
+        node_initstates = ComponentVector(snowpack=fill(0.0, 10), soilwater=fill(1303.00, 10))
         node_pas = ComponentVector(params=node_params, initstates=node_initstates)
-        output_ntp = ioadapter(repeat([input_ntp], 10), node_pas, config=(timeidx=ts, ptypes=node_names))
+        output_ntp = ioadapter(repeat([input_ntp], 10), node_pas)
         @test length(output_ntp) == 10
         @test Set(keys(output_ntp[1])) == Set(vcat(HydroModels.get_state_names(model), HydroModels.get_output_names(model)))
     end

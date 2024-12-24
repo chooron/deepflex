@@ -89,40 +89,35 @@ Apply the simple flux model to input data of various dimensions.
 - For 3D array input: A 3D array of flux outputs, with dimensions (output_var_names, node_names, ts_len).
 """
 function (flux::AbstractHydroFlux)(input::AbstractVector, pas::ComponentVector; kwargs...)
-    timeidx = get(kwargs, :timeidx, 1)
-    params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
-    flux.func(input, params_vec, timeidx)
+    params_vec = Vector(view(pas, :params))
+    flux.func(input, params_vec)
 end
 
 function (flux::AbstractHydroFlux)(input::AbstractArray{N,2}, pas::ComponentVector; kwargs...) where {N}
-    timeidx = get(kwargs, :timeidx, collect(1:size(input, 2)))
-    #* check input
-    check_input(flux, input, timeidx)
-    #* check parameters
-    check_parameters(flux, pas)
-    params_vec = collect([pas[:params][nm] for nm in get_param_names(flux)])
-    output_arr = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec), timeidx))
+    params_vec = Vector(view(pas, :params))
+    output_arr = reduce(hcat, flux.func.(eachslice(input, dims=2), Ref(params_vec)))
     output_arr
 end
 
 function (flux::AbstractHydroFlux)(input::AbstractArray{N,3}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {N}
-    #* get kwargs
-    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
-    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-    check_input(flux, input, timeidx)
-    #* check parameters
-    check_parameters(flux, pas, ptypes)
-    #* extract params and nn params
-    params_vec = collect([collect([pas[:params][ptype][pname] for pname in get_param_names(flux)]) for ptype in ptypes])
+    ptyidx = get(config, :ptyidx, 1:size(input, 2))
+    #* prepare parameter and nn parameter
+    params_len = length(get_param_names(flux))
+    #* convert to matrix (params_len, params_types)
+    params_mat = reshape(Vector(view(pas, :params)), :, params_len)'
+    extract_params_mat = view(params_mat, :, ptyidx)
     #* array dims: (var_names * node_names * ts_len)
-    flux_output_vec = [reduce(hcat, flux.func.(eachslice(input[:, :, i], dims=2), params_vec, timeidx[i])) for i in eachindex(timeidx)]
-    if length(flux_output_vec) == 1
-        tmp_output_arr = flux_output_vec[1]
-        flux_output_arr = reshape(tmp_output_arr, size(tmp_output_arr)..., 1)
-    else
-        flux_output_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), flux_output_vec)
+    output_vec = map(1:size(input, 3)) do i
+        input_ = @view input[:, :, i]
+        reduce(hcat, flux.func.(eachslice(input_, dims=2), eachslice(extract_params_mat, dims=2)))
     end
-    flux_output_arr
+    #* if there is only one time step, return the output as a matrix
+    if length(output_vec) == 1
+        tmp_output_arr = output_vec[1]
+        return reshape(tmp_output_arr, size(tmp_output_arr)..., 1)
+    else
+        return reduce((m1, m2) -> cat(m1, m2, dims=3), output_vec)
+    end
 end
 
 

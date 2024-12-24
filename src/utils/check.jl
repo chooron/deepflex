@@ -100,13 +100,65 @@ end
 function process_pas(c::AbstractComponent, pas::ComponentVector, ptypes::AbstractVector{Symbol}, stypes::AbstractVector{Symbol})
     check_pas(c, pas, ptypes, stypes)
     pas_type = eltype(pas)
-    params_names,state_names = get_param_names(c), get_state_names(c)
-    params_mat = isempty(params_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:params][ptype][params_names]) for ptype in ptypes])
-    initstates_mat = isempty(state_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:initstates][stype][state_names]) for stype in stypes])
+    params_names, state_names = get_param_names(c), get_state_names(c)
+
+    unq_ptypes = unique(ptypes)
+    unq_stypes = unique(stypes)
+
+    ptype_indices = [findfirst(isequal(ptype), unq_ptypes) for ptype in ptypes]
+    stype_indices = [findfirst(isequal(stype), unq_stypes) for stype in stypes]
+
+    params_mat  = isempty(params_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:params][ptype][params_names]) for ptype in unq_ptypes])
+    initstates_mat  = isempty(state_names) ? Matrix{pas_type}(undef, 0, 0) : reduce(hcat, [Vector(pas[:initstates][stype][state_names]) for stype in unq_stypes])
+
     new_pas = ComponentVector(
         params=params_mat,
         initstates=initstates_mat,
         nns=haskey(pas, :nns) ? Vector(pas[:nns][HydroModels.get_nn_names(c)]) : Vector{pas_type}(undef,0),
     )
-    return new_pas
+    return new_pas, ptype_indices, stype_indices
+end
+
+function process_pas(c::AbstractComponent, pas::ComponentVector, ptypes::AbstractVector{AbstractVector{Symbol}}, stypes::AbstractVector{AbstractVector{Symbol}})
+    @assert length(c.components) == length(ptypes) == length(stypes) "ptypes and stypes length must be equal to components length"
+    pas_type = eltype(pas)
+    params_names, state_names = get_param_names(c), get_state_names(c)
+
+    unq_ptypes = unique.(ptypes)
+    unq_stypes = unique.(stypes)
+
+    max_len_ptype = maximum(length.(unq_ptypes))
+    max_len_stype = maximum(length.(unq_stypes))
+
+    params_mat = zeros(pas_type, length(params_names), max_len_ptype)
+    initstates_mat = zeros(pas_type, length(state_names), max_len_stype)
+
+    for i in 1:length(c.components)
+        check_pas(c.components[i], pas, ptypes[i], stypes[i])
+        tmp_params_names, tmp_state_names = get_param_names(c.components[i]), get_state_names(c.components[i])
+        tmp_params_indices = [findfirst(isequal(tmp_param_name), params_names) for tmp_param_name in tmp_params_names]
+        tmp_state_indices = [findfirst(isequal(tmp_state_name), state_names) for tmp_state_name in tmp_state_names]
+
+        if !isempty(tmp_params_names)
+            params_mat[tmp_params_indices, 1:length(unq_ptypes[i])] .= [Vector(pas[:params][unq_ptype][tmp_params_names]) for unq_ptype in unq_ptypes[i]]
+        end
+        if !isempty(tmp_state_names)
+            initstates_mat[tmp_params_indices, 1:length(unq_stypes[i])] .= [Vector(pas[:initstates][unq_stype][tmp_state_names]) for unq_stype in unq_stypes[i]]
+        end
+    end
+
+    new_pas = ComponentVector(
+        params=params_mat,
+        initstates=initstates_mat,
+        nns=haskey(pas, :nns) ? Vector(pas[:nns][HydroModels.get_nn_names(c)]) : Vector{pas_type}(undef,0),
+    )
+
+    ptype_indices = map(unq_ptypes) do unq_ptype
+        [findfirst(isequal(ptype), ptypes) for ptype in unq_ptype]
+    end
+    stype_indices = map(unq_stypes) do unq_stype
+        [findfirst(isequal(stype), stypes) for stype in unq_stype]
+    end
+
+    return new_pas, ptype_indices, stype_indices
 end
