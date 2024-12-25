@@ -25,7 +25,6 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 [compat]
 Accessors = "0.1"
 Aqua = "0.8"
-BenchmarkTools = "1"
 ComponentArrays = "0.15"
 DataInterpolations = "6"
 Graphs = "1"
