@@ -4,10 +4,13 @@ using DataFrames
 using ComponentArrays
 using HydroModelTools
 using ModelingToolkit
-using Plots
 
-include("../../src/HydroModels.jl")
-include("../src/models/exphydro.jl")
+include("../src/HydroModels.jl")
+HydroFlux = HydroModels.HydroFlux
+StateFlux = HydroModels.StateFlux
+HydroBucket = HydroModels.HydroBucket
+HydroModel = HydroModels.HydroModel
+include("../models/exphydro.jl")
 
 # define parameters and initial states
 f, Smax, Qmax, Df, Tmax, Tmin = 0.01674478, 1709.461015, 18.46996175, 2.674548848, 0.175739196, -2.092959084
@@ -23,12 +26,10 @@ ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
 
 # run model with single node input
-solver = ODESolver(reltol=1e-3, abstol=1e-3)
+solver = ODESolver()
 adapter = HydroModels.NamedTupleIOAdapter(exphydro_model)
 result = adapter(input, pas, config=(solver=solver, timeidx=ts))
 
-plot(result.flow)
-plot!(df[!, "flow(mm)"])
 # # # run model with multi node input
 # node_num = 10
 # inputs = repeat([input], node_num)

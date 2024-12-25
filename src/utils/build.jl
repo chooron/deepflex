@@ -10,9 +10,7 @@ function build_flux_func(
         #* argument 1: Function calculation parameters
         DestructuredArgs(inputs),
         #* argument 2: Function neuralnetwork parameters
-        DestructuredArgs(params),
-        #* argument 3: Function time variable
-        DestructuredArgs(t)
+        DestructuredArgs(params)
     ]
     call_func = @RuntimeGeneratedFunction(
         toexpr(Func(func_args, [], Let(assign_list, outputs_arr, false)))
@@ -20,28 +18,54 @@ function build_flux_func(
     call_func
 end
 
-function build_rflux_func(
-    input::Num,
+function build_route_func(
+    func::AbstractFlux,
     states::Vector{Num},
-    outputs::Vector{Num},
-    params::Vector{Num},
-    exprs::Vector{Num},
 )
-    assign_list = Assignment.(outputs, exprs)
-    outputs_arr = MakeArray(outputs, Vector)
+    inputs = setdiff(get_input_vars(func), states)
+    func_params = get_param_vars(func)
+    func_nns = get_nnparam_vars(func)
+    assign_list = []
+    output_list = []
+    func_nns_bounds = []
+
+    if func isa AbstractNeuralFlux
+        #* For NeuralFlux, use nn_input to match the input variable
+        push!(assign_list, Assignment(func.nninfos[:inputs], MakeArray(func.inputs, Vector)))
+        #* For NeuralFlux, use nn_output to match the calculation result of nn expr
+        push!(assign_list, Assignment(func.nninfos[:outputs], get_exprs(func)[1]))
+        #* According to the output variable name, match each index of nn_output
+        for (idx, output) in enumerate(get_output_vars(func))
+            push!(assign_list, Assignment(output, func.nninfos[:outputs][idx]))
+            push!(output_list, output)
+        end
+        funcs_nns_len = length.(funcs_nns)
+        start_indices = [1; cumsum(funcs_nns_len)[1:end-1] .+ 1]
+        end_indices = cumsum(funcs_nns_len)
+        func_nns_bounds = [start:stop for (start, stop) in zip(start_indices, end_indices)]
+    else
+        #* According to the output variable name, match each result of the flux exprs
+        for (output, expr) in zip(get_output_vars(func), get_exprs(func))
+            push!(assign_list, Assignment(output, expr))
+            push!(output_list, output)
+        end
+    end
+
     func_args = [
-        DestructuredArgs([input]),
+        DestructuredArgs(inputs, :inputs, inbounds=true),
         #* argument 1: Function calculation parameters
-        DestructuredArgs([states]),
-        #* argument 2: Function neuralnetwork parameters
-        DestructuredArgs([params]),
-        #* argument 3: Function time variable
-        DestructuredArgs(t)
+        DestructuredArgs(states, :states, inbounds=true),
+        #* argument 2: Function calculation parameters
+        DestructuredArgs(func_params, :params, inbounds=true),
+        #* argument 3: Function neuralnetwork parameters
+        DestructuredArgs(func_nns, :nns, inds=func_nns_bounds, inbounds=true),
     ]
-    call_func = @RuntimeGeneratedFunction(
+
+    outputs_arr = MakeArray(output_list, Vector)
+    route_func = @RuntimeGeneratedFunction(
         toexpr(Func(func_args, [], Let(assign_list, outputs_arr, false)))
     )
-    call_func
+    route_func
 end
 
 #* 构建bucket的函数
@@ -59,6 +83,13 @@ function build_ele_func(
     funcs_states = collect(funcs_vars_ntp[meta.states])
     funcs_params = reduce(union, get_param_vars.(funcs))
     funcs_nns = reduce(union, get_nnparam_vars.(funcs))
+    funcs_nns_bounds = []
+    if !isempty(funcs_nns)
+        funcs_nns_len = length.(funcs_nns)
+        start_indices = [1; cumsum(funcs_nns_len)[1:end-1] .+ 1]
+        end_indices = cumsum(funcs_nns_len)
+        funcs_nns_bounds = [start:stop for (start, stop) in zip(start_indices, end_indices)]
+    end
 
     #* Call the method in SymbolicUtils.jl to build the Flux Function
     assign_list = Assignment[]
@@ -85,41 +116,29 @@ function build_ele_func(
         end
     end
     #* convert flux output to array
-    flux_output_array = MakeArray(output_list, Vector)
+    combine_list = vcat(funcs_states, output_list)
+    flux_output_array = MakeArray(combine_list, Vector)
 
     #* Set the input argument of ODE Function
     func_args = [
-        #* argument 1: Function input and state variables
-        DestructuredArgs(vcat(funcs_inputs, funcs_states)),
+        #* argument 1: Function input variables
+        DestructuredArgs(funcs_inputs, :inputs, inbounds=true), 
+        #* argument 2: Function state variables
+        DestructuredArgs(funcs_states, :states, inbounds=true),
         #* argument 2: Function calculation parameters
-        DestructuredArgs(funcs_params),
+        DestructuredArgs(funcs_params, :params, inbounds=true),
         #* argument 3: Function neuralnetwork parameters
-        DestructuredArgs(funcs_nns),
-        #* argument 4: current time idx for time-varying flux
-        DestructuredArgs(t),
+        DestructuredArgs(funcs_nns, :nns, inds=funcs_nns_bounds, inbounds=true),
     ]
 
     #* Construct Flux Function: Func(args, kwargs, body), where body represents the matching formula between each variable and expression
     merged_flux_func = @RuntimeGeneratedFunction(toexpr(Func(func_args, [], Let(assign_list, flux_output_array, false))))
 
-    if length(dfuncs) > 0
+    if !isempty(dfuncs)
         #* convert diff state output to array
         diffst_output_array = MakeArray(reduce(vcat, get_exprs.(dfuncs)), Vector)
-        #* Set the input argument of ODE Function
-        dfunc_args = [
-            #* argument 1: Function input variables
-            DestructuredArgs(funcs_inputs),
-            #* argument 2: Function state variables
-            DestructuredArgs(funcs_states),
-            #* argument 3: Function calculation parameters
-            DestructuredArgs(funcs_params),
-            #* argument 4: Function neuralnetwork parameters
-            DestructuredArgs(funcs_nns),
-            #* argument 5: current time idx for time-varying flux
-            DestructuredArgs(t),
-        ]
         merged_state_func = @RuntimeGeneratedFunction(
-            toexpr(Func(dfunc_args, [], Let(assign_list, diffst_output_array, false)))
+            toexpr(Func(func_args, [], Let(assign_list, diffst_output_array, false)))
         )
     else
         merged_state_func = nothing

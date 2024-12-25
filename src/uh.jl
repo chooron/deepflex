@@ -120,7 +120,7 @@ struct UnitHydrograph{T<:Num,UF<:UHFunction,M<:HydroMeta,ST} <: AbstractHydrogra
     ) where {T<:Num,UF<:UHFunction}
         input = fluxes[1][1]
         output = fluxes[2][1]
-        return UnitHydrograph(input, output, params, uhfunc, solvetype=solvetype)
+        return UnitHydrograph(input, output, params, uhfunc=uhfunc, solvetype=solvetype)
     end
 end
 
@@ -151,14 +151,14 @@ Apply the unit hydrograph flux model to input data of various dimensions.
 
 (::UnitHydrograph)(::AbstractVector, ::ComponentVector; kwargs...) = @error "UnitHydrograph is not support for single timepoint"
 
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
+function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; config::NamedTuple=NamedTuple(), kwargs...) where {T}
     solver = get(config, :solver, ManualSolver{true}())
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
     input_vec = input[1, :]
     #* convert the lagflux to a discrete problem
     lag_du_func(u, p, t) = input_vec[Int(t)] .* p[:weight] .+ [diff(u); -u[end]]
     #* prepare the initial states
-    lag = pas[:params][get_param_names(flux)[1]]
+    lag = Vector(pas)[1]
     uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
     if length(uh_weight) == 0
         @warn "The unit hydrograph weight is empty, please check the unit hydrograph function"
@@ -170,9 +170,9 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArra
     end
 end
 
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
+function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; kwargs...) where {T}
     input_vec = input[1, :]
-    lag = pas[:params][get_param_names(flux)[1]]
+    lag = Vector(pas)[1]
     uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]
 
     if length(uh_weight) == 0
@@ -189,40 +189,33 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{
     end
 end
 
-# todo: 卷积计算的结果与前两个计算结果不太一致
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArray{T,2}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
-    input_vec = input[1, :]
-    itp_method = get(config, :interp, LinearInterpolation)
-    itp = itp_method(input_vec, collect(1:length(input_vec)), extrapolate=true)
-    #* construct the unit hydrograph function based on the interpolation method and parameter
-    lag = pas[:params][get_param_names(flux)[1]]
-    tmax = get_uh_tmax(flux.uhfunc, lag)
-    uh_sum = solve(IntegralProblem(flux.uhfunc, (0, tmax), lag), QuadGKJL()).u
-    uh_itg_func = (x, p) -> flux.uhfunc(x, lag) * itp(p - x) / uh_sum
-    #* solve the integral problem
-    prob = IntegralProblem(uh_itg_func, (0, tmax), 1.0)
-    routed_result = map(1:length(input_vec)) do t
-        prob = remake(prob, p=t)
-        sol = solve(prob, QuadGKJL())
-        sol.u
-    end
-    reshape(routed_result, 1, length(input_vec))
-end
+# # todo: 卷积计算的结果与前两个计算结果不太一致
+# function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:INTEGRAL})(input::AbstractArray{T,2}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
+#     input_vec = input[1, :]
+#     itp_method = get(config, :interp, LinearInterpolation)
+#     itp = itp_method(input_vec, collect(1:length(input_vec)), extrapolate=true)
+#     #* construct the unit hydrograph function based on the interpolation method and parameter
+#     lag = pas[:params][get_param_names(flux)[1]]
+#     tmax = get_uh_tmax(flux.uhfunc, lag)
+#     uh_sum = solve(IntegralProblem(flux.uhfunc, (0, tmax), lag), QuadGKJL()).u
+#     uh_itg_func = (x, p) -> flux.uhfunc(x, lag) * itp(p - x) / uh_sum
+#     #* solve the integral problem
+#     prob = IntegralProblem(uh_itg_func, (0, tmax), 1.0)
+#     routed_result = map(1:length(input_vec)) do t
+#         prob = remake(prob, p=t)
+#         sol = solve(prob, QuadGKJL())
+#         sol.u
+#     end
+#     reshape(routed_result, 1, length(input_vec))
+# end
 
 function (uh::UnitHydrograph)(input::AbstractArray{T,3}, pas::ComponentVector; config::NamedTuple=NamedTuple(), kwargs...) where {T}
     #* array dims: (variable dim, num of node, sequence length)
     #* Extract the initial state of the parameters and routement in the pas variable
-    ptypes = get(config, :ptypes, collect(keys(pas[:params])))
-    timeidx = get(config, :timeidx, collect(1:size(input, 3)))
-    check_input(uh, input, timeidx)
-    check_ptypes(uh, input, ptypes)
-    pytype_params = [pas[:params][ptype] for ptype in ptypes]
-
-    sols = map(eachindex(ptypes)) do (idx)
-        tmp_pas = ComponentVector(params=pytype_params[idx])
-        node_sols = reduce(hcat, uh(input[:, idx, :], tmp_pas))
-        node_sols
-    end
-    sol_arr = reduce((m1, m2) -> cat(m1, m2, dims=3), sols)
-    return permutedims(sol_arr, (1, 3, 2))
+    ptyidx = get(config, :ptyidx, 1:size(input, 2))
+    params = Vector(view(pas, :params))
+    extract_params = reshape(view(params, ptyidx), 1, :)
+    node_sols = uh.(Matrix.(eachslice(input, dims=2)), Vector.(eachslice(extract_params, dims=2)))
+    sol_mat = reduce((m1, m2) -> cat(m1, m2, dims=1), node_sols)
+    return reshape(sol_mat, 1, size(input)[2], size(input)[3])
 end

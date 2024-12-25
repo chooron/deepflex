@@ -9,8 +9,8 @@
     # Parameter: x1 (routing parameter)
     # Using uh_1_half as the unit hydrograph function
     # Solve type: unithydro1 (convolution method)
-    uh1 = HydroModels.UnitHydrograph(q1, q1_routed, x1, uhfunc=uh_func, solvetype=:DISCRETE)
-    uh2 = HydroModels.UnitHydrograph(q1, q1_routed, x1, uhfunc=uh_func, solvetype=:SPARSE)
+    uh1 = HydroModels.UnitHydrograph([q1] => [q1_routed], [x1], uhfunc=uh_func, solvetype=:DISCRETE)
+    uh2 = HydroModels.UnitHydrograph(q1, q1_routed, [x1], uhfunc=uh_func, solvetype=:SPARSE)
     # Test the input names of the router
     @test HydroModels.get_input_names(uh1) == HydroModels.get_input_names(uh2) == [:q1]
     # Test the parameter names of the router
@@ -27,9 +27,7 @@
     # test with multiple nodes
     input_arr = repeat(reshape(input_flow, 1, 1, length(input_flow)), 1, 10, 1)
     ndtypes = [Symbol("node_$i") for i in 1:10]
-    node_params = NamedTuple{Tuple(ndtypes)}(repeat([(x1=3.5,)], 10))
-    node_initstates = NamedTuple{Tuple(ndtypes)}(repeat([NamedTuple()], 10))
-    input_pas = ComponentVector(params=node_params, initstates=node_initstates)
+    input_pas = ComponentVector(params=(x1=fill(3.5, 10),),)
     config = (ptypes=ndtypes, solver=ManualSolver{true}())
     expected_output_arr = repeat(reshape(expected_output, 1, 1, length(expected_output)), 1, 10, 1)
     @test uh1(input_arr, input_pas, config=config) ≈ expected_output_arr atol = 1e-3

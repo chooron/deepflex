@@ -1,9 +1,3 @@
-HydroFlux = HydroModels.HydroFlux
-StateFlux = HydroModels.StateFlux
-NeuralFlux = HydroModels.NeuralFlux
-HydroBucket = HydroModels.HydroBucket
-HydroModel = HydroModels.HydroModel
-
 step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
 #! parameters in the Exp-Hydro model
 @parameters Tmin Tmax Df Smax f Qmax
