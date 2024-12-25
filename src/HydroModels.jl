@@ -33,11 +33,8 @@ using Graphs
 using DataInterpolations
 using DataInterpolations: AbstractInterpolation
 
-# integral
-using Integrals
 # deep learning
 using Lux
-using LuxCore
 using NNlib
 
 ## Abstract Component Types

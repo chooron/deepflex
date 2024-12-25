@@ -11,8 +11,8 @@
     # test with multiple nodes
     input_arr = permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), [2.0 3.0 1.0; 3.0 2.0 2.0] for _ in 1:10), (1, 3, 2))
     ndtypes = [Symbol("node_$i") for i in 1:10]
-    input_pas = ComponentVector(params=NamedTuple{Tuple(ndtypes)}(repeat([(p1=3.0, p2=4.0)], 10)))
-    @test simple_flux_1(input_arr, input_pas, ptypes=ndtypes) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (1, 3, 2))
+    input_pas = ComponentVector(params=(p1=fill(3.0, 10), p2=fill(4.0, 10)))
+    @test simple_flux_1(input_arr, input_pas, config=(;ptyidx=1:10)) == permutedims(reduce((m1, m2) -> cat(m1, m2, dims=3), output_mat for _ in 1:10), (1, 3, 2))
 end
 
 @testset "test state flux (build by Symbolics.jl)" begin
@@ -45,8 +45,6 @@ end
     @test HydroModels.get_output_names(state_flux_3) == Symbol[]
     @test HydroModels.get_state_names(state_flux_3) == [:d,]
 end
-
-
 
 @testset "test neural flux (single output)" begin
     @variables a b c d e

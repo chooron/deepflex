@@ -15,13 +15,13 @@ struct ManualSolver{mutable} end
 
 function (solver::ManualSolver{true})(
     du_func::Function,
-    pas::ComponentVector,
+    pas::AbstractVector,
     initstates::AbstractArray{<:Number, 1},
     timeidx::AbstractVector;
     convert_to_array::Bool=true
 )
     T1 = promote_type(eltype(pas), eltype(initstates))
-    states_results = zeros(T1, size(initstates)..., length(timeidx))
+    states_results = zeros(eltype(initstates), length(initstates), length(timeidx))
     tmp_initstates = copy(initstates)
     for (i, t) in enumerate(timeidx)
         tmp_du = du_func(tmp_initstates, pas, t)
@@ -33,17 +33,18 @@ end
 
 function (solver::ManualSolver{true})(
     du_func::Function,
-    pas::ComponentVector,
+    pas::AbstractVector,
     initstates::AbstractArray{<:Number, 2},
     timeidx::AbstractVector;
     convert_to_array::Bool=true
 )
     T1 = promote_type(eltype(pas), eltype(initstates))
-    states_results = zeros(T1, size(initstates)..., length(timeidx))
+    states_results = zeros(eltype(initstates), size(initstates)..., length(timeidx))
     tmp_initstates = copy(initstates)
     for (i, t) in enumerate(timeidx)
         tmp_du = du_func(tmp_initstates, pas, t)
-        tmp_initstates = tmp_initstates .+ tmp_du
+        tmp_du_mat = reduce(hcat, tmp_du)
+        tmp_initstates = tmp_initstates .+ tmp_du_mat
         states_results[:, :, i] .= tmp_initstates
     end
     states_results
@@ -51,7 +52,7 @@ end
 
 function (solver::ManualSolver{false})(
     du_func::Function,
-    pas::ComponentVector,
+    pas::AbstractVector,
     initstates::AbstractArray{<:Number, 1},
     timeidx::AbstractVector;
     convert_to_array::Bool=true
@@ -68,7 +69,7 @@ end
 
 function (solver::ManualSolver{false})(
     du_func::Function,
-    pas::ComponentVector,
+    pas::AbstractVector,
     initstates::AbstractArray{<:Number, 2},
     timeidx::AbstractVector;
     convert_to_array::Bool=true
