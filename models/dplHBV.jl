@@ -31,32 +31,32 @@ nn_wrapper = HydroModels.NeuralWrapper([prcp, temp, pet] => [BETA, GAMMA], param
 split_flux = HydroFlux([prcp, temp] => [snowfall, rainfall], [TT],
     exprs=[step_func(TT - temp) * prcp, step_func(temp - TT) * prcp])
 #* snowpack bucket
-snow_funcs = [
+snow_fluxes = [
     HydroFlux([temp, snowpack] => [melt], [TT, CFMAX], exprs=[min(snowpack, max(0.0, temp - TT) * CFMAX)]),
     HydroFlux([temp, meltwater] => [refreeze], [TT, CFR, CFMAX], exprs=[min(max((TT - temp), 0.0) * CFR * CFMAX, meltwater)]),
     HydroFlux([meltwater] => [infil], [CWH], exprs=[max(0.0, meltwater - snowpack * CWH)])
 ]
-snow_dfuncs = [StateFlux([snowfall, refreeze] => [melt], snowpack), StateFlux([melt] => [refreeze, infil], meltwater)]
-snow_bucket = HydroBucket(name=:hbv_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_dfluxes = [StateFlux([snowfall, refreeze] => [melt], snowpack), StateFlux([melt] => [refreeze, infil], meltwater)]
+snow_bucket = HydroBucket(name=:hbv_snow, fluxes=snow_fluxes, dfluxes=snow_dfluxes)
 
 #* soilwater bucket
-soil_funcs = [
+soil_fluxes = [
     HydroFlux([infil, rainfall, BETA] => [recharge], [FC], exprs=[(rainfall + infil) * clamp(max(0.0, soilwater / FC)^(BETA * 5 + 1), 0, 1)]),
     HydroFlux([soilwater] => [excess], [FC], exprs=[max(soilwater - FC, 0.0)]),
     HydroFlux([soilwater, pet, GAMMA] => [evap], [LP, FC], exprs=[clamp(max(0.0, soilwater / (LP * FC))^(GAMMA + 1), 0, 1) * pet]),
 ]
-soil_dfuncs = [StateFlux([rainfall, infil] => [recharge, excess, evap], soilwater)]
-soil_bucket = HydroBucket(name=:hbv_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_dfluxes = [StateFlux([rainfall, infil] => [recharge, excess, evap], soilwater)]
+soil_bucket = HydroBucket(name=:hbv_soil, fluxes=soil_fluxes, dfluxes=soil_dfluxes)
 
 #* up and low zone bucket
-zone_funcs = [
+zone_fluxes = [
     HydroFlux([suz] => [perc], [PPERC], exprs=[suz * PPERC]),
     HydroFlux([suz] => [q0], [UZL, k0], exprs=[max(0.0, suz - UZL) * k0]),
     HydroFlux([suz] => [q1], [k1], exprs=[suz * k1]),
     HydroFlux([slz] => [q2], [k2], exprs=[slz * k2]),
     HydroFlux([q0, q1, q2] => [q], exprs=[q0 + q1 + q2]),
 ]
-zone_dfuncs = [StateFlux([recharge, excess] => [perc, q0, q1], suz), StateFlux([perc] => [q2], slz),]
-zone_bucket = HydroBucket(name=:hbv_zone, funcs=zone_funcs, dfuncs=zone_dfuncs)
+zone_dfluxes = [StateFlux([recharge, excess] => [perc, q0, q1], suz), StateFlux([perc] => [q2], slz),]
+zone_bucket = HydroBucket(name=:hbv_zone, fluxes=zone_fluxes, dfluxes=zone_dfluxes)
 dpl_hbv_model = HydroModel(name=:dpl_hbv, components=[nn_wrapper, split_flux, snow_bucket, soil_bucket, zone_bucket])
 

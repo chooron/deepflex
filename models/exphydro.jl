@@ -12,7 +12,7 @@ fluxes_1 = [
     HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 dfluxes_1 = [StateFlux([snowfall] => [melt], snowpack),]
-bucket_1 = HydroBucket(name=:surface, funcs=fluxes_1, dfuncs=dfluxes_1)
+bucket_1 = HydroBucket(name=:surface, fluxes=fluxes_1, dfluxes=dfluxes_1)
 
 fluxes_2 = [
     HydroFlux([soilwater, pet] => [evap], [Smax], exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
@@ -21,8 +21,8 @@ fluxes_2 = [
     HydroFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
 ]
 dfluxes_2 = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-bucket_2 = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
+bucket_2 = HydroBucket(name=:soil, fluxes=fluxes_2, dfluxes=dfluxes_2)
 
 exphydro_model = HydroModel(name=:exphydro, components=[bucket_1, bucket_2]) 
 
-export bucket_1, exphydro_model
+export bucket_1

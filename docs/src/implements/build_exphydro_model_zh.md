@@ -49,7 +49,7 @@ fluxes_1 = [
     HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 dfluxes_1 = [StateFlux([snowfall] => [melt], snowpack),]
-snowpack_bucket = HydroBucket(name=:surface, funcs=fluxes_1, dfuncs=dfluxes_1)
+snowpack_bucket = HydroBucket(name=:surface, fluxes=fluxes_1, dfluxes=dfluxes_1)
 
 # define soilwater bucket
 fluxes_2 = [
@@ -59,7 +59,7 @@ fluxes_2 = [
     HydroFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
 ]
 dfluxes_2 = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-soilwater_bucket = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
+soilwater_bucket = HydroBucket(name=:soil, fluxes=fluxes_2, dfluxes=dfluxes_2)
 
 # define the Exp-Hydro model
 exphydro_model = HydroModel(name=:exphydro, components=[snowpack_bucket, soilwater_bucket])
@@ -111,7 +111,7 @@ fluxes_1 = [
     HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
 ]
 dfluxes_1 = [StateFlux([snowfall] => [melt], snowpack),]
-snowpack_bucket = HydroBucket(name=:surface, funcs=fluxes_1, dfuncs=dfluxes_1)
+snowpack_bucket = HydroBucket(name=:surface, fluxes=fluxes_1, dfluxes=dfluxes_1)
 
 # define soilwater bucket
 fluxes_2 = [
@@ -121,7 +121,7 @@ fluxes_2 = [
     HydroFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
 ]
 dfluxes_2 = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-soilwater_bucket = HydroBucket(name=:soil, funcs=fluxes_2, dfuncs=dfluxes_2)
+soilwater_bucket = HydroBucket(name=:soil, fluxes=fluxes_2, dfluxes=dfluxes_2)
 ```
 
 `HydroBucket`的构建由`HydroFlux`和`StateFlux`组成, 其中`HydroFlux`用于定义模型的计算公式,`StateFlux`用于定义状态变量的平衡方程.

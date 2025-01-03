@@ -1,4 +1,5 @@
 .vscode
+*.cursorrules
 project
 .gitignore
 .cursorrules

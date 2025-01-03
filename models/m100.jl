@@ -33,7 +33,7 @@ m100_nn_params = Vector(ComponentVector(first(Lux.setup(StableRNGs.LehmerRNG(123
 #! get init parameters for each NN
 
 #! define the soil water reservoir
-m100_funcs = [
+m100_fluxes = [
     #* normalize
     HydroFlux([snowpack] => [norm_snw], [snowpack_mean, snowpack_std], exprs=[(snowpack - snowpack_mean) / snowpack_std]),
     HydroFlux([soilwater] => [norm_slw], [soilwater_mean, soilwater_std], exprs=[(soilwater - soilwater_mean) / soilwater_std]),
@@ -43,14 +43,14 @@ m100_funcs = [
     HydroFlux([asinh_melt, snowpack] => [melt], exprs=[relu(sinh(asinh_melt) * step_func(snowpack))]),
 ]
 
-m100_nn_flux = soil_funcs[end-1]
+m100_nn_flux = soil_fluxes[end-1]
 state_expr1 = relu(sinh(asinh_ps)) * step_func(-temp) - melt
 state_expr2 = relu(sinh(asinh_pr)) + melt - step_func(soilwater) * lday * exp(log_evap_div_lday) - step_func(soilwater) * exp(log_flow)
-m100_dfuncs = [
+m100_dfluxes = [
     StateFlux([asinh_ps, temp, melt], snowpack, Num[], expr=state_expr1),
     StateFlux([asinh_pr, melt, soilwater, lday, log_evap_div_lday, log_flow], soilwater, Num[], expr=state_expr2),
 ]
-m100_bucket = HydroBucket(name=:m100_bucket, funcs=m100_funcs, dfuncs=m100_dfuncs)
+m100_bucket = HydroBucket(name=:m100_bucket, fluxes=m100_fluxes, dfluxes=m100_dfluxes)
 m100_bucket.ode_func
 #! define the Exp-Hydro model
 m100_model = HydroModel(name=:m100, components=[m100_bucket]);

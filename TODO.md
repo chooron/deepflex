@@ -8,8 +8,9 @@
 - [ ] Flux output need constraint
 - [ ] Add NoneMeanFlux
 - [ ] **GPU support (limited by scalar index)**
+    - [ ] DataInterpolations.jl is not support for now
 - [ ] meta should store variables and parameters
-- [ ] compact problem
+- [X] compact problem
 - [ ] ensemble model
 - [ ] base merge for component meta
 - [ ] Neural Flux make the gradient computation slow a lot 

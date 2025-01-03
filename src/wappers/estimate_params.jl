@@ -30,28 +30,29 @@ When called, it:
 The estimation process uses the parameter types specified in `ptypes` to organize
 and update the correct parameter groups in the component.
 """
-struct EstimateComponentParams{C<:AbstractComponent,E<:AbstractHydroFlux,P<:Union{AbstractVector{Symbol},Nothing},M<:HydroMeta} <: AbstractHydroWrapper
-    component::C
-    estfuncs::AbstractVector{E}
-    pkeys::P
+struct EstimateComponentParams{N,M<:ComponentVector} <: AbstractHydroWrapper
+    component::AbstractComponent
+    estfuncs::AbstractVector{<:AbstractHydroFlux}
+    pkeys::Union{AbstractVector{Symbol},Nothing}
     meta::M
 
     function EstimateComponentParams(
-        component::C, estfuncs::AbstractVector{E}, pkeys::P=nothing
+        component::C, estfuncs::AbstractVector{E}; pkeys::P=nothing, name::Union{Symbol,Nothing}=nothing
     ) where {C<:AbstractComponent,E<:AbstractHydroFlux,P<:Union{AbstractVector{Symbol},Nothing}}
         @assert length(estfuncs) != 0 "At least one estimation function is required"
         comp_meta = component.meta
-        est_input_names, est_output_names = get_var_names(estfuncs)
-        est_param_names = reduce(union, get_param_names.(estfuncs))
-        # todo: due to ComponentVector merging limitations, arbitrary values still need to be provided for estimated parameters
-        # new_param_names = setdiff(union(comp_meta.params, est_input_names, est_param_names), est_output_names)
-        new_param_names = union(comp_meta.params, est_input_names, est_param_names)
-        new_meta = HydroMeta(comp_meta.name, comp_meta.inputs, comp_meta.outputs, new_param_names, comp_meta.states, comp_meta.nns)
-        return new{C,E,P,typeof(new_meta)}(component, estfuncs, pkeys, new_meta)
+        est_raw_inputs = reduce(union, get_input_vars.(estfuncs))
+        est_outputs = reduce(union, get_output_vars.(estfuncs))
+        est_inputs = setdiff(est_raw_inputs, est_outputs)
+        est_params = reduce(union, get_param_vars.(estfuncs))
+        new_params = setdiff(reduce(union, [comp_meta.params, est_inputs, est_params]), est_outputs)
+        new_meta = ComponentVector(inputs=comp_meta.inputs, params=new_params, outputs=comp_meta.outputs, states=comp_meta.states, nns=comp_meta.nns)
+        name = isnothing(name) ? Symbol("##wrapper#", hash(new_meta)) : name
+        return new{name,typeof(new_meta)}(component, estfuncs, pkeys, new_meta)
     end
 end
 
-function (wrapper::EstimateComponentParams{C,E,P,M})(input::Any, pas::ComponentVector; kwargs...) where {C,E,P<:Nothing,M}
+function (wrapper::EstimateComponentParams)(input::AbstractArray{T,2}, pas::ComponentVector; kwargs...) where {T}
     est_params_ntp = reduce(merge, map(wrapper.estfuncs) do estfunc
         tmp_input = collect(pas[:params][get_input_names(estfunc)])
         tmp_pas = collect(pas[:params][get_param_names(estfunc)])
@@ -62,7 +63,7 @@ function (wrapper::EstimateComponentParams{C,E,P,M})(input::Any, pas::ComponentV
     return output
 end
 
-function (wrapper::EstimateComponentParams{C,E,P,M})(input::Any, pas::ComponentVector; kwargs...) where {C,E,P<:AbstractVector{Symbol},M}
+function (wrapper::EstimateComponentParams)(input::AbstractArray{T,3}, pas::ComponentVector; kwargs...) where {T}
     est_config = (ptypes=wrapper.pkeys,)
     est_params_mat = reduce(vcat, map(wrapper.estfuncs) do estfunc
         tmp_input_mat = reduce(vcat, map(wrapper.pkeys) do pkey

@@ -2,8 +2,8 @@
 using CSV
 using DataFrames
 using ComponentArrays
-using HydroModelTools
 using ModelingToolkit
+using Plots
 
 include("../src/HydroModels.jl")
 HydroFlux = HydroModels.HydroFlux
@@ -24,11 +24,10 @@ data = CSV.File(file_path);
 df = DataFrame(data);
 ts = collect(1:10000)
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"])
+input_arr = Matrix(reduce(hcat, collect(input[HydroModels.get_input_names(exphydro_model)]))')
 
 # run model with single node input
-solver = ODESolver()
-adapter = HydroModels.NamedTupleIOAdapter(exphydro_model)
-result = adapter(input, pas, config=(solver=solver, timeidx=ts))
+result = exphydro_model(input_arr, pas)
 
 # # # run model with multi node input
 # node_num = 10

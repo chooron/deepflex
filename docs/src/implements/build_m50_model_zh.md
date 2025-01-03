@@ -97,16 +97,16 @@ q_nn_flux = NeuralFlux([norm_slw, norm_prcp] => [log_flow], q_nn)
 
 ```julia
 # define the snow pack reservoir
-snow_funcs = [
+snow_fluxes = [
     HydroFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
     HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
     HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * min(snowpack, Df * (temp - Tmax))]),
 ]
-snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+snow_dfluxes = [StateFlux([snowfall] => [melt], snowpack)]
+snow_ele = HydroBucket(name=:exphydro_snow, fluxes=snow_fluxes, dfluxes=snow_dfluxes)
 
 # define the soil water reservoir
-soil_funcs = [
+soil_fluxes = [
     #* normalize
     HydroFlux([snowpack, soilwater, prcp, temp] => [norm_snw, norm_slw, norm_prcp, norm_temp],
         [snowpack_mean, soilwater_mean, prcp_mean, temp_mean, snowpack_std, soilwater_std, prcp_std, temp_std],
@@ -118,8 +118,8 @@ soil_funcs = [
     q_nn_flux
 ]
 state_expr = rainfall + melt - step_func(soilwater) * lday * exp(log_evap_div_lday) - step_func(soilwater) * exp(log_flow)
-soil_dfuncs = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, expr=state_expr)]
-soil_ele = HydroBucket(name=:m50_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+soil_dfluxes = [StateFlux([soilwater, rainfall, melt, lday, log_evap_div_lday, log_flow], soilwater, expr=state_expr)]
+soil_ele = HydroBucket(name=:m50_soil, fluxes=soil_fluxes, dfluxes=soil_dfluxes)
 convert_flux = HydroFlux([log_flow] => [flow], exprs=[exp(log_flow)])
 # define the Exp-Hydro model
 m50_model = HydroModel(name=:m50, components=[snow_ele, soil_ele, convert_flux]);

@@ -15,23 +15,23 @@ step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
     pas = ComponentVector(initstates=initstates, params=params)
 
     #! define the snow pack reservoir
-    snow_funcs = [
+    snow_fluxes = [
         HydroFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
         HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
         HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
-    snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_dfluxes = [StateFlux([snowfall] => [melt], snowpack)]
+    snow_ele = HydroBucket(name=:exphydro_snow, fluxes=snow_fluxes, dfluxes=snow_dfluxes)
 
     #! define the soil water reservoir
-    soil_funcs = [
+    soil_fluxes = [
         HydroFlux([soilwater, pet] => [evap], [Smax], exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
         HydroFlux([soilwater] => [baseflow], [Smax, Qmax, f], exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
         HydroFlux([soilwater] => [surfaceflow], [Smax], exprs=[max(0.0, soilwater - Smax)]),
         HydroFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
     ]
-    soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-    soil_ele = HydroBucket(name=:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+    soil_dfluxes = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
+    soil_ele = HydroBucket(name=:exphydro_soil, fluxes=soil_fluxes, dfluxes=soil_dfluxes)
 
     convertflux = HydroModels.HydroFlux([flow] => [q], [area_coef], exprs=[flow * area_coef])
 
@@ -82,23 +82,23 @@ end
     pas = ComponentVector(initstates=initstates, params=params)
 
     #! define the snow pack reservoir
-    snow_funcs = [
+    snow_fluxes = [
         HydroFlux([temp, lday] => [pet], exprs=[29.8 * lday * 24 * 0.611 * exp((17.3 * temp) / (temp + 237.3)) / (temp + 273.2)]),
         HydroFlux([prcp, temp] => [snowfall, rainfall], [Tmin], exprs=[step_func(Tmin - temp) * prcp, step_func(temp - Tmin) * prcp]),
         HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))]),
     ]
-    snow_dfuncs = [StateFlux([snowfall] => [melt], snowpack)]
-    snow_ele = HydroBucket(name=:exphydro_snow, funcs=snow_funcs, dfuncs=snow_dfuncs)
+    snow_dfluxes = [StateFlux([snowfall] => [melt], snowpack)]
+    snow_ele = HydroBucket(name=:exphydro_snow, fluxes=snow_fluxes, dfluxes=snow_dfluxes)
 
     #! define the soil water reservoir
-    soil_funcs = [
+    soil_fluxes = [
         HydroFlux([soilwater, pet] => [evap], [Smax], exprs=[step_func(soilwater) * pet * min(1.0, soilwater / Smax)]),
         HydroFlux([soilwater] => [baseflow], [Smax, Qmax, f], exprs=[step_func(soilwater) * Qmax * exp(-f * (max(0.0, Smax - soilwater)))]),
         HydroFlux([soilwater] => [surfaceflow], [Smax], exprs=[max(0.0, soilwater - Smax)]),
         HydroFlux([baseflow, surfaceflow] => [flow], exprs=[baseflow + surfaceflow]),
     ]
-    soil_dfuncs = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
-    soil_ele = HydroBucket(name=:exphydro_soil, funcs=soil_funcs, dfuncs=soil_dfuncs)
+    soil_dfluxes = [StateFlux([rainfall, melt] => [evap, flow], soilwater)]
+    soil_ele = HydroBucket(name=:exphydro_soil, fluxes=soil_fluxes, dfluxes=soil_dfluxes)
 
     #! define the routing method
     network = DiGraph(9)

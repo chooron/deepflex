@@ -85,36 +85,30 @@ This structure is designed to be flexible and can be integrated into larger hydr
 to represent various routing processes in different parts of a water system.
 
 """
-struct UnitHydrograph{T<:Num,UF<:UHFunction,M<:HydroMeta,ST} <: AbstractHydrograph
-    "A vector of input variables (Num)"
-    inputs::Vector{T}
-    "A vector of output variables (Num)"
-    outputs::Vector{T}
-    "A vector of parameter variables (Num)"
-    params::Vector{T}
+struct UnitHydrograph{N,M<:ComponentVector,ST} <: AbstractHydrograph
     "The unit hydrograph function"
-    uhfunc::UF
+    uhfunc::UHFunction
     "A named tuple containing information about inputs, outputs, parameters, and states"
     meta::M
 
     function UnitHydrograph(
         input::T,
         output::T,
-        params::AbstractVector{T};
+        params::Vector{T};
         uhfunc::UF,
+        name::Union{Symbol,Nothing}=nothing,
         solvetype::Symbol=:SPARSE,
     ) where {T<:Num,UF<:UHFunction}
-        output_name = Symbolics.tosymbol(output, escape=false)
         @assert solvetype in [:DISCRETE, :SPARSE, :INTEGRAL] "solvetype must be one of [:DISCRETE, :SPARSE, :INTEGRAL]"
         #* Setup the name information of the hydroroutement
-        meta = HydroMeta(inputs=[input], outputs=[output], params=params, name=Symbol(output_name, :_uh))
-
-        return new{T,UF,typeof(meta),solvetype}([input], [output], params, uhfunc, meta)
+        meta = ComponentVector(inputs = [input], outputs = [output], params = params)
+        uh_name = isnothing(name) ? Symbol("##uh#", hash(meta)) : name
+        return new{uh_name,typeof(meta),solvetype}(uhfunc, meta)
     end
 
     function UnitHydrograph(
         fluxes::Pair{Vector{T},Vector{T}},
-        params::AbstractVector{T};
+        params::Vector{T};
         uhfunc::UF,
         solvetype::Symbol=:SPARSE,
     ) where {T<:Num,UF<:UHFunction}
@@ -151,7 +145,7 @@ Apply the unit hydrograph flux model to input data of various dimensions.
 
 (::UnitHydrograph)(::AbstractVector, ::ComponentVector; kwargs...) = @error "UnitHydrograph is not support for single timepoint"
 
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; config::NamedTuple=NamedTuple(), kwargs...) where {T}
+function (flux::UnitHydrograph{N,M,:DISCRETE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; config::NamedTuple=NamedTuple(), kwargs...) where {N,M,T}
     solver = get(config, :solver, ManualSolver{true}())
     timeidx = get(config, :timeidx, collect(1:size(input, 2)))
     input_vec = input[1, :]
@@ -170,7 +164,7 @@ function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:DISCRETE})(input::AbstractArra
     end
 end
 
-function (flux::UnitHydrograph{<:Any,<:Any,<:Any,:SPARSE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; kwargs...) where {T}
+function (flux::UnitHydrograph{N,M,:SPARSE})(input::AbstractArray{T,2}, pas::Union{ComponentVector, AbstractVector}; kwargs...) where {N,M,T}
     input_vec = input[1, :]
     lag = Vector(pas)[1]
     uh_weight = map(t -> flux.uhfunc(t, lag), 1:get_uh_tmax(flux.uhfunc, lag))[1:end-1]

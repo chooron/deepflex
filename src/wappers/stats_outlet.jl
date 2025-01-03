@@ -22,20 +22,19 @@ The wrapper requires that the outlet name exists in the component's node names. 
 
 This is useful for focusing analysis on a particular outlet point in a hydrological network.
 """
-struct ComputeComponentOutlet{C<:AbstractComponent,M<:HydroMeta} <: AbstractHydroWrapper
-    component::C
+struct ComputeComponentOutlet{M<:ComponentVector} <: AbstractHydroWrapper
+    component::AbstractComponent
     outlet::Integer
     meta::M
 
     function ComputeComponentOutlet(component::C, outlet::I) where {C<:AbstractComponent,I<:Integer}
-        new{C,typeof(component.meta)}(component, outlet, component.meta)
+        new{typeof(component.meta)}(component, outlet, component.meta)
     end
 end
 
 function (wrapper::ComputeComponentOutlet)(input::AbstractVector{<:NamedTuple}, pas::ComponentVector; kwargs...)
-    convert_to_ntp = get(kwargs, :convert_to_ntp, true)
     output = wrapper.component(input, pas; kwargs...)
-    return convert_to_ntp ? output[wrapper.outlet] : output[:, wrapper.outlet, :]
+    return output[:, wrapper.outlet, :]
 end
 
 """
@@ -62,35 +61,30 @@ The wrapper requires that the outlet name exists in the component's node names. 
 
 This is useful for focusing analysis on a particular outlet point in a hydrological network.
 """
-struct WeightSumComponentOutlet{C<:AbstractComponent,M<:HydroMeta,T<:Number} <: AbstractHydroWrapper
-    component::C
-    vars::AbstractVector{T}
+struct WeightSumComponentOutlet{N, M<:ComponentVector} <: AbstractHydroWrapper
+    component::AbstractComponent
+    vars::AbstractVector{<:Number}
     meta::M
     weight_names::Symbol
 
     function WeightSumComponentOutlet(component::C, vars::AbstractVector{T}; weight_names::Symbol=:weight) where {C<:AbstractComponent,T<:Num}
-        new_params = vcat(component.meta.param_names, [weight_names])
+        weight_ps = first(@parameters $(weight_names))
+        new_params = vcat(component.meta.params, [weight_ps])
         var_names = Symbolics.tosymbol.(vars)
-        new_meta = HydroMeta(component.meta.name, component.meta.input_names, new_params, var_names, component.meta.state_names, component.meta.nn_names)
-        new{C,typeof(meta),T}(component, vars, new_meta, weight_names)
+        new_meta = ComponentVector(inputs=component.meta.inputs, params=new_params, outputs=var_names, states=component.meta.states, nns=component.meta.nns)
+        name = isnothing(name) ? Symbol("##wrapper#", hash(new_meta)) : name
+        new{name,typeof(new_meta)}(component, vars, new_meta, weight_names)
     end
 end
 
-function (wrapper::WeightSumComponentOutlet)(input::Union{AbstractArray{<:Number,3},AbstractVector{<:NamedTuple}}, pas::ComponentVector; kwargs...)
-    convert_to_ntp = get(kwargs, :convert_to_ntp, true)
+function (wrapper::WeightSumComponentOutlet)(input::AbstractArray{<:Number,3}, pas::ComponentVector; kwargs...)
     output = wrapper.component(input, pas; kwargs...)
     var_names = Symbolics.tosymbol.(wrapper.vars)
     weight_vec = [pas[:params][ptype][wrapper.weight_names] for ptype in wrapper.ptypes]
-    if convert_to_ntp
-        var_vec = map(var_names) do var_nm
-            sum(reduce(hcat, [out[var_nm] .* weight_vec[i] for (i, out) in enumerate(weight_vec)]))
-        end
-        return NamedTuple{Tuple(var_names)}(var_vec)
-    else
-        var_idx = [findfirst(nm -> nm == var_nm, wrapper.component.varnames) for var_nm in var_names]
-        var_vec = map(var_idx) do idx
-            sum([output[idx, i, :] .* weight_vec[i] for i in eachindex(weight_vec)])
-        end
-        return reduce(hcat, var_vec)
+
+    var_idx = [findfirst(nm -> nm == var_nm, wrapper.component.varnames) for var_nm in var_names]
+    var_vec = map(var_idx) do idx
+        sum([output[idx, i, :] .* weight_vec[i] for i in eachindex(weight_vec)])
     end
+    return reduce(hcat, var_vec)
 end

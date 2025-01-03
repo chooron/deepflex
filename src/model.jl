@@ -1,5 +1,5 @@
 """
-    HydroModel <: AbstractModel
+	HydroModel <: AbstractModel
 
 Represents a hydrological model composed of multiple components.
 
@@ -9,7 +9,7 @@ Represents a hydrological model composed of multiple components.
 - `varindices::Vector`: A vector of indices for each component's input, used to map overall model inputs to component-specific inputs.
 
 # Constructor
-    HydroModel(name; components::Vector{<:AbstractComponent})
+	HydroModel(name; components::Vector{<:AbstractComponent})
 
 Constructs a HydroModel with the given name and components.
 
@@ -25,90 +25,96 @@ as inputs to later ones, effectively simulating the hydrological system over tim
 
 Each component's kwargs may be different, include solver, interp
 """
-struct HydroModel{C<:AbstractComponent,M<:HydroMeta} <: AbstractModel
-    "hydrological computation elements"
-    components::Vector{C}
-    "input variables index for each components"
-    varindices::AbstractVector{<:AbstractVector{<:Integer}}
-    "output variables index for sort output variables"
-    outputindices::AbstractVector{<:Integer}
-    "meta data of hydrological model"
-    meta::M
+struct HydroModel{N, M <: ComponentVector} <: AbstractModel
+	"hydrological computation elements"
+	components::Vector{<:AbstractComponent}
+	"input variables index for each components"
+	varindices::AbstractVector{<:AbstractVector{<:Integer}}
+	"output variables index for sort output variables"
+	outputindices::AbstractVector{<:Integer}
+	"meta data of hydrological model"
+	meta::M
 
-    function HydroModel(;
-        name::Symbol,
-        components::Vector{C},
-        sort_components::Bool=false
-    ) where {C<:AbstractComponent}
-        components = sort_components ? sort_components(components) : components
-        input_names, output_names, state_names = get_var_names(components)
-        vcat_names = reduce(vcat, [input_names, state_names, output_names])
-        param_names, nn_names = reduce(union, get_param_names.(components)), reduce(union, get_nn_names.(components))
-        input_idx, output_idx = Vector{Int}[], Int[]
-        var_names = input_names
-        for component in components
-            #* extract input index
-            tmp_input_idx = map((nm) -> findfirst(varnm -> varnm == nm, var_names), get_input_names(component))
-            push!(input_idx, tmp_input_idx)
-            #* extract output index
-            tmp_cpt_vcat_names = vcat(get_state_names(component), get_output_names(component))
-            var_names = vcat(var_names, tmp_cpt_vcat_names)
-            tmp_output_idx = map((nm) -> findfirst(varnm -> varnm == nm, vcat_names), tmp_cpt_vcat_names)
-            output_idx = vcat(output_idx, tmp_output_idx)
-        end
-        model_meta = HydroMeta(name, input_names, output_names, param_names, state_names, nn_names)
-        new{C,typeof(model_meta)}(
-            components,
-            input_idx,
-            output_idx,
-            model_meta,
-        )
-    end
+	function HydroModel(;
+		components::Vector{C},
+		name::Union{Symbol, Nothing} = nothing,
+		sort_components::Bool = false,
+	) where {C <: AbstractComponent}
+		components = sort_components ? sort_components(components) : components
+		model_inputs, model_outputs, model_states = get_all_vars(components)
+		model_params = reduce(union, get_param_vars.(components))
+		model_nns_ntp = reduce(merge, map(flux -> NamedTuple(get_nn_vars(flux)), components))
+		input_idx, output_idx = _prepare_indices(components, model_inputs, vcat(model_inputs, model_states, model_outputs))
+		model_meta = ComponentVector(inputs = model_inputs, outputs = model_outputs, states = model_states, params = model_params, nns = model_nns_ntp)
+		model_name = isnothing(name) ? Symbol("##model#", hash(model_meta)) : name
+		new{model_name, typeof(model_meta)}(
+			components,
+			input_idx,
+			output_idx,
+			model_meta,
+		)
+	end
 end
 
-# 求解并计算
-function (model::HydroModel)(
-    input::AbstractArray{T,2},
-    pas::ComponentVector;
-    config::Union{NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
-    kwargs...
-) where {T<:Number}
-    comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
-    @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
-    fluxes = input
-    params = haskey(pas, :params) ? view(pas, :params) : ComponentVector()
-    initstates = haskey(pas, :initstates) ? view(pas, :initstates) : ComponentVector()
-    nns = haskey(pas, :nns) ? view(pas, :nns) : ComponentVector()
-    for (idx_, (comp_, config_)) in enumerate(zip(model.components, comp_configs))
-        extract_params = view(params, get_param_names(comp_))
-        extract_initstates = view(initstates, get_state_names(comp_))
-        extract_nns = view(nns, get_nn_names(comp_))
-        tmp_pas = ComponentVector(params=extract_params, initstates=extract_initstates, nns=extract_nns)
-        tmp_fluxes = comp_(view(fluxes, model.varindices[idx_], :), tmp_pas; config=config_)
-        fluxes = cat(fluxes, tmp_fluxes, dims=1)
-    end
-    return view(fluxes, model.outputindices, :)
+function _prepare_indices(components::Vector{<:AbstractComponent}, components_inputs::Vector{<:Num}, components_outputs::Vector{<:Num})
+	input_idx, output_idx = Vector{Integer}[], Vector{Integer}()
+	var_names = Symbolics.tosymbol.(components_inputs)
+	vcat_names = Symbolics.tosymbol.(components_outputs)
+	for component in components
+		#* extract input index
+		tmp_input_idx = map((nm) -> findfirst(varnm -> varnm == nm, var_names), get_input_names(component))
+		push!(input_idx, tmp_input_idx)
+		#* extract output index
+		tmp_cpt_vcat_names = vcat(get_state_names(component), get_output_names(component))
+		var_names = vcat(var_names, tmp_cpt_vcat_names)
+		tmp_output_idx = map((nm) -> findfirst(varnm -> varnm == nm, vcat_names), tmp_cpt_vcat_names)
+		output_idx = vcat(output_idx, tmp_output_idx)
+	end
+	return input_idx, output_idx
 end
 
 function (model::HydroModel)(
-    input::AbstractArray{T,3},
-    pas::ComponentVector;
-    config::Union{<:NamedTuple,Vector{<:NamedTuple}}=NamedTuple(),
-    kwargs...
-) where {T<:Number}
-    comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
-    @assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
-    fluxes = input
-    params = haskey(pas, :params) ? view(pas, :params) : ComponentVector()
-    initstates = haskey(pas, :initstates) ? view(pas, :initstates) : ComponentVector()
-    nns = haskey(pas, :nns) ? view(pas, :nns) : ComponentVector()
-    for (idx_, (comp_, config_)) in enumerate(zip(model.components, comp_configs))
-        extract_params = view(params, get_param_names(comp_))
-        extract_initstates = view(initstates, get_state_names(comp_))
-        extract_nns = view(nns, get_nn_names(comp_))
-        tmp_pas = ComponentVector(params=extract_params, initstates=extract_initstates, nns=extract_nns)
-        tmp_fluxes = comp_(view(fluxes, model.varindices[idx_], :, :), tmp_pas; config=config_)
-        fluxes = cat(fluxes, tmp_fluxes, dims=1)
-    end
-    return view(fluxes, model.outputindices, :, :)
+	input::AbstractArray{T, 2},
+	pas::ComponentVector;
+	config::Union{NamedTuple, Vector{<:NamedTuple}} = NamedTuple(),
+	kwargs...,
+) where {T <: Number}
+	comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
+	@assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
+	outputs = input
+	params = haskey(pas, :params) ? view(pas, :params) : ComponentVector()
+	initstates = haskey(pas, :initstates) ? view(pas, :initstates) : ComponentVector()
+	nns = haskey(pas, :nns) ? view(pas, :nns) : ComponentVector()
+	for (idx_, (comp_, config_)) in enumerate(zip(model.components, comp_configs))
+		extract_params = view(params, get_param_names(comp_))
+		extract_initstates = view(initstates, get_state_names(comp_))
+		extract_nns = view(nns, get_nn_names(comp_)) 
+		tmp_pas = ComponentVector(params = extract_params, initstates = extract_initstates, nns = extract_nns)
+		tmp_outputs = comp_(view(outputs, model.varindices[idx_], :), tmp_pas; config = config_)
+		outputs = cat(outputs, tmp_outputs, dims = 1)
+	end
+	return view(outputs, model.outputindices, :)
+end
+
+function (model::HydroModel)(
+	input::AbstractArray{T, 3},
+	pas::ComponentVector;
+	config::Union{<:NamedTuple, Vector{<:NamedTuple}} = NamedTuple(),
+	kwargs...,
+) where {T <: Number}
+	comp_configs = config isa NamedTuple ? fill(config, length(model.components)) : config
+	@assert length(comp_configs) == length(model.components) "component configs length must be equal to components length"
+	outputs = input
+	params = haskey(pas, :params) ? view(pas, :params) : ComponentVector()
+	initstates = haskey(pas, :initstates) ? view(pas, :initstates) : ComponentVector()
+	nns = haskey(pas, :nns) ? view(pas, :nns) : ComponentVector()
+	for (idx_, (comp_, config_)) in enumerate(zip(model.components, comp_configs))
+		extract_params = view(params, get_param_names(comp_))
+		extract_initstates = view(initstates, get_state_names(comp_))
+		extract_nns = view(nns, get_nn_names(comp_))
+		tmp_pas = ComponentVector(params = extract_params, initstates = extract_initstates, nns = extract_nns)
+		tmp_outputs = comp_(view(outputs, model.varindices[idx_], :, :), tmp_pas; config = config_)
+		outputs = cat(outputs, tmp_outputs, dims = 1)
+	end
+	return view(outputs, model.outputindices, :, :)
 end

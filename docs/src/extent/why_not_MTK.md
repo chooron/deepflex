@@ -16,4 +16,4 @@ HydroModels.jl的设计理念事实上是与ModelingToolkit.jl完全一致的,�
 
 ## 未来的工作
 
-不可否认ModelingToolkit.jl是一个非常好的框架,在满足了水文模型的需求之后,我会尽量将HydroModels.jl中的模块能够成为    ModelingToolkitStandardLibrary.jl中相似的模块,并继承ModelingToolkit.jl提供的AbstractSystem类的支持,提供一致的功能支持,从而兼容更多SciML生态的计算功能.
+不可否认ModelingToolkit.jl是一个非常好的框架,在满足了水文模型的需求之后,我会尽量将HydroModels.jl中的模块能够成为ModelingToolkitStandardLibrary.jl中相似的模块,并继承ModelingToolkit.jl提供的AbstractSystem类的支持,提供一致的功能支持,从而兼容更多SciML生态的计算功能.

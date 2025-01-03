@@ -60,13 +60,12 @@ export AbstractFlux, AbstractHydroFlux, AbstractNeuralFlux, AbstractStateFlux
 export AbstractElement, AbstractBucket, AbstractHydrograph, AbstractRoute, AbstractHydroRoute, AbstractModel
 
 # utils
-include("utils/name.jl")
 include("utils/attr.jl")
 include("utils/show.jl")
 include("utils/build.jl")
 include("utils/sort.jl")
 include("utils/check.jl")
-# A discrete ODE solver, if want to use more efficient solver, please import HydroModelTools.jl
+#! A discrete ODE solver, if want to use more efficient solver, please import HydroModelTools.jl
 include("utils/solver.jl")
 export ManualSolver
 
@@ -88,7 +87,7 @@ export EstimateComponentParams
 include("wappers/record_states.jl")
 export RecordComponentState
 include("wappers/neural_wrapper.jl")
-export NeuralWrapper
+export NeuralWrapper2, NeuralWrapper3
 include("wappers/io_adapter.jl")
 export NamedTupleIOAdapter
 include("wappers/stats_outlet.jl")

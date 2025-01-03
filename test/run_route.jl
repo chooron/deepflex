@@ -16,7 +16,7 @@
     pas = ComponentVector(; params, initstates)
     route = HydroModels.GridRoute(rfunc=rflux, rstates=[s_river], flwdir=flwdir, positions=positions)
     @test HydroModels.get_input_names(route) == [:q1]
-    @test HydroModels.get_output_names(route) == [:q_gen,:q1_routed]
+    @test HydroModels.get_output_names(route) == [:q_gen, :q1_routed]
     @test HydroModels.get_param_names(route) == [:lag]
     @test HydroModels.get_state_names(route) == [:s_river]
     

@@ -1,10 +1,11 @@
-struct NamedTupleIOAdapter{C,M} <: AbstractIOAdapter where {C<:AbstractComponent,M<:HydroMeta}
-    component::C
+struct NamedTupleIOAdapter{N,M} <: AbstractIOAdapter where {N,M<:ComponentVector}
+    component::AbstractComponent
     meta::M
 
-    function NamedTupleIOAdapter(component::C) where {C<:AbstractComponent}
+    function NamedTupleIOAdapter(component::C; name::Union{Symbol,Nothing}=nothing) where {C<:AbstractComponent}
         @assert !(typeof(component) isa AbstractIOAdapter) "Component $component is already an IO adapter"
-        new{C,typeof(component.meta)}(component, component.meta)
+        wrapper_name = isnothing(name) ? Symbol("##wrapper#", get_name(component)) : name
+        new{wrapper_name,typeof(component.meta)}(component, component.meta)
     end
 end
 
