@@ -12,7 +12,10 @@ makedocs(
         canonical = "https://chooron.github.io/HydroModels.jl/dev",
         # 配置侧边栏
         collapselevel = 2,
-        sidebar_sitename = true
+        sidebar_sitename = true,
+        # Add icons
+        assets = ["assets/icon.ico"],
+        edit_link = "main"
     ),
     # 配置模块
     modules = [HydroModels],
@@ -20,7 +23,7 @@ makedocs(
     doctest = false,
     linkcheck = true,
     source = "src",
-    build = "build_en",
+    build = "build_en", 
     warnonly = true,
     # 配置页面结构
     pages = [
