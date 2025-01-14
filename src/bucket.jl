@@ -124,7 +124,7 @@ function (ele::HydroBucket{N, M, true})(
 	kwargs...,
 ) where {N, M, T}
 
-#* get kwargs
+	#* get kwargs
 	solver = get(config, :solver, ManualSolver{true}())
 	interp = get(config, :interp, DataInterpolations.LinearInterpolation)
 	timeidx = get(config, :timeidx, collect(1:size(input, 2)))
@@ -134,7 +134,7 @@ function (ele::HydroBucket{N, M, true})(
 	nn_params = isempty(get_nn_vars(ele)) ? Vector{eltype(pas)}[] : Vector(view(pas, :nns)) 
 
 	#* prepare input interpolation
-	itpfunc_list = map((var) -> interp(var, timeidx, extrapolate = true), eachrow(input))
+	itpfunc_list = map((var) -> interp(var, timeidx), eachrow(input))
 	ode_input_func(t) = map(itpfunc -> itpfunc(t), itpfunc_list)
 
 	#* prepare parameter and nn parameter
@@ -201,7 +201,7 @@ function (ele::HydroBucket{N, M, true})(
 
 	#* prepare input function
 	input_reshape = reshape(input, input_dims * num_nodes, time_len)
-	itpfunc_list = interp.(eachslice(input_reshape, dims = 1), Ref(timeidx), extrapolate = true)
+	itpfunc_list = interp.(eachslice(input_reshape, dims = 1), Ref(timeidx))
 	ode_input_func(t) = map(itpfunc -> itpfunc(t), itpfunc_list)
 
 	#* define the ODE function

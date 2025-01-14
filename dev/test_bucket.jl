@@ -4,9 +4,8 @@ using DataFrames
 using ComponentArrays
 using ModelingToolkit
 using Lux
-using BenchmarkTools
-using DataInterpolations
 using CUDA
+using BenchmarkTools
 using Zygote
 
 include("../src/HydroModels.jl")
@@ -26,12 +25,12 @@ pas = ComponentVector(params=params, initstates=init_states)
 file_path = "data/exphydro/01013500.csv"
 data = CSV.File(file_path);
 df = DataFrame(data);
-ts = collect(1:10000)
+ts = collect(1:1000)
 
 # single node input
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]) 
 input_arr = Matrix(reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))')
-results = ele(input_arr, pas)
+@btime results = ele(input_arr, pas)
 
 # multi node input
 node_num = 10
