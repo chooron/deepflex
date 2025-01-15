@@ -3,10 +3,6 @@ using CSV
 using DataFrames
 using ComponentArrays
 using ModelingToolkit
-using Lux
-using CUDA
-using BenchmarkTools
-using Zygote
 
 include("../src/HydroModels.jl")
 
@@ -30,7 +26,7 @@ ts = collect(1:1000)
 # single node input
 input = (lday=df[ts, "dayl(day)"], temp=df[ts, "tmean(C)"], prcp=df[ts, "prcp(mm/day)"]) 
 input_arr = Matrix(reduce(hcat, collect(input[HydroModels.get_input_names(ele)]))')
-@btime results = ele(input_arr, pas)
+results = ele(input_arr, pas)
 
 # multi node input
 node_num = 10

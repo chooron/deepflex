@@ -3,7 +3,6 @@ using CSV
 using DataFrames
 using ComponentArrays
 using ModelingToolkit
-using Plots
 
 include("../src/HydroModels.jl")
 HydroFlux = HydroModels.HydroFlux
@@ -28,6 +27,10 @@ input_arr = Matrix(reduce(hcat, collect(input[HydroModels.get_input_names(exphyd
 
 # run model with single node input
 result = exphydro_model(input_arr, pas)
+
+states_and_output_names = vcat(HydroModels.get_state_names(exphydro_model), HydroModels.get_output_names(exphydro_model))
+output = NamedTuple{Tuple(states_and_output_names)}(eachslice(result, dims=1))
+df = DataFrame(output)
 
 # # # run model with multi node input
 # node_num = 10
