@@ -1,8 +1,8 @@
 # Getting Started With HydroModels.jl
 
-`HydroModels.jl` 是一个基于 Julia 语言的现代水文模型框架.它在 SUPERFLEX 设计理念的基础上进行了扩展和增强,具有灵活的模型构建能力和高效的计算性能,并支持深度学习模型集成.本教程将介绍如何使用 `HydroModels.jl` 构建和运行水文模型.
+`HydroModels.jl` is a modern hydrological modeling framework based on the Julia language. Built upon and extending the SUPERFLEX design philosophy, it offers flexible model construction capabilities, efficient computational performance, and support for deep learning model integration. This tutorial will demonstrate how to build and run hydrological models using `HydroModels.jl`.
 
-## Installation,.
+## Installation
 
 ```julia
 ] add HydroModels
@@ -12,7 +12,7 @@
 
 ### Introduction to ExpHydro Model
 
-ExpHydro 是一个由积雪模块和土壤模块组成的简单水文模型.其数学表达式如下：
+`ExpHydro` is a simple hydrological model consisting of a snow module and a soil module. Its mathematical expressions are as follows.
 
 ```math
 \begin{aligned}
@@ -29,15 +29,10 @@ ExpHydro 是一个由积雪模块和土壤模块组成的简单水文模型.其�
 & surfaceflow = \max(0.0, soilwater - S_{max}) && (8) \\
 & flow = baseflow + ,urfaceflow && (9) \\.
 & \frac{d(soilwater)}{dt} = rainfall + melt - evap - flow && (10)
-\end{aligned},,.
+\end{aligned}
 ```
-,,,.
-其中：
-- $H(x)$ 表示 Heaviside 阶跃函数,当 $x > 0$ 时为 1,否则为 0,.
-- $T_{min}, T_{max}, D_f, S_{max}, Q_{max}, f$ 为模型参数
-- $temp, lday, prcp$ 为输入变量
-- $snowpack, soilwater$ 为状态变量
-- 其他变量为中间计算变量
+
+where $H(x)$ represents the Heaviside step function that equals 1 when $x > 0$ and 0 otherwise; $T_{min}$, $T_{max}$, $D_f$, $S_{max}$, $Q_{max}$, and $f$ are model parameters; $temp$, $lday$, and $prcp$ are input variables; $snowpack$ and $soilwater$ are state variables; and the remaining variables are intermediate calculation variables.
 
 ### Build an ExpHydro Model in HydroModels.jl
 
@@ -327,6 +322,12 @@ The calculation results look like this:
   9999 │  279.714       1.84     0.0       -0.0   1518.29  0.311022  0.27624   0.752073           0.0  0.752073
  10000 │  279.854       0.14     0.0       -0.0   1517.38  0.176836  0.156967  0.740711           0.0  0.740711
 ```
+
+### Plot the Results
+
+The model results are compared with the actual values ​​and plotted into a line graph as follows.
+
+![exphydro model predict](assets/exphydro_predict.png)
 
 ### Running with Config
 

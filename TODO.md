@@ -20,3 +20,5 @@
     1. 多个bucket遍历插值
 - [ ] 针对multiple nodes模型参数的最佳设置方式,需要考虑计算效率, 考虑采用 ComponentVector(params=(p1=[2,3,4], p2=[3,3,4]))
 - [ ] 添加gradient的test
+- [ ] 添加参数检查, 参数默认设置的功能
+- [ ] 添加说明文档
