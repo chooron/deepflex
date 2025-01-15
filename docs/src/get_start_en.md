@@ -18,16 +18,16 @@
 \begin{aligned}
 & \text{Snowpack Bucket:} \\
 & pet = 29.8 \cdot lday \cdot 24 \cdot 0.611 \cdot \frac{\exp(17.3 \cdot temp)}{temp + 237.3} \cdot \frac{1}{temp + 273.2} && (1) \\
-& :nowfall = H(T_{min} - temp) \cdot prcp && (2) \\
+& snowfall = H(T_{min} - temp) \cdot prcp && (2) \\
 & rainfall = H(temp - T_{m,n}) \cdot prcp,&& (3) \\
 & melt = H(temp - T_{max}) \cdot H(snowpack) \cdot \min(snowpack, D_f \cdot (temp - T_{max})) && (4) \\
 & \frac{d(snowpack)}{dt} = snowfall - melt && (5) \\
 \\
-& \text{Soilwater Bucket:} \\,.
+& \text{Soilwater Bucket:} \\
 & evap = H(soilwater) \cdot pet \cdot \min(1.0, \frac{soilwater}{S_{max}}) && (6) \\
 & baseflow = H(soilwater) \cdot Q_{max} \cdot \exp(-f \cdot \max(0.0, S_{max} - soilwater)) && (7) \\
 & surfaceflow = \max(0.0, soilwater - S_{max}) && (8) \\
-& flow = baseflow + ,urfaceflow && (9) \\.
+& flow = baseflow + ,urfaceflow && (9) \\
 & \frac{d(soilwater)}{dt} = rainfall + melt - evap - flow && (10)
 \end{aligned}
 ```
@@ -62,6 +62,9 @@ Define the model parameters, state variables, and other variables (including pre
 Next, we need to construct the various computational formulas of the model, including state equations and intermediate variable calculations. Let's use the snowmelt formula as an example to demonstrate how to use `HydroFlux`:
 
 ```julia
+# define the step function
+step_func(x) = (tanh(5.0 * x) + 1.0) * 0.5
+
 melt_flux = HydroFlux([snowpack, temp] => [melt], [Tmax, Df], exprs=[step_func(temp - Tmax) * step_func(snowpack) * min(snowpack, Df * (temp - Tmax))])
 ```
 
@@ -284,8 +287,6 @@ Then store the parameters and initial states in a single `ComponentVector` (some
 ```julia
 pas = ComponentVector(params=params, initstates=init_states)
 ```
-
-[Would you like me to continue with the next section?]
 
 ### Run the ExpHydro Model
 
