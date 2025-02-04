@@ -30,3 +30,4 @@ docs/.vscode
 *.jl.mem
 
 log
+dev
